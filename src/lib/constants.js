@@ -10,6 +10,20 @@ export const CARGO_LABELS = {
   CHOFER: "Chofer",
 };
 
+// Grupo operativo/organizacional del usuario (sucursal o socios), independiente del
+// campo Area. Se usa para agrupar la lista de Choferes/Usuarios.
+export const GRUPO_OPTIONS = [
+  { value: "SOCIEDAD", label: "Sociedad" },
+  { value: "MILANO_NORD", label: "Milano Nord" },
+  { value: "MILANO_SUD", label: "Milano Sud" },
+  { value: "ROMA", label: "Roma" },
+  { value: "FARMACIA", label: "Farmacia" },
+];
+
+export const GRUPO_LABELS = Object.fromEntries(
+  GRUPO_OPTIONS.map((opt) => [opt.value, opt.label])
+);
+
 export const RECORD_STATUS_OPTIONS = [
   { value: "IN_SOSPESO", label: "En suspenso" },
   { value: "IN_CONSEGNA", label: "En camino" },

@@ -10,7 +10,13 @@ import { StatCard } from "../../components/ui/StatCard";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, CARGO_LABELS, TIPO_DOCUMENTO_OPTIONS } from "../../lib/constants";
+import {
+  AREA_OPTIONS,
+  CARGO_LABELS,
+  GRUPO_LABELS,
+  GRUPO_OPTIONS,
+  TIPO_DOCUMENTO_OPTIONS,
+} from "../../lib/constants";
 import {
   createDocumentRequest,
   listDocumentsRequest,
@@ -33,6 +39,7 @@ const toFormState = (driver) => ({
   correoElectronico: driver.correoElectronico ?? "",
   numeroCelular: driver.numeroCelular ?? "",
   area: driver.area ?? "",
+  grupo: driver.grupo ?? "",
   estado: driver.estado ?? "",
   fechaNacimiento: toDateInputValue(driver.fechaNacimiento),
 });
@@ -286,6 +293,7 @@ export const DriverDetailPage = () => {
         {!editing ? (
           <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <DriverStat label="Cargo" value={CARGO_LABELS[driver.cargo] ?? driver.cargo} />
+            <DriverStat label="Grupo" value={driver.grupo ? GRUPO_LABELS[driver.grupo] : null} />
             <DriverStat label="Area" value={areaLabel(driver.area)} />
             <DriverStat
               label="Estado de la cuenta"
@@ -343,6 +351,15 @@ export const DriverDetailPage = () => {
                 value={form.area}
                 onChange={(v) => setField("area", v)}
                 error={fieldErrors.area?.[0]}
+              />
+              <SearchableSelect
+                id="grupo"
+                label="Grupo"
+                placeholder="Escribe para buscar un grupo"
+                options={GRUPO_OPTIONS}
+                value={form.grupo}
+                onChange={(v) => setField("grupo", v)}
+                error={fieldErrors.grupo?.[0]}
               />
               <SearchableSelect
                 id="estado"
