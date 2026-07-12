@@ -49,6 +49,23 @@ const NavTab = ({ to, label }) => (
   </NavLink>
 );
 
+// Nav inferior fija para pantallas de celular: ocupa todo el ancho, siempre visible
+// arriba del contenido de cada seccion. En desktop se sigue usando el NavTab de arriba.
+const BottomNavTab = ({ to, label }) => (
+  <NavLink
+    to={to}
+    end={to === "/"}
+    className={({ isActive }) =>
+      clsx(
+        "flex flex-1 items-center justify-center py-3 text-[13px] font-medium transition-colors",
+        isActive ? "text-ink-50" : "text-ink-400"
+      )
+    }
+  >
+    {label}
+  </NavLink>
+);
+
 export const AppShell = () => {
   const { user, logout } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
@@ -100,7 +117,7 @@ export const AppShell = () => {
               </button>
             </div>
 
-            <nav className="flex items-center gap-1 rounded-full glass-surface-sm p-1">
+            <nav className="hidden items-center gap-1 rounded-full glass-surface-sm p-1 sm:flex">
               <NavTab to="/" label="Inicio" />
               <NavTab to="/records" label="Registros" />
               {isPrivileged && <NavTab to="/choferes" label="Choferes" />}
@@ -109,10 +126,17 @@ export const AppShell = () => {
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl px-4 pb-16 sm:px-6">
+        <main className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 sm:pb-16">
           <Outlet />
         </main>
       </div>
+
+      <nav className="fixed inset-x-0 bottom-0 z-20 flex w-full items-stretch border-t border-white/10 bg-black/70 backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] sm:hidden">
+        <BottomNavTab to="/" label="Inicio" />
+        <BottomNavTab to="/records" label="Registros" />
+        {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" />}
+        {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" />}
+      </nav>
     </div>
   );
 };
