@@ -1,0 +1,588 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
+import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
+import { GlassCard } from "../../components/ui/GlassCard";
+import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { Spinner } from "../../components/ui/Spinner";
+import { StatusBadge } from "../../components/ui/StatusBadge";
+import { TextField } from "../../components/ui/TextField";
+import { Textarea } from "../../components/ui/Textarea";
+import { useAuth } from "../../context/AuthContext";
+import { parseApiError } from "../../lib/api";
+import { listClientsRequest } from "../../lib/clients.api";
+import { RECORD_STATUS_OPTIONS, TIPO_ARCHIVO_LABELS } from "../../lib/constants";
+import { formatDateTime, toDateTimeInputValue } from "../../lib/format";
+import {
+  getRecordRequest,
+  listRecordFilesRequest,
+  updateRecordRequest,
+  uploadRecordFileRequest,
+} from "../../lib/records.api";
+import { listUsersRequest } from "../../lib/users.api";
+import { listVehiclesRequest } from "../../lib/vehicles.api";
+
+const OPERATIONAL_FIELDS = [
+  "estado",
+  "horasDia",
+  "horasNoche",
+  "tiempoEspera",
+  "comentarios",
+  "kilometrosReales",
+];
+
+// Solo OWNER/ADMIN pueden tocar estos campos; el backend ya lo restringe igual
+// (SELF_EDITABLE_FIELDS en record.service.js), esto es solo para no mandarlos si es CHOFER.
+const OWNER_FIELDS = [
+  "codigo",
+  "clientId",
+  "driverId",
+  "vehicleId",
+  "destinazione",
+  "descripcion",
+  "fechaServicio",
+  "eta",
+  "kilometros",
+  "precioKm",
+  "areaC",
+  "costoEspera",
+  "costoTraforoFrejusBrennero",
+  "peajes",
+  "vignetta",
+  "costoHotel",
+  "pagoRecibido",
+  "costoCombustible",
+  "clienteConfirmado",
+];
+
+const toFormState = (record) => ({
+  estado: record.estado ?? "",
+  horasDia: record.horasDia ?? "",
+  horasNoche: record.horasNoche ?? "",
+  tiempoEspera: record.tiempoEspera ?? "",
+  comentarios: record.comentarios ?? "",
+  kilometrosReales: record.kilometrosReales ?? "",
+  codigo: record.codigo ?? "",
+  clientId: record.client?.id ?? "",
+  driverId: record.driver?.id ?? "",
+  vehicleId: record.vehicle?.id ?? "",
+  destinazione: record.destinazione ?? "",
+  descripcion: record.descripcion ?? "",
+  fechaServicio: toDateTimeInputValue(record.fechaServicio),
+  eta: toDateTimeInputValue(record.eta),
+  kilometros: record.kilometros ?? "",
+  precioKm: record.precioKm ?? "",
+  areaC: record.areaC ?? "",
+  costoEspera: record.costoEspera ?? "",
+  costoTraforoFrejusBrennero: record.costoTraforoFrejusBrennero ?? "",
+  peajes: record.peajes ?? "",
+  vignetta: record.vignetta ?? "",
+  costoHotel: record.costoHotel ?? "",
+  pagoRecibido: record.pagoRecibido ?? "",
+  costoCombustible: record.costoCombustible ?? "",
+  clienteConfirmado: record.clienteConfirmado ?? false,
+});
+
+export const RecordDetailPage = () => {
+  const { id } = useParams();
+  const { user } = useAuth();
+  const isChofer = user?.cargo === "CHOFER";
+
+  const [record, setRecord] = useState(null);
+  const [files, setFiles] = useState([]);
+  const [form, setForm] = useState(null);
+  const [loadError, setLoadError] = useState("");
+
+  const [drivers, setDrivers] = useState(null);
+  const [vehicles, setVehicles] = useState(null);
+  const [clients, setClients] = useState(null);
+
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
+  const load = useCallback(() => {
+    setLoadError("");
+    Promise.all([getRecordRequest(id), listRecordFilesRequest(id)])
+      .then(([recordData, filesData]) => {
+        setRecord(recordData);
+        setForm(toFormState(recordData));
+        setFiles(filesData);
+      })
+      .catch((err) => setLoadError(parseApiError(err).message));
+  }, [id]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useEffect(() => {
+    if (isChofer) return;
+    Promise.all([listUsersRequest(), listVehiclesRequest(), listClientsRequest()])
+      .then(([users, vehiclesData, clientsData]) => {
+        setDrivers(users.filter((u) => u.cargo === "CHOFER" && u.estado === "ACTIVO"));
+        setVehicles(vehiclesData);
+        setClients(clientsData);
+      })
+      .catch((err) => setLoadError(parseApiError(err).message));
+  }, [isChofer]);
+
+  const handleChange = (field) => (e) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.value }));
+
+  const setField = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
+
+  const handleCheckboxChange = (field) => (e) =>
+    setForm((prev) => ({ ...prev, [field]: e.target.checked }));
+
+  const handleSave = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setSaveError("");
+    setSaveSuccess(false);
+
+    const fieldsToSubmit = isChofer ? OPERATIONAL_FIELDS : [...OPERATIONAL_FIELDS, ...OWNER_FIELDS];
+
+    const payload = Object.fromEntries(
+      fieldsToSubmit
+        .map((field) => [field, form[field]])
+        .filter(([, value]) => value !== "" && value !== undefined)
+    );
+
+    try {
+      const updated = await updateRecordRequest(id, payload);
+      setRecord(updated);
+      setForm(toFormState(updated));
+      setSaveSuccess(true);
+    } catch (err) {
+      setSaveError(parseApiError(err).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    setUploading(true);
+    setUploadError("");
+
+    try {
+      const newFile = await uploadRecordFileRequest(id, file, "FOTO_ENTREGA");
+      setFiles((prev) => [newFile, ...prev]);
+    } catch (err) {
+      setUploadError(parseApiError(err).message);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (loadError) {
+    return <Alert>{loadError}</Alert>;
+  }
+
+  const dropdownsLoaded = isChofer || (drivers && vehicles && clients);
+
+  if (!record || !form || !dropdownsLoaded) {
+    return (
+      <div className="flex justify-center py-16">
+        <Spinner className="h-6 w-6 border-white/20 border-t-white" />
+      </div>
+    );
+  }
+
+  const driverOptions = !isChofer
+    ? drivers.map((d) => ({ value: d.id, label: `${d.nombre} ${d.apellido}` }))
+    : [];
+  const vehicleOptions = !isChofer
+    ? vehicles.map((v) => ({ value: v.id, label: `${v.targa} - ${v.modelo}` }))
+    : [];
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <Link to="/records" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
+          &larr; Mis registros
+        </Link>
+      </div>
+
+      <GlassCard>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <span className="text-[13px] font-medium text-ink-400">{record.codigo}</span>
+            <h1 className="mt-0.5 text-[22px] font-semibold text-ink-50">{record.destinazione}</h1>
+          </div>
+          <StatusBadge status={record.estado} />
+        </div>
+
+        <p className="mt-3 text-[15px] text-ink-200">{record.descripcion}</p>
+
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <InfoRow label="Fecha de servicio" value={formatDateTime(record.fechaServicio)} />
+          <InfoRow label="ETA" value={formatDateTime(record.eta)} />
+          <InfoRow
+            label="Vehiculo"
+            value={`${record.vehicle?.targa ?? "-"} - ${record.vehicle?.modelo ?? ""}`}
+          />
+          <InfoRow label="Cliente" value={record.client?.nombre} />
+          <InfoRow
+            label="Chofer"
+            value={`${record.driver?.nombre ?? ""} ${record.driver?.apellido ?? ""}`}
+          />
+        </div>
+
+        <div className="mt-6 border-t border-white/10 pt-6">
+          <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+            Kilometraje
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <InfoRow label="Km planificados" value={record.kilometros ?? "-"} />
+            <InfoRow label="Km reales" value={record.kilometrosReales ?? "-"} />
+            {!isChofer && (
+              <InfoRow
+                label="Diferencia"
+                value={
+                  record.diferenciaKm != null
+                    ? `${record.diferenciaKm > 0 ? "+" : ""}${record.diferenciaKm} km`
+                    : "-"
+                }
+                tone={
+                  record.diferenciaKm > 0 ? "amber" : record.diferenciaKm < 0 ? "blue" : undefined
+                }
+              />
+            )}
+          </div>
+        </div>
+
+        {!isChofer && (
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+              Detalle economico
+            </h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <InfoRow label="Precio/km" value={record.precioKm ?? "-"} />
+              <InfoRow label="Total" value={record.total ?? "-"} />
+            </div>
+          </div>
+        )}
+      </GlassCard>
+
+      <GlassCard>
+        <h2 className="text-[17px] font-medium text-ink-50">Archivos</h2>
+        <p className="mt-1 text-[13px] text-ink-300">
+          {isChofer
+            ? "Sube tu foto de entrega para confirmar el servicio."
+            : "Documentos y comprobantes cargados para este registro."}
+        </p>
+
+        <Alert>{uploadError}</Alert>
+
+        {isChofer && (
+          <label className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl glass-input px-4 py-3 text-[14px] font-medium text-ink-50 hover:bg-white/10">
+            {uploading ? <Spinner /> : "Subir foto de entrega"}
+            <input
+              type="file"
+              accept="image/*,application/pdf"
+              className="hidden"
+              onChange={handleUpload}
+              disabled={uploading}
+            />
+          </label>
+        )}
+
+        <ul className="mt-4 flex flex-col gap-2">
+          {files.length === 0 && (
+            <li className="text-[14px] text-ink-400">Todavia no hay archivos cargados.</li>
+          )}
+          {files.map((file) => (
+            <li key={file.id}>
+              <a
+                href={file.archivoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="flex items-center justify-between rounded-xl glass-surface-sm px-4 py-3 text-[14px] text-ink-50 hover:bg-white/10"
+              >
+                <span>{TIPO_ARCHIVO_LABELS[file.tipoArchivo] ?? file.tipoArchivo}</span>
+                <span className="text-[12px] text-ink-400">{formatDateTime(file.createdAt)}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </GlassCard>
+
+      <GlassCard>
+        <h2 className="text-[17px] font-medium text-ink-50">
+          {isChofer ? "Cargar datos de mi viaje" : "Editar servicio"}
+        </h2>
+        <p className="mt-1 text-[13px] text-ink-300">
+          {isChofer
+            ? "Kilometros reales, horas trabajadas, tiempo de espera y comentarios del servicio."
+            : "Modifica cualquier dato del servicio, incluidos los planificados y economicos."}
+        </p>
+
+        <form className="mt-6 flex flex-col gap-5" onSubmit={handleSave}>
+          {saveSuccess && <Alert variant="success">Cambios guardados correctamente.</Alert>}
+          <Alert>{saveError}</Alert>
+
+          {!isChofer && (
+            <>
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+                <TextField
+                  id="codigo"
+                  label="Codigo"
+                  value={form.codigo}
+                  onChange={handleChange("codigo")}
+                />
+                <ClientAutocomplete
+                  id="clientId"
+                  label="Cliente"
+                  clients={clients}
+                  value={form.clientId}
+                  onChange={(clientId) => setField("clientId", clientId)}
+                  onClientCreated={(client) => setClients((prev) => [...prev, client])}
+                />
+                <SearchableSelect
+                  id="driverId"
+                  label="Chofer"
+                  placeholder="Escribe para buscar un chofer"
+                  options={driverOptions}
+                  value={form.driverId}
+                  onChange={(v) => setField("driverId", v)}
+                />
+                <SearchableSelect
+                  id="vehicleId"
+                  label="Vehiculo"
+                  placeholder="Escribe para buscar un vehiculo"
+                  options={vehicleOptions}
+                  value={form.vehicleId}
+                  onChange={(v) => setField("vehicleId", v)}
+                />
+                <TextField
+                  id="destinazione"
+                  label="Destino"
+                  value={form.destinazione}
+                  onChange={handleChange("destinazione")}
+                />
+                <div />
+                <TextField
+                  id="fechaServicio"
+                  label="Fecha de servicio"
+                  type="datetime-local"
+                  value={form.fechaServicio}
+                  onChange={handleChange("fechaServicio")}
+                />
+                <TextField
+                  id="eta"
+                  label="ETA"
+                  type="datetime-local"
+                  value={form.eta}
+                  onChange={handleChange("eta")}
+                />
+              </div>
+
+              <Textarea
+                id="descripcion"
+                label="Descripcion"
+                value={form.descripcion}
+                onChange={handleChange("descripcion")}
+              />
+            </>
+          )}
+
+          <SearchableSelect
+            id="estado"
+            label="Estado"
+            placeholder="Escribe para buscar un estado"
+            options={RECORD_STATUS_OPTIONS}
+            value={form.estado}
+            onChange={(v) => setField("estado", v)}
+          />
+
+          <TextField
+            id="kilometrosReales"
+            label={`Kilometros reales${record.kilometros != null ? ` (planificado: ${record.kilometros} km)` : ""}`}
+            type="number"
+            step="0.1"
+            min="0"
+            placeholder="Kilometros recorridos"
+            value={form.kilometrosReales}
+            onChange={handleChange("kilometrosReales")}
+          />
+
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <TextField
+              id="horasDia"
+              label="Horas dia"
+              type="number"
+              step="0.5"
+              min="0"
+              value={form.horasDia}
+              onChange={handleChange("horasDia")}
+            />
+            <TextField
+              id="horasNoche"
+              label="Horas noche"
+              type="number"
+              step="0.5"
+              min="0"
+              value={form.horasNoche}
+              onChange={handleChange("horasNoche")}
+            />
+            <TextField
+              id="tiempoEspera"
+              label="Tiempo de espera (h)"
+              type="number"
+              step="0.5"
+              min="0"
+              value={form.tiempoEspera}
+              onChange={handleChange("tiempoEspera")}
+            />
+          </div>
+
+          <Textarea
+            id="comentarios"
+            label="Comentarios"
+            placeholder="Notas sobre el servicio..."
+            value={form.comentarios}
+            onChange={handleChange("comentarios")}
+          />
+
+          {!isChofer && (
+            <div className="border-t border-white/10 pt-5">
+              <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+                Datos economicos (planificados)
+              </h3>
+
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                <TextField
+                  id="kilometros"
+                  label="Kilometros planificados"
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  value={form.kilometros}
+                  onChange={handleChange("kilometros")}
+                />
+                <TextField
+                  id="precioKm"
+                  label="Precio por km"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.precioKm}
+                  onChange={handleChange("precioKm")}
+                />
+                <TextField
+                  id="pagoRecibido"
+                  label="Pago previsto"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.pagoRecibido}
+                  onChange={handleChange("pagoRecibido")}
+                />
+                <TextField
+                  id="costoCombustible"
+                  label="Costo combustible"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.costoCombustible}
+                  onChange={handleChange("costoCombustible")}
+                />
+                <TextField
+                  id="peajes"
+                  label="Peajes"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.peajes}
+                  onChange={handleChange("peajes")}
+                />
+                <TextField
+                  id="vignetta"
+                  label="Vignetta"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.vignetta}
+                  onChange={handleChange("vignetta")}
+                />
+                <TextField
+                  id="costoHotel"
+                  label="Costo de hotel"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.costoHotel}
+                  onChange={handleChange("costoHotel")}
+                />
+                <TextField
+                  id="costoTraforoFrejusBrennero"
+                  label="Traforo Frejus/Brennero"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.costoTraforoFrejusBrennero}
+                  onChange={handleChange("costoTraforoFrejusBrennero")}
+                />
+                <TextField
+                  id="areaC"
+                  label="Area C"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.areaC}
+                  onChange={handleChange("areaC")}
+                />
+                <TextField
+                  id="costoEspera"
+                  label="Costo de espera"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.costoEspera}
+                  onChange={handleChange("costoEspera")}
+                />
+              </div>
+
+              <label className="mt-5 flex w-fit items-center gap-2 text-[14px] text-ink-200">
+                <input
+                  type="checkbox"
+                  checked={form.clienteConfirmado}
+                  onChange={handleCheckboxChange("clienteConfirmado")}
+                  className="h-4 w-4 rounded border-white/20 bg-transparent accent-accent-500"
+                />
+                Cliente confirmado
+              </label>
+            </div>
+          )}
+
+          <Button type="submit" loading={saving} className="sm:w-auto sm:px-8">
+            Guardar cambios
+          </Button>
+        </form>
+      </GlassCard>
+    </div>
+  );
+};
+
+const TONE_CLASSES = {
+  amber: "text-amber-300",
+  blue: "text-accent-300",
+};
+
+const InfoRow = ({ label, value, tone }) => (
+  <div className="glass-surface-sm rounded-xl px-4 py-3">
+    <span className="block text-[12px] uppercase tracking-wide text-ink-400">{label}</span>
+    <span className={`mt-0.5 block text-[15px] ${TONE_CLASSES[tone] ?? "text-ink-50"}`}>
+      {value || "-"}
+    </span>
+  </div>
+);
