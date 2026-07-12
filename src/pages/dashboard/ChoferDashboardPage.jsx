@@ -5,8 +5,8 @@ import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatCard } from "../../components/ui/StatCard";
-import { StatusBadge } from "../../components/ui/StatusBadge";
 import { parseApiError } from "../../lib/api";
+import { RECORD_STATUS_LABELS, RECORD_STATUS_TONE } from "../../lib/constants";
 import {
   computeCurrentServices,
   computeMyServiceCounts,
@@ -14,6 +14,16 @@ import {
 } from "../../lib/dashboardStats";
 import { formatDateTime } from "../../lib/format";
 import { listRecordsRequest, updateRecordRequest, uploadRecordFileRequest } from "../../lib/records.api";
+
+// Solo el color de texto del estado, sin fondo ni borde (se usa en el resumen simple).
+const STATUS_TEXT_TONE = {
+  amber: "text-amber-300",
+  blue: "text-accent-300",
+  green: "text-[#4ddb6e]",
+  slate: "text-ink-300",
+  purple: "text-fuchsia-300",
+  red: "text-[#ff6961]",
+};
 
 export const ChoferDashboardPage = () => {
   const [records, setRecords] = useState(null);
@@ -91,40 +101,35 @@ export const ChoferDashboardPage = () => {
         ) : (
           <div className="mt-4 flex flex-col divide-y divide-white/10">
             {currentServices.map((service) => (
-              <div key={service.id} className="py-5 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div>
-                    <span className="text-[13px] font-medium text-ink-400">{service.codigo}</span>
-                    <h3 className="mt-0.5 text-[19px] font-medium text-ink-50">
-                      {service.destinazione}
-                    </h3>
-                  </div>
-                  <StatusBadge status={service.estado} />
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-                  <StatCard label="Cliente" value={service.client?.nombre ?? "-"} />
-                  <StatCard label="Fecha" value={formatDateTime(service.fechaServicio)} />
-                  <StatCard
-                    label="Vehiculo"
-                    value={`${service.vehicle?.targa ?? "-"} - ${service.vehicle?.modelo ?? ""}`}
-                  />
-                </div>
+              <div key={service.id} className="py-4 first:pt-0 last:pb-0">
+                <p className="text-[13px] text-ink-200">
+                  <span className="font-medium text-ink-50">
+                    {service.codigo} — {service.destinazione}
+                  </span>{" "}
+                  <span className={STATUS_TEXT_TONE[RECORD_STATUS_TONE[service.estado]]}>
+                    ({RECORD_STATUS_LABELS[service.estado] || service.estado})
+                  </span>
+                </p>
+                <p className="mt-1 text-[12px] text-ink-400">
+                  Cliente: {service.client?.nombre ?? "-"} &middot; Fecha:{" "}
+                  {formatDateTime(service.fechaServicio)} &middot; Vehiculo:{" "}
+                  {service.vehicle?.targa ?? "-"} - {service.vehicle?.modelo ?? ""}
+                </p>
 
                 <Alert>{finishErrors[service.id]}</Alert>
                 <Alert>{uploadErrors[service.id]}</Alert>
 
-                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                <div className="mt-3 flex flex-wrap items-center gap-3">
                   <Button
                     onClick={handleFinish(service.id)}
                     loading={finishingId === service.id}
-                    className="sm:w-auto sm:px-6"
+                    className="sm:w-auto sm:px-5 sm:py-2 sm:text-[13px]"
                   >
                     Finalizar servicio
                   </Button>
 
-                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-full glass-surface-sm px-6 py-3 text-[15px] font-medium text-ink-50 hover:bg-white/10 sm:w-auto">
-                    {uploadingId === service.id ? <Spinner /> : "Subir evidencia"}
+                  <label className="flex cursor-pointer items-center gap-2 rounded-full glass-surface-sm px-5 py-2 text-[13px] font-medium text-ink-50 hover:bg-white/10">
+                    {uploadingId === service.id ? <Spinner className="h-3.5 w-3.5" /> : "Subir evidencia"}
                     <input
                       type="file"
                       accept="image/*,application/pdf"
@@ -136,7 +141,7 @@ export const ChoferDashboardPage = () => {
 
                   <Link
                     to={`/records/${service.id}`}
-                    className="flex items-center justify-center px-2 text-[13px] font-medium text-accent-400 hover:text-accent-300"
+                    className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
                   >
                     Ver detalle completo &rarr;
                   </Link>
