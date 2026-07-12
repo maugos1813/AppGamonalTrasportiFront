@@ -47,10 +47,11 @@ export const RECORD_STATUS_TONE = {
   ANNULLATO: "red",
 };
 
-// Division de la seccion Registros en 2 pestanias. RITIRATO y RISCHEDULATO siguen
-// requiriendo accion (igual que en "Pendientes" del dashboard), por eso van en proceso.
-export const EN_PROCESO_STATUSES = ["IN_SOSPESO", "IN_CONSEGNA", "RITIRATO", "RISCHEDULATO"];
-export const TERMINADOS_STATUSES = ["CONSEGNATO", "ANNULLATO"];
+// Division de la seccion Registros en 2 pestanias, y de "Servicio actual" en el
+// dashboard del chofer. RISCHEDULATO se considera terminado (queda para
+// reprogramarse como un nuevo servicio, no sigue abierto).
+export const EN_PROCESO_STATUSES = ["IN_SOSPESO", "IN_CONSEGNA", "RITIRATO"];
+export const TERMINADOS_STATUSES = ["CONSEGNATO", "ANNULLATO", "RISCHEDULATO"];
 
 // Paleta categorica validada (contraste + separacion CVD) para el grafico de
 // estados en el dashboard OWNER. Mismo orden que RECORD_STATUS_OPTIONS.

@@ -8,7 +8,7 @@ import { StatCard } from "../../components/ui/StatCard";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { parseApiError } from "../../lib/api";
 import {
-  computeCurrentService,
+  computeCurrentServices,
   computeMyServiceCounts,
   computeWorkHours,
 } from "../../lib/dashboardStats";
@@ -19,10 +19,10 @@ export const ChoferDashboardPage = () => {
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
 
-  const [finishing, setFinishing] = useState(false);
-  const [finishError, setFinishError] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const [finishingId, setFinishingId] = useState(null);
+  const [finishErrors, setFinishErrors] = useState({});
+  const [uploadingId, setUploadingId] = useState(null);
+  const [uploadErrors, setUploadErrors] = useState({});
 
   const load = useCallback(() => {
     setError("");
@@ -45,38 +45,37 @@ export const ChoferDashboardPage = () => {
     );
   }
 
-  const currentService = computeCurrentService(records);
+  const currentServices = computeCurrentServices(records);
   const myServiceCounts = computeMyServiceCounts(records);
   const workHours = computeWorkHours(records);
 
-  const handleFinish = async () => {
-    if (!currentService) return;
-    setFinishing(true);
-    setFinishError("");
+  const handleFinish = (recordId) => async () => {
+    setFinishingId(recordId);
+    setFinishErrors((prev) => ({ ...prev, [recordId]: "" }));
     try {
-      const updated = await updateRecordRequest(currentService.id, { estado: "CONSEGNATO" });
+      const updated = await updateRecordRequest(recordId, { estado: "CONSEGNATO" });
       setRecords((prev) => prev.map((r) => (r.id === updated.id ? updated : r)));
     } catch (err) {
-      setFinishError(parseApiError(err).message);
+      setFinishErrors((prev) => ({ ...prev, [recordId]: parseApiError(err).message }));
     } finally {
-      setFinishing(false);
+      setFinishingId(null);
     }
   };
 
-  const handleUpload = async (e) => {
+  const handleUpload = (recordId) => async (e) => {
     const file = e.target.files?.[0];
     e.target.value = "";
-    if (!file || !currentService) return;
+    if (!file) return;
 
-    setUploading(true);
-    setUploadError("");
+    setUploadingId(recordId);
+    setUploadErrors((prev) => ({ ...prev, [recordId]: "" }));
     try {
-      await uploadRecordFileRequest(currentService.id, file, "FOTO_ENTREGA");
+      await uploadRecordFileRequest(recordId, file, "FOTO_ENTREGA");
       load();
     } catch (err) {
-      setUploadError(parseApiError(err).message);
+      setUploadErrors((prev) => ({ ...prev, [recordId]: parseApiError(err).message }));
     } finally {
-      setUploading(false);
+      setUploadingId(null);
     }
   };
 
@@ -85,63 +84,66 @@ export const ChoferDashboardPage = () => {
       <GlassCard>
         <h2 className="text-[17px] font-medium text-ink-50">Servicio actual</h2>
 
-        {!currentService ? (
+        {currentServices.length === 0 ? (
           <p className="mt-4 text-[14px] text-ink-300">
-            No tienes un servicio en curso ni programado para hoy.
+            No tienes servicios en curso ni pendientes.
           </p>
         ) : (
-          <>
-            <div className="mt-4 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <span className="text-[13px] font-medium text-ink-400">{currentService.codigo}</span>
-                <h3 className="mt-0.5 text-[19px] font-medium text-ink-50">
-                  {currentService.destinazione}
-                </h3>
+          <div className="mt-4 flex flex-col divide-y divide-white/10">
+            {currentServices.map((service) => (
+              <div key={service.id} className="py-5 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[13px] font-medium text-ink-400">{service.codigo}</span>
+                    <h3 className="mt-0.5 text-[19px] font-medium text-ink-50">
+                      {service.destinazione}
+                    </h3>
+                  </div>
+                  <StatusBadge status={service.estado} />
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <StatCard label="Cliente" value={service.client?.nombre ?? "-"} />
+                  <StatCard label="Fecha" value={formatDateTime(service.fechaServicio)} />
+                  <StatCard
+                    label="Vehiculo"
+                    value={`${service.vehicle?.targa ?? "-"} - ${service.vehicle?.modelo ?? ""}`}
+                  />
+                </div>
+
+                <Alert>{finishErrors[service.id]}</Alert>
+                <Alert>{uploadErrors[service.id]}</Alert>
+
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <Button
+                    onClick={handleFinish(service.id)}
+                    loading={finishingId === service.id}
+                    className="sm:w-auto sm:px-6"
+                  >
+                    Finalizar servicio
+                  </Button>
+
+                  <label className="flex cursor-pointer items-center justify-center gap-2 rounded-full glass-surface-sm px-6 py-3 text-[15px] font-medium text-ink-50 hover:bg-white/10 sm:w-auto">
+                    {uploadingId === service.id ? <Spinner /> : "Subir evidencia"}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      className="hidden"
+                      onChange={handleUpload(service.id)}
+                      disabled={uploadingId === service.id}
+                    />
+                  </label>
+
+                  <Link
+                    to={`/records/${service.id}`}
+                    className="flex items-center justify-center px-2 text-[13px] font-medium text-accent-400 hover:text-accent-300"
+                  >
+                    Ver detalle completo &rarr;
+                  </Link>
+                </div>
               </div>
-              <StatusBadge status={currentService.estado} />
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <StatCard label="Cliente" value={currentService.client?.nombre ?? "-"} />
-              <StatCard label="Fecha" value={formatDateTime(currentService.fechaServicio)} />
-              <StatCard
-                label="Vehiculo"
-                value={`${currentService.vehicle?.targa ?? "-"} - ${currentService.vehicle?.modelo ?? ""}`}
-              />
-            </div>
-
-            <Alert>{finishError}</Alert>
-            <Alert>{uploadError}</Alert>
-
-            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-              <Button
-                onClick={handleFinish}
-                loading={finishing}
-                disabled={currentService.estado === "CONSEGNATO"}
-                className="sm:w-auto sm:px-6"
-              >
-                Finalizar servicio
-              </Button>
-
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-full glass-surface-sm px-6 py-3 text-[15px] font-medium text-ink-50 hover:bg-white/10 sm:w-auto">
-                {uploading ? <Spinner /> : "Subir evidencia"}
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  className="hidden"
-                  onChange={handleUpload}
-                  disabled={uploading}
-                />
-              </label>
-
-              <Link
-                to={`/records/${currentService.id}`}
-                className="flex items-center justify-center px-2 text-[13px] font-medium text-accent-400 hover:text-accent-300"
-              >
-                Ver detalle completo &rarr;
-              </Link>
-            </div>
-          </>
+            ))}
+          </div>
         )}
       </GlassCard>
 

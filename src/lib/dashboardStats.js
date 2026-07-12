@@ -1,3 +1,5 @@
+import { EN_PROCESO_STATUSES } from "./constants";
+
 const isSameDay = (a, b) => {
   const dateA = new Date(a);
   const dateB = new Date(b);
@@ -128,11 +130,16 @@ export const computeCurrentService = (records, now = new Date()) => {
   return proximosHoy[0] ?? null;
 };
 
-const PENDIENTE_STATUSES = ["IN_CONSEGNA", "IN_SOSPESO", "RITIRATO"];
+// Todos los servicios en curso o pendientes de accion (IN_CONSEGNA, IN_SOSPESO,
+// RITIRATO), para el listado completo de "Servicio actual" del chofer.
+export const computeCurrentServices = (records) =>
+  records
+    .filter((r) => EN_PROCESO_STATUSES.includes(r.estado))
+    .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
 export const computeMyServiceCounts = (records, now = new Date()) => ({
   hoy: records.filter((r) => isSameDay(r.fechaServicio, now)).length,
-  pendientes: records.filter((r) => PENDIENTE_STATUSES.includes(r.estado)).length,
+  pendientes: records.filter((r) => EN_PROCESO_STATUSES.includes(r.estado)).length,
   completados: records.filter((r) => r.estado === "CONSEGNATO").length,
   cancelados: records.filter((r) => r.estado === "ANNULLATO").length,
 });
