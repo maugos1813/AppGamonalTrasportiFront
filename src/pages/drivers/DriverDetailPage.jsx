@@ -7,6 +7,7 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatCard } from "../../components/ui/StatCard";
+import { Switch } from "../../components/ui/Switch";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
@@ -40,6 +41,7 @@ const toFormState = (driver) => ({
   numeroCelular: driver.numeroCelular ?? "",
   area: driver.area ?? "",
   grupo: driver.grupo ?? "",
+  cargo: driver.cargo ?? "CHOFER",
   estado: driver.estado ?? "",
   fechaNacimiento: toDateInputValue(driver.fechaNacimiento),
 });
@@ -380,6 +382,34 @@ export const DriverDetailPage = () => {
                 required
               />
             </div>
+
+            {driver.id !== user.id && (
+              <div className="border-t border-white/10 pt-5">
+                <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+                  Permisos
+                </h3>
+                <div className="flex flex-col gap-4">
+                  <Switch
+                    id="cargo-admin"
+                    label="Administrador"
+                    description="Puede gestionar choferes, vehiculos y registros de toda la empresa."
+                    checked={form.cargo === "ADMIN" || form.cargo === "OWNER"}
+                    onChange={(checked) =>
+                      setField("cargo", checked ? (form.cargo === "OWNER" ? "OWNER" : "ADMIN") : "CHOFER")
+                    }
+                  />
+                  {user.cargo === "OWNER" && (
+                    <Switch
+                      id="cargo-owner"
+                      label="Propietario"
+                      description="Acceso total, incluida la asignacion de otros propietarios."
+                      checked={form.cargo === "OWNER"}
+                      onChange={(checked) => setField("cargo", checked ? "OWNER" : "ADMIN")}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="flex flex-col gap-3 sm:flex-row">
               <Button type="submit" loading={saving} className="sm:w-auto sm:px-8">
