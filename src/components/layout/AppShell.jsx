@@ -34,6 +34,70 @@ const LogoutIcon = (props) => (
   </svg>
 );
 
+const HomeIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M3 11.5 12 4l9 7.5" />
+    <path d="M5.5 10v9a1 1 0 0 0 1 1h4v-6h3v6h4a1 1 0 0 0 1-1v-9" />
+  </svg>
+);
+
+const ListIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <rect x="4" y="3" width="16" height="18" rx="2" />
+    <path d="M8 8h8M8 12h8M8 16h5" />
+  </svg>
+);
+
+const UsersIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M2.5 20c0-3.4 3-5 6.5-5s6.5 1.6 6.5 5" />
+    <circle cx="17.5" cy="9" r="2.5" />
+    <path d="M15.8 20c.1-2.6 1.6-4.2 3.7-4.6" />
+  </svg>
+);
+
+const TruckIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M2 7h11v9H2z" />
+    <path d="M13 10h4l3.5 3.5V16h-7.5" />
+    <circle cx="6.5" cy="18" r="1.8" />
+    <circle cx="17" cy="18" r="1.8" />
+  </svg>
+);
+
 const NavTab = ({ to, label }) => (
   <NavLink
     to={to}
@@ -51,17 +115,18 @@ const NavTab = ({ to, label }) => (
 
 // Nav inferior fija para pantallas de celular: ocupa todo el ancho, siempre visible
 // arriba del contenido de cada seccion. En desktop se sigue usando el NavTab de arriba.
-const BottomNavTab = ({ to, label }) => (
+const BottomNavTab = ({ to, label, icon: Icon }) => (
   <NavLink
     to={to}
     end={to === "/"}
     className={({ isActive }) =>
       clsx(
-        "flex flex-1 items-center justify-center py-3 text-[13px] font-medium transition-colors",
+        "flex flex-1 flex-col items-center justify-center gap-1 py-3.5 text-[11px] font-medium transition-colors",
         isActive ? "text-ink-50" : "text-ink-400"
       )
     }
   >
+    <Icon className="h-6 w-6" />
     {label}
   </NavLink>
 );
@@ -126,16 +191,16 @@ export const AppShell = () => {
           </div>
         </header>
 
-        <main className="mx-auto max-w-5xl px-4 pb-24 sm:px-6 sm:pb-16">
+        <main className="mx-auto max-w-5xl px-4 pb-28 sm:px-6 sm:pb-16">
           <Outlet />
         </main>
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 flex w-full items-stretch border-t border-white/10 bg-black/70 backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] sm:hidden">
-        <BottomNavTab to="/" label="Inicio" />
-        <BottomNavTab to="/records" label="Registros" />
-        {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" />}
-        {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" />}
+        <BottomNavTab to="/" label="Inicio" icon={HomeIcon} />
+        <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
+        {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
+        {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
       </nav>
     </div>
   );
