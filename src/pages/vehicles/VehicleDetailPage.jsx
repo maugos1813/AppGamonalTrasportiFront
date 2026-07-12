@@ -52,8 +52,18 @@ const TruckIcon = ({ className }) => (
   </svg>
 );
 
-// Fila de un documento del vehiculo: atenuada si falta, con selector de archivo en edicion.
-const VehicleDocumentField = ({ label, url, editing, fileName, onFileChange }) => {
+// Fila de un documento del vehiculo: atenuada si falta, con selector de archivo y su propia
+// fecha de vencimiento (poliza para Assicurazione, revision tecnica para Libreto).
+const VehicleDocumentField = ({
+  label,
+  url,
+  editing,
+  fileName,
+  onFileChange,
+  dateLabel,
+  dateValue,
+  onDateChange,
+}) => {
   const hasDoc = Boolean(url) || Boolean(fileName);
   return (
     <div className={`glass-surface-sm rounded-xl px-4 py-3 ${hasDoc ? "" : "opacity-40"}`}>
@@ -79,6 +89,28 @@ const VehicleDocumentField = ({ label, url, editing, fileName, onFileChange }) =
           <input type="file" accept="application/pdf" className="hidden" onChange={onFileChange} />
         </label>
       )}
+
+      <div className="mt-2 border-t border-white/10 pt-2">
+        {editing ? (
+          <label className="flex items-center gap-2">
+            <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-400">
+              {dateLabel}
+            </span>
+            <input
+              type="date"
+              value={dateValue}
+              onChange={onDateChange}
+              className="glass-input w-full rounded-lg px-2 py-1 text-[13px] text-ink-50"
+            />
+          </label>
+        ) : (
+          <span
+            className={`block text-[12px] ${dateValue ? "text-ink-300" : "text-ink-400 opacity-60"}`}
+          >
+            {dateLabel}: {dateValue ? formatDate(dateValue) : "Sin completar"}
+          </span>
+        )}
+      </div>
     </div>
   );
 };
@@ -240,11 +272,6 @@ export const VehicleDetailPage = () => {
           <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <VehicleStat label="Area" value={areaLabel(vehicle.area)} />
             <VehicleStat label="Grupo" value={vehicle.grupo ? grupoLabel(vehicle.grupo) : null} />
-            <VehicleStat label="Vencimiento poliza" value={vehicle.poliza ? formatDate(vehicle.poliza) : null} />
-            <VehicleStat
-              label="Revision tecnica"
-              value={vehicle.rTecnica ? formatDate(vehicle.rTecnica) : null}
-            />
           </div>
         ) : (
           <form className="mt-8 flex flex-col gap-5" onSubmit={handleSave}>
@@ -294,22 +321,6 @@ export const VehicleDetailPage = () => {
                 onChange={(v) => setField("estado", v)}
                 error={fieldErrors.estado?.[0]}
               />
-              <TextField
-                id="poliza"
-                label="Vencimiento poliza"
-                type="date"
-                value={form.poliza}
-                onChange={handleChange("poliza")}
-                error={fieldErrors.poliza?.[0]}
-              />
-              <TextField
-                id="rTecnica"
-                label="Vencimiento revision tecnica"
-                type="date"
-                value={form.rTecnica}
-                onChange={handleChange("rTecnica")}
-                error={fieldErrors.rTecnica?.[0]}
-              />
             </div>
 
             <div className="border-t border-white/10 pt-5">
@@ -323,6 +334,9 @@ export const VehicleDetailPage = () => {
                   editing
                   fileName={files.libreto?.name}
                   onFileChange={handleFileChange("libreto")}
+                  dateLabel="Vence revision tecnica"
+                  dateValue={form.rTecnica}
+                  onDateChange={handleChange("rTecnica")}
                 />
                 <VehicleDocumentField
                   label="Assicurazione"
@@ -330,6 +344,9 @@ export const VehicleDetailPage = () => {
                   editing
                   fileName={files.assicurazione?.name}
                   onFileChange={handleFileChange("assicurazione")}
+                  dateLabel="Vence poliza"
+                  dateValue={form.poliza}
+                  onDateChange={handleChange("poliza")}
                 />
               </div>
             </div>
@@ -357,11 +374,19 @@ export const VehicleDetailPage = () => {
               Documentos
             </h3>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <VehicleDocumentField label="Libreto" url={vehicle.libretoUrl} editing={false} />
+              <VehicleDocumentField
+                label="Libreto"
+                url={vehicle.libretoUrl}
+                editing={false}
+                dateLabel="Vence revision tecnica"
+                dateValue={vehicle.rTecnica}
+              />
               <VehicleDocumentField
                 label="Assicurazione"
                 url={vehicle.assicurazioneUrl}
                 editing={false}
+                dateLabel="Vence poliza"
+                dateValue={vehicle.poliza}
               />
             </div>
           </div>

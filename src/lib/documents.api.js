@@ -11,8 +11,9 @@ export const createDocumentRequest = (usuarioId, tipoDocumento, file) => {
   return api.post("/documents", formData).then((res) => res.data.data.document);
 };
 
-export const updateDocumentRequest = (id, file) => {
+export const updateDocumentRequest = (id, { file, fechaScadenza } = {}) => {
   const formData = new FormData();
-  formData.append("archivo", file);
+  if (file) formData.append("archivo", file);
+  if (fechaScadenza) formData.append("fechaScadenza", fechaScadenza);
   return api.patch(`/documents/${id}`, formData).then((res) => res.data.data.document);
 };
