@@ -8,3 +8,6 @@ export const getVehicleRequest = (id) =>
 
 export const createVehicleRequest = (formData) =>
   api.post("/vehiculos", formData).then((res) => res.data.data.vehicle);
+
+export const updateVehicleRequest = (id, formData) =>
+  api.patch(`/vehiculos/${id}`, formData).then((res) => res.data.data.vehicle);

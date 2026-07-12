@@ -15,6 +15,7 @@ import { NewRecordPage } from "./pages/records/NewRecordPage";
 import { RecordDetailPage } from "./pages/records/RecordDetailPage";
 import { RecordsListPage } from "./pages/records/RecordsListPage";
 import { NewVehiclePage } from "./pages/vehicles/NewVehiclePage";
+import { VehicleDetailPage } from "./pages/vehicles/VehicleDetailPage";
 import { VehiclesPage } from "./pages/vehicles/VehiclesPage";
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
           <Route path="/choferes/:id" element={<DriverDetailPage />} />
           <Route path="/vehiculos" element={<VehiclesPage />} />
           <Route path="/vehiculos/new" element={<NewVehiclePage />} />
+          <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
         </Route>
       </Route>
 
