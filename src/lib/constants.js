@@ -5,8 +5,8 @@ export const AREA_OPTIONS = [
 ];
 
 export const CARGO_LABELS = {
-  OWNER: "Propietario",
-  ADMIN: "Administrador",
+  OWNER: "Socio",
+  ADMIN: "Responsable",
   CHOFER: "Chofer",
 };
 

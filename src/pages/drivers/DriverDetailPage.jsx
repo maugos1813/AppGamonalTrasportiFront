@@ -446,7 +446,7 @@ export const DriverDetailPage = () => {
                 <div className="flex flex-col gap-4">
                   <Switch
                     id="cargo-admin"
-                    label="Administrador"
+                    label="Responsable"
                     description="Puede gestionar choferes, vehiculos y registros de toda la empresa."
                     checked={form.cargo === "ADMIN" || form.cargo === "OWNER"}
                     onChange={(checked) =>
@@ -456,8 +456,8 @@ export const DriverDetailPage = () => {
                   {user.cargo === "OWNER" && (
                     <Switch
                       id="cargo-owner"
-                      label="Propietario"
-                      description="Acceso total, incluida la asignacion de otros propietarios."
+                      label="Socio"
+                      description="Acceso total, incluida la asignacion de otros socios."
                       checked={form.cargo === "OWNER"}
                       onChange={(checked) => setField("cargo", checked ? "OWNER" : "ADMIN")}
                     />
