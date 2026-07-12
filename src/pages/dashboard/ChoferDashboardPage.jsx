@@ -83,34 +83,6 @@ export const ChoferDashboardPage = () => {
   return (
     <div className="flex flex-col gap-6">
       <GlassCard>
-        <h2 className="text-[17px] font-medium text-ink-50">Mis servicios</h2>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Hoy" value={myServiceCounts.hoy} tone="blue" />
-          <StatCard label="Pendientes" value={myServiceCounts.pendientes} tone="amber" />
-          <StatCard label="Completados" value={myServiceCounts.completados} tone="green" />
-          <StatCard label="Cancelados" value={myServiceCounts.cancelados} tone="red" />
-        </div>
-        <Link
-          to="/records"
-          className="mt-4 inline-block text-[13px] font-medium text-accent-400 hover:text-accent-300"
-        >
-          Ver historial completo &rarr;
-        </Link>
-      </GlassCard>
-
-      <GlassCard>
-        <h2 className="text-[17px] font-medium text-ink-50">Horas de trabajo</h2>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <StatCard label="Horas hoy" value={workHours.horasHoy} />
-          <StatCard label="Horas esta semana" value={workHours.horasSemana} />
-          <StatCard label="Horas este mes" value={workHours.horasMes} />
-          <StatCard label="Horas dia (mes)" value={workHours.horasDiaMes} />
-          <StatCard label="Horas noche (mes)" value={workHours.horasNocheMes} />
-          <StatCard label="Tiempo de espera (mes)" value={workHours.tiempoEsperaMes} />
-        </div>
-      </GlassCard>
-
-      <GlassCard>
         <h2 className="text-[17px] font-medium text-ink-50">Servicio actual</h2>
 
         {!currentService ? (
@@ -171,6 +143,34 @@ export const ChoferDashboardPage = () => {
             </div>
           </>
         )}
+      </GlassCard>
+
+      <GlassCard>
+        <h2 className="text-[17px] font-medium text-ink-50">Mis servicios</h2>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label="Hoy" value={myServiceCounts.hoy} tone="blue" />
+          <StatCard label="Pendientes" value={myServiceCounts.pendientes} tone="amber" />
+          <StatCard label="Completados" value={myServiceCounts.completados} tone="green" />
+          <StatCard label="Cancelados" value={myServiceCounts.cancelados} tone="red" />
+        </div>
+        <Link
+          to="/records"
+          className="mt-4 inline-block text-[13px] font-medium text-accent-400 hover:text-accent-300"
+        >
+          Ver historial completo &rarr;
+        </Link>
+      </GlassCard>
+
+      <GlassCard>
+        <h2 className="text-[17px] font-medium text-ink-50">Horas de trabajo</h2>
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <StatCard label="Horas hoy" value={workHours.horasHoy} />
+          <StatCard label="Horas esta semana" value={workHours.horasSemana} />
+          <StatCard label="Horas este mes" value={workHours.horasMes} />
+          <StatCard label="Horas dia (mes)" value={workHours.horasDiaMes} />
+          <StatCard label="Horas noche (mes)" value={workHours.horasNocheMes} />
+          <StatCard label="Tiempo de espera (mes)" value={workHours.tiempoEsperaMes} />
+        </div>
       </GlassCard>
     </div>
   );
