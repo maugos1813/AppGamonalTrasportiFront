@@ -1,13 +1,81 @@
+import { Capacitor, registerPlugin } from "@capacitor/core";
+import { useState } from "react";
+import { Alert } from "../../components/ui/Alert";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { StatCard } from "../../components/ui/StatCard";
+import { Switch } from "../../components/ui/Switch";
 import { useAuth } from "../../context/AuthContext";
+import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, CARGO_LABELS } from "../../lib/constants";
 import { formatDate } from "../../lib/format";
+import { updateUserRequest } from "../../lib/users.api";
+
+const BackgroundGeolocation = registerPlugin("BackgroundGeolocation");
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 
+// Pide el permiso de ubicacion correspondiente a la plataforma. En el APK dispara el
+// flujo nativo (y si solo se otorgo "mientras se usa la app", manda a Configuracion
+// para elegir "Permitir todo el tiempo"). En el navegador solo existe el permiso
+// estandar del sitio, no hay un equivalente a "siempre".
+const requestLocationPermission = () =>
+  new Promise((resolve) => {
+    if (Capacitor.isNativePlatform()) {
+      let watcherId;
+      BackgroundGeolocation.addWatcher(
+        {
+          backgroundMessage: "Gamonal Trasporti puede compartir tu ubicacion mientras tenes un servicio en camino.",
+          backgroundTitle: "Compartir ubicacion",
+          requestPermissions: true,
+          stale: true,
+        },
+        (location, error) => {
+          if (error) {
+            if (error.code === "NOT_AUTHORIZED") {
+              BackgroundGeolocation.openSettings();
+            }
+            resolve();
+            return;
+          }
+          if (watcherId != null) {
+            BackgroundGeolocation.removeWatcher({ id: watcherId }).catch(() => {});
+          }
+          resolve();
+        }
+      ).then((id) => {
+        watcherId = id;
+      });
+    } else if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => resolve(),
+        () => resolve(),
+        { enableHighAccuracy: true, timeout: 10000 }
+      );
+    } else {
+      resolve();
+    }
+  });
+
 export const ProfilePage = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
+  const [savingLocation, setSavingLocation] = useState(false);
+  const [locationError, setLocationError] = useState("");
+
+  const handleToggleLocationSharing = async (checked) => {
+    setSavingLocation(true);
+    setLocationError("");
+    try {
+      if (checked) {
+        await requestLocationPermission();
+      }
+      const updated = await updateUserRequest(user.id, { compartirUbicacion: checked });
+      setUser(updated);
+    } catch (err) {
+      setLocationError(parseApiError(err).message);
+    } finally {
+      setSavingLocation(false);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -42,6 +110,20 @@ export const ProfilePage = () => {
           <StatCard label="Fecha de nacimiento" value={formatDate(user?.fechaNacimiento)} />
           <StatCard label="Miembro desde" value={formatDate(user?.createdAt)} />
         </div>
+
+        {user?.cargo === "CHOFER" && (
+          <div className="mt-6 border-t border-white/10 pt-6">
+            <Alert>{locationError}</Alert>
+            <Switch
+              id="compartir-ubicacion"
+              label="Compartir ubicacion GPS"
+              description="Mientras este activado, la empresa puede ver tu ubicacion en el mapa solo durante un servicio en camino."
+              checked={Boolean(user?.compartirUbicacion)}
+              disabled={savingLocation}
+              onChange={handleToggleLocationSharing}
+            />
+          </div>
+        )}
       </GlassCard>
     </div>
   );

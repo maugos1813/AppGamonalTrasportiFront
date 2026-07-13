@@ -9,16 +9,17 @@ const BackgroundGeolocation = registerPlugin("BackgroundGeolocation");
 
 const CHECK_INTERVAL_MS = 20000;
 
-// Comparte la ubicacion del chofer mientras tiene un servicio IN_CONSEGNA activo.
-// Dentro del APK (Capacitor) usa el plugin nativo de background geolocation, que
-// sigue funcionando con la app minimizada o la pantalla bloqueada (muestra una
-// notificacion persistente, obligatoria en Android). En la version web normal
-// solo funciona mientras la pestania esta abierta y visible.
+// Comparte la ubicacion del chofer mientras tiene un servicio IN_CONSEGNA activo Y
+// activo el switch "Compartir ubicacion GPS" de su perfil (compartirUbicacion). Dentro
+// del APK (Capacitor) usa el plugin nativo de background geolocation, que sigue
+// funcionando con la app minimizada o la pantalla bloqueada (muestra una notificacion
+// persistente, obligatoria en Android). En la version web normal solo funciona
+// mientras la pestania esta abierta y visible.
 export const useLocationSharing = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user?.cargo !== "CHOFER") return;
+    if (user?.cargo !== "CHOFER" || !user?.compartirUbicacion) return;
 
     let cancelled = false;
     let watcherId = null;
@@ -89,5 +90,5 @@ export const useLocationSharing = () => {
       clearInterval(intervalId);
       stopNativeTracking();
     };
-  }, [user?.cargo]);
+  }, [user?.cargo, user?.compartirUbicacion]);
 };

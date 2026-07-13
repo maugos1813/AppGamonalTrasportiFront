@@ -70,6 +70,7 @@ export const AuthProvider = ({ children }) => {
       login,
       register,
       logout,
+      setUser,
     }),
     [user, initializing, login, register, logout]
   );
