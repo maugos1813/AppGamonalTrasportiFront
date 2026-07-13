@@ -1,0 +1,8 @@
+{
+  "appId": "com.gamonaltrasporti.app",
+  "appName": "Gamonal Trasporti",
+  "webDir": "dist",
+  "android": {
+    "useLegacyBridge": true
+  }
+}

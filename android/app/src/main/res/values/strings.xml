@@ -1,0 +1,16 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Gamonal Trasporti</string>
+    <string name="title_activity_main">Gamonal Trasporti</string>
+    <string name="package_name">com.gamonaltrasporti.app</string>
+    <string name="custom_url_scheme">com.gamonaltrasporti.app</string>
+
+    <!-- Notificacion persistente mientras se comparte la ubicacion en segundo plano
+    (obligatoria en Android, no se puede ocultar). -->
+    <string name="capacitor_background_geolocation_notification_channel_name">
+        Seguimiento de servicio
+    </string>
+    <string name="capacitor_background_geolocation_notification_color">
+        #0071e3
+    </string>
+</resources>
