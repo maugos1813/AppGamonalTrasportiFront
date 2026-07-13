@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:mobile": "VITE_API_URL=https://appgamonaltrasportiback.onrender.com/api vite build && npx cap sync android",
+    "android:apk": "cd android && JAVA_HOME=\"/Applications/Android Studio.app/Contents/jbr/Contents/Home\" ./gradlew assembleDebug"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.2.26",
