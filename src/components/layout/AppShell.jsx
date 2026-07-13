@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { NotificationsBell } from "./NotificationsBell";
 
 const UserIcon = (props) => (
@@ -98,6 +99,21 @@ const TruckIcon = (props) => (
   </svg>
 );
 
+const MapPinIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z" />
+    <circle cx="12" cy="9.5" r="2.3" />
+  </svg>
+);
+
 const NavTab = ({ to, label }) => (
   <NavLink
     to={to}
@@ -134,6 +150,8 @@ const BottomNavTab = ({ to, label, icon: Icon }) => (
 export const AppShell = () => {
   const { user, logout } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+
+  useLocationSharing();
 
   return (
     <div className="relative min-h-dvh w-full bg-black">
@@ -187,6 +205,7 @@ export const AppShell = () => {
               <NavTab to="/records" label="Registros" />
               {isPrivileged && <NavTab to="/choferes" label="Choferes" />}
               {isPrivileged && <NavTab to="/vehiculos" label="Vehiculos" />}
+              {isPrivileged && <NavTab to="/mapa" label="Mapa" />}
             </nav>
           </div>
         </header>
@@ -201,6 +220,7 @@ export const AppShell = () => {
         <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
         {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
         {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
+        {isPrivileged && <BottomNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
       </nav>
     </div>
   );

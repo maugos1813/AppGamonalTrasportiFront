@@ -10,6 +10,7 @@ import { DashboardPage } from "./pages/dashboard/DashboardPage";
 import { DriverDetailPage } from "./pages/drivers/DriverDetailPage";
 import { DriversPage } from "./pages/drivers/DriversPage";
 import { NewDriverPage } from "./pages/drivers/NewDriverPage";
+import { MapPage } from "./pages/map/MapPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
 import { NewRecordPage } from "./pages/records/NewRecordPage";
 import { RecordDetailPage } from "./pages/records/RecordDetailPage";
@@ -41,6 +42,7 @@ function App() {
           <Route path="/vehiculos" element={<VehiclesPage />} />
           <Route path="/vehiculos/new" element={<NewVehiclePage />} />
           <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
+          <Route path="/mapa" element={<MapPage />} />
         </Route>
       </Route>
 

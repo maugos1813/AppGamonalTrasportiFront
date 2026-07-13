@@ -17,3 +17,9 @@ export const uploadUserAvatarRequest = (id, file) => {
   formData.append("imagen", file);
   return api.post(`/users/${id}/avatar`, formData).then((res) => res.data.data.user);
 };
+
+export const updateMyLocationRequest = (lat, lng) =>
+  api.patch("/users/me/ubicacion", { lat, lng });
+
+export const listDriverLocationsRequest = () =>
+  api.get("/users/ubicaciones").then((res) => res.data.data.ubicaciones);
