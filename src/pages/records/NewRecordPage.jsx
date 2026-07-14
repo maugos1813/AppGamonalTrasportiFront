@@ -8,10 +8,11 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { Spinner } from "../../components/ui/Spinner";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
+import { StopListEditor } from "../../components/records/StopListEditor";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { RECORD_STATUS_OPTIONS } from "../../lib/constants";
+import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -21,7 +22,8 @@ const INITIAL_FORM = {
   clientId: "",
   driverId: "",
   vehicleId: "",
-  destinazione: "",
+  aplicativo: "",
+  stops: [""],
   descripcion: "",
   fechaServicio: "",
   eta: "",
@@ -73,7 +75,13 @@ export const NewRecordPage = () => {
     setFormError("");
     setFieldErrors({});
 
-    const payload = Object.fromEntries(Object.entries(form).filter(([, value]) => value !== ""));
+    const trimmedStops = form.stops.map((s) => s.trim()).filter(Boolean);
+
+    const payload = Object.fromEntries(
+      Object.entries({ ...form, stops: trimmedStops }).filter(
+        ([key, value]) => key === "stops" || value !== ""
+      )
+    );
 
     try {
       const record = await createRecordRequest(payload);
@@ -167,16 +175,6 @@ export const NewRecordPage = () => {
               error={fieldErrors.vehicleId?.[0]}
             />
 
-            <TextField
-              id="destinazione"
-              label="Destino"
-              placeholder="Ej: Milano, Italia"
-              value={form.destinazione}
-              onChange={handleChange("destinazione")}
-              error={fieldErrors.destinazione?.[0]}
-              required
-            />
-
             <SearchableSelect
               id="estado"
               label="Estado inicial"
@@ -184,6 +182,16 @@ export const NewRecordPage = () => {
               options={RECORD_STATUS_OPTIONS}
               value={form.estado}
               onChange={(v) => setField("estado", v)}
+            />
+
+            <SearchableSelect
+              id="aplicativo"
+              label="Numero de aplicativo"
+              placeholder="Escribe para buscar un aplicativo"
+              options={APLICATIVO_OPTIONS}
+              value={form.aplicativo}
+              onChange={(v) => setField("aplicativo", v)}
+              error={fieldErrors.aplicativo?.[0]}
             />
 
             <TextField
@@ -204,6 +212,15 @@ export const NewRecordPage = () => {
               onChange={handleChange("eta")}
               error={fieldErrors.eta?.[0]}
               required
+            />
+          </div>
+
+          <div className="mt-5">
+            <StopListEditor
+              stops={form.stops}
+              onChange={(stops) => setField("stops", stops)}
+              error={fieldErrors.stops?.[0]}
+              disabled={submitting}
             />
           </div>
 

@@ -1,3 +1,7 @@
+// Punto de partida fijo de todo servicio (coincide con DEPOT_ORIGIN del backend).
+// Aca es solo para mostrarlo en la UI, no se geocodifica en el frontend.
+export const DEPOT_ORIGIN_LABEL = "Via Walter Tobagi, 8, 20068 Bettola-Zeloforamagno MI";
+
 export const AREA_OPTIONS = [
   { value: "EXTRAS_PIAZZA", label: "Extras Piazza" },
   { value: "DHL", label: "DHL" },
@@ -32,6 +36,17 @@ export const RECORD_STATUS_OPTIONS = [
   { value: "RISCHEDULATO", label: "Reprogramado" },
   { value: "ANNULLATO", label: "Anulado" },
 ];
+
+// Circuito/aplicativo de reparto asignado al servicio (se carga por servicio, no por
+// chofer, para conservar el historial exacto aunque el chofer cambie de aplicativo).
+export const APLICATIVO_OPTIONS = Array.from({ length: 18 }, (_, i) => ({
+  value: `MILANO_${i + 1}`,
+  label: `MILANO ${i + 1}`,
+}));
+
+export const APLICATIVO_LABELS = Object.fromEntries(
+  APLICATIVO_OPTIONS.map((opt) => [opt.value, opt.label])
+);
 
 export const RECORD_STATUS_LABELS = Object.fromEntries(
   RECORD_STATUS_OPTIONS.map((opt) => [opt.value, opt.label])

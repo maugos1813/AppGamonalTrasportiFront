@@ -9,10 +9,11 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
+import { StopListEditor } from "../../components/records/StopListEditor";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { RECORD_STATUS_OPTIONS, TIPO_ARCHIVO_LABELS } from "../../lib/constants";
+import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, TIPO_ARCHIVO_LABELS } from "../../lib/constants";
 import { formatDateTime, toDateTimeInputValue } from "../../lib/format";
 import {
   getRecordRequest,
@@ -39,7 +40,8 @@ const OWNER_FIELDS = [
   "clientId",
   "driverId",
   "vehicleId",
-  "destinazione",
+  "aplicativo",
+  "stops",
   "descripcion",
   "fechaServicio",
   "eta",
@@ -67,7 +69,8 @@ const toFormState = (record) => ({
   clientId: record.client?.id ?? "",
   driverId: record.driver?.id ?? "",
   vehicleId: record.vehicle?.id ?? "",
-  destinazione: record.destinazione ?? "",
+  aplicativo: record.aplicativo ?? "",
+  stops: record.stops?.length ? record.stops.map((s) => s.direccion) : [""],
   descripcion: record.descripcion ?? "",
   fechaServicio: toDateTimeInputValue(record.fechaServicio),
   eta: toDateTimeInputValue(record.eta),
@@ -149,7 +152,10 @@ export const RecordDetailPage = () => {
 
     const payload = Object.fromEntries(
       fieldsToSubmit
-        .map((field) => [field, form[field]])
+        .map((field) => [
+          field,
+          field === "stops" ? form.stops.map((s) => s.trim()).filter(Boolean) : form[field],
+        ])
         .filter(([, value]) => value !== "" && value !== undefined)
     );
 
@@ -235,6 +241,12 @@ export const RecordDetailPage = () => {
             label="Chofer"
             value={`${record.driver?.nombre ?? ""} ${record.driver?.apellido ?? ""}`}
           />
+          {record.ruta?.duracionMin != null && (
+            <InfoRow
+              label="Ruta estimada"
+              value={`${record.ruta.distanciaKm.toFixed(1)} km - ${Math.round(record.ruta.duracionMin)} min`}
+            />
+          )}
         </div>
 
         <div className="mt-6 border-t border-white/10 pt-6">
@@ -363,13 +375,14 @@ export const RecordDetailPage = () => {
                   value={form.vehicleId}
                   onChange={(v) => setField("vehicleId", v)}
                 />
-                <TextField
-                  id="destinazione"
-                  label="Destino"
-                  value={form.destinazione}
-                  onChange={handleChange("destinazione")}
+                <SearchableSelect
+                  id="aplicativo"
+                  label="Numero de aplicativo"
+                  placeholder="Escribe para buscar un aplicativo"
+                  options={APLICATIVO_OPTIONS}
+                  value={form.aplicativo}
+                  onChange={(v) => setField("aplicativo", v)}
                 />
-                <div />
                 <TextField
                   id="fechaServicio"
                   label="Fecha de servicio"
@@ -385,6 +398,12 @@ export const RecordDetailPage = () => {
                   onChange={handleChange("eta")}
                 />
               </div>
+
+              <StopListEditor
+                stops={form.stops}
+                onChange={(stops) => setField("stops", stops)}
+                disabled={saving}
+              />
 
               <Textarea
                 id="descripcion"
