@@ -9,9 +9,21 @@ const BackgroundGeolocation = registerPlugin("BackgroundGeolocation");
 
 const CHECK_INTERVAL_MS = 20000;
 
-// Comparte la ubicacion del chofer mientras tiene un servicio IN_CONSEGNA activo Y
-// activo el switch "Compartir ubicacion GPS" de su perfil (compartirUbicacion). Dentro
-// del APK (Capacitor) usa el plugin nativo de background geolocation, que sigue
+// Horario laboral segun contrato: lunes a sabado de 7:00 a 19:00 (hora local).
+const isWithinWorkSchedule = () => {
+  const now = new Date();
+  const day = now.getDay(); // 0=domingo ... 6=sabado
+  const hour = now.getHours();
+  const isWorkDay = day >= 1 && day <= 6;
+  const isWorkHour = hour >= 7 && hour < 19;
+  return isWorkDay && isWorkHour;
+};
+
+// Comparte la ubicacion del chofer mientras tiene un servicio IN_CONSEGNA activo, y
+// ademas se cumple una de estas dos condiciones: esta dentro del horario laboral
+// (lunes a sabado, 7:00 a 19:00), o tiene activado manualmente el switch "Compartir
+// ubicacion GPS" de su perfil (compartirUbicacion) para servicios fuera de horario.
+// Dentro del APK (Capacitor) usa el plugin nativo de background geolocation, que sigue
 // funcionando con la app minimizada o la pantalla bloqueada (muestra una notificacion
 // persistente, obligatoria en Android). En la version web normal solo funciona
 // mientras la pestania esta abierta y visible.
@@ -19,7 +31,7 @@ export const useLocationSharing = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    if (user?.cargo !== "CHOFER" || !user?.compartirUbicacion) return;
+    if (user?.cargo !== "CHOFER") return;
 
     let cancelled = false;
     let watcherId = null;
@@ -68,6 +80,12 @@ export const useLocationSharing = () => {
 
     const tick = async () => {
       try {
+        const canShare = isWithinWorkSchedule() || user?.compartirUbicacion;
+        if (!canShare) {
+          stopNativeTracking();
+          return;
+        }
+
         const active = await hasActiveService();
         if (cancelled) return;
 

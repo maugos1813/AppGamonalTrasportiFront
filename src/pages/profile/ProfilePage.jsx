@@ -117,7 +117,7 @@ export const ProfilePage = () => {
             <Switch
               id="compartir-ubicacion"
               label="Compartir ubicacion GPS"
-              description="Mientras este activado, la empresa puede ver tu ubicacion en el mapa solo durante un servicio en camino."
+              description="De lunes a sabado de 7:00 a 19:00 tu ubicacion se comparte automaticamente durante un servicio en camino. Fuera de ese horario, activa este switch si te sale un servicio."
               checked={Boolean(user?.compartirUbicacion)}
               disabled={savingLocation}
               onChange={handleToggleLocationSharing}
