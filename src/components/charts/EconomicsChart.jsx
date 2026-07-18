@@ -1,9 +1,14 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { useTheme } from "../../context/ThemeContext";
 import { CHART_COLORS } from "../../lib/constants";
 import { formatCurrency } from "../../lib/format";
 import { ChartTooltip } from "./ChartTooltip";
+import { useChartAxisColors } from "./useChartAxisColors";
 
 export const EconomicsChart = ({ facturacion, costos, ganancia }) => {
+  const { theme } = useTheme();
+  const { tickColor, axisLineColor, cursorColor } = useChartAxisColors(theme);
+
   const data = [
     { key: "facturacion", label: "Facturacion", value: facturacion, color: CHART_COLORS.facturacion },
     { key: "costos", label: "Costos operativos", value: costos, color: CHART_COLORS.costos },
@@ -20,12 +25,12 @@ export const EconomicsChart = ({ facturacion, costos, ganancia }) => {
       <BarChart data={data} margin={{ top: 8, right: 8, left: 8, bottom: 0 }} barCategoryGap="25%">
         <XAxis
           dataKey="label"
-          tick={{ fill: "#8e8e93", fontSize: 12 }}
-          axisLine={{ stroke: "rgba(255,255,255,0.12)" }}
+          tick={{ fill: tickColor, fontSize: 12 }}
+          axisLine={{ stroke: axisLineColor }}
           tickLine={false}
         />
         <Tooltip
-          cursor={{ fill: "rgba(255,255,255,0.06)" }}
+          cursor={{ fill: cursorColor }}
           content={<ChartTooltip formatValue={formatCurrency} />}
         />
         <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>

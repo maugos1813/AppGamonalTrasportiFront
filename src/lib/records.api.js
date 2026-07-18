@@ -3,6 +3,15 @@ import { api } from "./api";
 export const listRecordsRequest = () =>
   api.get("/records").then((res) => res.data.data.records);
 
+// Resumen liviano (id/fechaServicio/estado) de un mes, para armar el acordeon de
+// dias sin traer stops/ruta/economico de cada registro.
+export const listRecordsSummaryByMonthRequest = (year, month) =>
+  api.get(`/records/${year}/${month}/summary`).then((res) => res.data.data.records);
+
+// Registros completos de un dia especifico (se piden recien al desplegar ese dia).
+export const listRecordsByDayRequest = (year, month, day) =>
+  api.get(`/records/${year}/${month}/${day}`).then((res) => res.data.data.records);
+
 export const createRecordRequest = (payload) =>
   api.post("/records", payload).then((res) => res.data.data.record);
 

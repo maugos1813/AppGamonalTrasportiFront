@@ -29,6 +29,35 @@ const isWithinPeriod = (value, period, now) => {
   return true;
 };
 
+// Rango del periodo inmediatamente anterior al seleccionado (mismo largo), para
+// poder mostrar "+X% vs periodo anterior" en los KPI economicos.
+const isWithinPreviousPeriod = (value, period, now) => {
+  const date = new Date(value);
+  if (period === "hoy") {
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    return isSameDay(date, yesterday);
+  }
+  if (period === "semana") {
+    const start = startOfWeek(now);
+    const prevStart = new Date(start);
+    prevStart.setDate(prevStart.getDate() - 7);
+    return date >= prevStart && date < start;
+  }
+  if (period === "mes") {
+    const start = startOfMonth(now);
+    const prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
+    return date >= prevStart && date < start;
+  }
+  return false;
+};
+
+// null cuando no hay base de comparacion (evita mostrar "+Infinity%").
+const percentChange = (current, previous) => {
+  if (!previous) return null;
+  return ((current - previous) / Math.abs(previous)) * 100;
+};
+
 const RECORD_STATUS_KEYS = [
   "IN_SOSPESO",
   "IN_CONSEGNA",
@@ -101,10 +130,15 @@ const recordProfit = (record) => (record.pagoRecibido ?? 0) - recordCost(record)
 
 export const computeEconomicStats = (records, period, now = new Date()) => {
   const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
+  const previousScoped = records.filter((r) => isWithinPreviousPeriod(r.fechaServicio, period, now));
 
   const facturacion = scoped.reduce((sum, r) => sum + (r.pagoRecibido ?? 0), 0);
   const costos = scoped.reduce((sum, r) => sum + recordCost(r), 0);
   const ganancia = facturacion - costos;
+
+  const facturacionAnterior = previousScoped.reduce((sum, r) => sum + (r.pagoRecibido ?? 0), 0);
+  const gananciaAnterior =
+    facturacionAnterior - previousScoped.reduce((sum, r) => sum + recordCost(r), 0);
 
   const withProfit = scoped
     .map((r) => ({ record: r, profit: recordProfit(r) }))
@@ -116,7 +150,48 @@ export const computeEconomicStats = (records, period, now = new Date()) => {
     .sort((a, b) => a.profit - b.profit)
     .slice(0, 5);
 
-  return { facturacion, costos, ganancia, masRentables, conPerdidas };
+  return {
+    facturacion,
+    costos,
+    ganancia,
+    masRentables,
+    conPerdidas,
+    facturacionDeltaPct: percentChange(facturacion, facturacionAnterior),
+    gananciaDeltaPct: percentChange(ganancia, gananciaAnterior),
+  };
+};
+
+const OTROS_LABEL = "Otros";
+const MAX_CLIENT_SLICES = 4;
+
+// Distribucion de facturacion por cliente en el periodo, para el grafico de
+// torta del dashboard OWNER. Agrupa todo lo que no entra en el top N como "Otros".
+export const computeClientDistribution = (records, period, now = new Date()) => {
+  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
+
+  const totalsByClient = new Map();
+  scoped.forEach((r) => {
+    const name = r.client?.nombre ?? "Sin cliente";
+    const amount = r.pagoRecibido ?? 0;
+    totalsByClient.set(name, (totalsByClient.get(name) ?? 0) + amount);
+  });
+
+  const sorted = Array.from(totalsByClient.entries())
+    .filter(([, value]) => value > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  const top = sorted.slice(0, MAX_CLIENT_SLICES);
+  const rest = sorted.slice(MAX_CLIENT_SLICES);
+  const otrosTotal = rest.reduce((sum, [, value]) => sum + value, 0);
+
+  const entries = otrosTotal > 0 ? [...top, [OTROS_LABEL, otrosTotal]] : top;
+  const total = entries.reduce((sum, [, value]) => sum + value, 0);
+
+  return entries.map(([name, value]) => ({
+    name,
+    value,
+    percent: total > 0 ? (value / total) * 100 : 0,
+  }));
 };
 
 export const computeCurrentService = (records, now = new Date()) => {

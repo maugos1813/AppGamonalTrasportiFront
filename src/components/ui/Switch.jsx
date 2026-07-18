@@ -19,7 +19,7 @@ export const Switch = ({ id, label, description, checked, onChange, disabled }) 
       onClick={() => onChange(!checked)}
       className={clsx(
         "relative inline-flex h-7 w-12 shrink-0 items-center rounded-full transition-colors duration-200 focus:outline-none focus-visible:ring-4 focus-visible:ring-success-500/30",
-        checked ? "bg-success-500" : "bg-white/15",
+        checked ? "bg-success-500" : "bg-line/15",
         disabled ? "cursor-not-allowed opacity-50" : "cursor-pointer"
       )}
     >

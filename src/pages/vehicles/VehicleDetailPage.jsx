@@ -4,6 +4,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatCard } from "../../components/ui/StatCard";
 import { TextField } from "../../components/ui/TextField";
@@ -82,7 +83,7 @@ const VehicleDocumentField = ({
           <span className="text-[14px] text-ink-50">Sin subir</span>
         )
       ) : (
-        <label className="mt-1 flex cursor-pointer items-center justify-between gap-2 rounded-lg glass-input px-3 py-2 text-[13px] text-ink-50 hover:bg-white/10">
+        <label className="mt-1 flex cursor-pointer items-center justify-between gap-2 rounded-lg glass-input px-3 py-2 text-[13px] text-ink-50 hover:bg-line/10">
           <span className="truncate">
             {fileName ?? (url ? "Reemplazar archivo" : "Subir archivo")}
           </span>
@@ -90,7 +91,7 @@ const VehicleDocumentField = ({
         </label>
       )}
 
-      <div className="mt-2 border-t border-white/10 pt-2">
+      <div className="mt-2 border-t border-line/10 pt-2">
         {editing ? (
           <label className="flex items-center gap-2">
             <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-400">
@@ -203,18 +204,25 @@ export const VehicleDetailPage = () => {
   };
 
   if (loadError) {
-    return <Alert>{loadError}</Alert>;
+    return (
+      <SlideOverPanel closeTo="/vehiculos">
+        <Alert>{loadError}</Alert>
+      </SlideOverPanel>
+    );
   }
 
   if (!vehicle || !form) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner className="h-6 w-6 border-white/20 border-t-white" />
-      </div>
+      <SlideOverPanel closeTo="/vehiculos">
+        <div className="flex justify-center py-16">
+          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
+        </div>
+      </SlideOverPanel>
     );
   }
 
   return (
+    <SlideOverPanel closeTo="/vehiculos">
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link to="/vehiculos" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
@@ -254,7 +262,7 @@ export const VehicleDetailPage = () => {
 
         {editing && (
           <div className="mt-4 flex flex-col items-center gap-2 sm:items-start">
-            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full glass-input px-4 py-2 text-[13px] font-medium text-ink-50 hover:bg-white/10">
+            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full glass-input px-4 py-2 text-[13px] font-medium text-ink-50 hover:bg-line/10">
               <span className="truncate">
                 {files.imagen?.name ?? (vehicle.imagenUrl ? "Reemplazar foto" : "Subir foto del vehiculo")}
               </span>
@@ -323,7 +331,7 @@ export const VehicleDetailPage = () => {
               />
             </div>
 
-            <div className="border-t border-white/10 pt-5">
+            <div className="border-t border-line/10 pt-5">
               <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
                 Documentos
               </h3>
@@ -369,7 +377,7 @@ export const VehicleDetailPage = () => {
         )}
 
         {!editing && (
-          <div className="mt-6 border-t border-white/10 pt-6">
+          <div className="mt-6 border-t border-line/10 pt-6">
             <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
               Documentos
             </h3>
@@ -393,5 +401,6 @@ export const VehicleDetailPage = () => {
         )}
       </GlassCard>
     </div>
+    </SlideOverPanel>
   );
 };

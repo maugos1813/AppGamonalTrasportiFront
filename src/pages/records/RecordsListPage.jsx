@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, NavLink } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
@@ -10,7 +10,11 @@ import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { APLICATIVO_LABELS, EN_PROCESO_STATUSES, TERMINADOS_STATUSES } from "../../lib/constants";
 import { formatDate, formatTimeRemaining } from "../../lib/format";
-import { listRecordsRequest } from "../../lib/records.api";
+import {
+  listRecordsByDayRequest,
+  listRecordsRequest,
+  listRecordsSummaryByMonthRequest,
+} from "../../lib/records.api";
 
 const TAB_OPTIONS = [
   { value: "en_proceso", label: "En proceso" },
@@ -22,55 +26,87 @@ const TAB_STATUSES = {
   terminados: TERMINADOS_STATUSES,
 };
 
-// Claves de agrupacion en horario local (evita el corrimiento de dia/mes que da UTC).
-const monthKey = (value) => {
-  const d = new Date(value);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+// "Extras Piazza" es lo unico que existia hasta ahora: los registros viejos no
+// tienen spedizzione cargada, asi que se tratan como Extras Piazza por defecto.
+// "DHL - AB Service" agrupa ambos spedizzione; el alta desde esta seccion crea
+// siempre servicios DHL (AB_SERVICE por ahora solo llega via sincronizacion externa).
+const SECTIONS = {
+  "extras-piazza": {
+    label: "Extras Piazza",
+    matchesSpedizzione: (s) => s === "EXTRA_PIAZZA" || s == null,
+    allowCreate: true,
+    newPath: "/records/extras-piazza/new",
+  },
+  "dhl-ab-service": {
+    label: "DHL - AB Service",
+    matchesSpedizzione: (s) => s === "DHL" || s === "AB_SERVICE",
+    allowCreate: true,
+    newPath: "/records/dhl-ab-service/new",
+  },
 };
+const SECTION_OPTIONS = Object.entries(SECTIONS).map(([value, s]) => ({ value, label: s.label }));
+
+// El backend arma los rangos /:year/:month/:day en UTC (buildDateRange). El resumen
+// del mes se agrupa client-side, asi que tiene que usar el mismo criterio de "dia"
+// (UTC), o el conteo del resumen y lo que trae el fetch puntual de un dia no van a
+// coincidir para usuarios en husos horarios distintos a UTC.
 const dayKey = (value) => {
   const d = new Date(value);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}-${String(d.getUTCDate()).padStart(2, "0")}`;
 };
 
-const monthLabel = (value) => new Date(value).toLocaleDateString("es-AR", { month: "long", year: "numeric" }).toUpperCase();
+const monthLabel = (year, month) =>
+  new Date(Date.UTC(year, month - 1, 1))
+    .toLocaleDateString("es-AR", { month: "long", year: "numeric", timeZone: "UTC" })
+    .toUpperCase();
 const dayLabel = (value) =>
-  new Date(value).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit", year: "2-digit" });
+  new Date(value).toLocaleDateString("es-AR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "2-digit",
+    timeZone: "UTC",
+  });
 
 const driverName = (record) =>
   record.driver ? `${record.driver.nombre} ${record.driver.apellido}` : "Sin chofer asignado";
 
-// Agrupa por mes de creacion > dia de creacion (mas reciente primero); dentro de
-// cada dia, los servicios quedan en una sola lista ordenada por chofer (columna
-// "Chofer" de la fila compacta), para que el OWNER/ADMIN pueda navegar como un
-// calendario y ubicar rapido los registros de un dia y de un chofer en particular.
-// Solo aparecen meses/dias que tengan al menos un registro.
-const groupByMonthDay = (list) => {
-  const months = new Map();
-
-  for (const record of list) {
-    const mKey = monthKey(record.createdAt);
-    if (!months.has(mKey)) months.set(mKey, { date: record.createdAt, days: new Map() });
-    const month = months.get(mKey);
-
-    const dKey = dayKey(record.createdAt);
-    if (!month.days.has(dKey)) month.days.set(dKey, { date: record.createdAt, records: [] });
-    month.days.get(dKey).records.push(record);
+// Agrupa el resumen (liviano, solo id/fechaServicio/estado) de un mes por dia de
+// SERVICIO (no de creacion: un import historico masivo puede crearse todo el mismo
+// dia pero corresponder a fechas de servicio bien distintas). Mas reciente primero.
+const groupSummaryByDay = (list) => {
+  const days = new Map();
+  for (const item of list) {
+    const dKey = dayKey(item.fechaServicio);
+    if (!days.has(dKey)) days.set(dKey, { key: dKey, date: item.fechaServicio, count: 0 });
+    days.get(dKey).count += 1;
   }
-
-  return Array.from(months.entries())
-    .sort(([a], [b]) => (a < b ? 1 : -1))
-    .map(([key, month]) => ({
-      key,
-      date: month.date,
-      days: Array.from(month.days.entries())
-        .sort(([a], [b]) => (a < b ? 1 : -1))
-        .map(([dKey, day]) => ({
-          key: dKey,
-          date: day.date,
-          records: [...day.records].sort((a, b) => driverName(a).localeCompare(driverName(b))),
-        })),
-    }));
+  return Array.from(days.values()).sort((a, b) => (a.key < b.key ? 1 : -1));
 };
+
+const shiftMonth = ({ year, month }, delta) => {
+  const d = new Date(Date.UTC(year, month - 1 + delta, 1));
+  return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
+};
+
+// Igual al SegmentedControl visualmente, pero enrutado (NavLink) en vez de
+// controlado por estado, para que la seccion quede reflejada en la URL.
+const SectionTabs = () => (
+  <div className="inline-flex items-center gap-1 rounded-full glass-surface-sm p-1">
+    {SECTION_OPTIONS.map((opt) => (
+      <NavLink
+        key={opt.value}
+        to={`/records/${opt.value}`}
+        className={({ isActive }) =>
+          `rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
+            isActive ? "bg-line/15 text-ink-50" : "text-ink-300 hover:text-ink-50"
+          }`
+        }
+      >
+        {opt.label}
+      </NavLink>
+    ))}
+  </div>
+);
 
 const ChevronIcon = ({ open }) => (
   <svg
@@ -97,7 +133,7 @@ const DisclosureHeader = ({ open, onClick, children, className }) => (
 
 const RecordCard = ({ record }) => (
   <Link to={`/records/${record.id}`}>
-    <GlassCard className="transition-colors hover:bg-white/[0.08]">
+    <GlassCard className="transition-colors hover:bg-line/[0.08]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <span className="text-[13px] font-medium text-ink-400">{record.codigo}</span>
@@ -146,7 +182,7 @@ const CompactRowHeader = () => (
 const RecordRow = ({ record }) => (
   <Link
     to={`/records/${record.id}`}
-    className="flex h-[50px] items-center gap-3 rounded-xl px-4 text-[12px] text-ink-200 transition-colors hover:bg-white/[0.08]"
+    className="flex h-[50px] items-center gap-3 rounded-xl px-4 text-[12px] text-ink-200 transition-colors hover:bg-line/[0.08]"
   >
     <span className={ROW_COLUMN_CLASSES.chofer} title={driverName(record)}>
       {driverName(record)}
@@ -173,24 +209,28 @@ const RecordRow = ({ record }) => (
   </Link>
 );
 
-export const RecordsListPage = () => {
+const now = new Date();
+const CURRENT_VIEW_DATE = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+
+export const RecordsListPage = ({ section }) => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  const [records, setRecords] = useState(null);
+  const sectionConfig = SECTIONS[section];
   const [error, setError] = useState("");
   const [tab, setTab] = useState("en_proceso");
-  const [openMonths, setOpenMonths] = useState(() => new Set([monthKey(new Date())]));
-  const [openDays, setOpenDays] = useState(() => new Set());
 
-  const toggleSet = (setter) => (key) =>
-    setter((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  const toggleMonth = toggleSet(setOpenMonths);
-  const toggleDay = toggleSet(setOpenDays);
+  // --- Vista OWNER/ADMIN: navega mes a mes, trae solo un resumen liviano del mes
+  // y recien pide los registros completos del dia cuando se despliega ese dia. ---
+  const [viewDate, setViewDate] = useState(CURRENT_VIEW_DATE);
+  const [summary, setSummary] = useState(null);
+  const [openDays, setOpenDays] = useState(() => new Set());
+  const [dayRecords, setDayRecords] = useState(() => new Map());
+  const [loadingDays, setLoadingDays] = useState(() => new Set());
+  const [dayErrors, setDayErrors] = useState(() => new Map());
+
+  // --- Vista CHOFER: lista plana simple, trae todo de una (siempre es poco, son
+  // solo sus propios servicios). ---
+  const [records, setRecords] = useState(null);
 
   // Fuerza un re-render cada minuto para que "tiempo restante antes de vencer" no quede desactualizado.
   const [, setTick] = useState(0);
@@ -200,6 +240,7 @@ export const RecordsListPage = () => {
   }, []);
 
   useEffect(() => {
+    if (isPrivileged) return;
     let cancelled = false;
 
     listRecordsRequest()
@@ -213,25 +254,82 @@ export const RecordsListPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [isPrivileged]);
 
-  const visibleRecords = records?.filter((r) => TAB_STATUSES[tab].includes(r.estado));
+  useEffect(() => {
+    if (!isPrivileged) return;
+    let cancelled = false;
+    setSummary(null);
+
+    listRecordsSummaryByMonthRequest(viewDate.year, viewDate.month)
+      .then((data) => {
+        if (!cancelled) setSummary(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(parseApiError(err).message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPrivileged, viewDate.year, viewDate.month]);
+
+  const fetchDay = (day) => {
+    setLoadingDays((prev) => new Set(prev).add(day.key));
+    const d = new Date(day.date);
+    listRecordsByDayRequest(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate())
+      .then((data) => {
+        setDayRecords((prev) => new Map(prev).set(day.key, data));
+      })
+      .catch((err) => {
+        setDayErrors((prev) => new Map(prev).set(day.key, parseApiError(err).message));
+      })
+      .finally(() => {
+        setLoadingDays((prev) => {
+          const next = new Set(prev);
+          next.delete(day.key);
+          return next;
+        });
+      });
+  };
+
+  const toggleDay = (day) => {
+    setOpenDays((prev) => {
+      const next = new Set(prev);
+      if (next.has(day.key)) next.delete(day.key);
+      else next.add(day.key);
+      return next;
+    });
+    if (!dayRecords.has(day.key) && !loadingDays.has(day.key)) fetchDay(day);
+  };
+
+  const visibleRecords = records?.filter(
+    (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
+  );
+  const summaryDays = summary
+    ? groupSummaryByDay(
+        summary.filter(
+          (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
+        )
+      )
+    : null;
 
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-semibold text-ink-50">Mis registros</h1>
+          <h1 className="text-[24px] font-semibold text-ink-50">{sectionConfig.label}</h1>
           <p className="mt-1 text-[14px] text-ink-300">
             {isPrivileged
-              ? "Agrupados por mes, dia y chofer de creacion."
+              ? "Navega mes a mes; cada dia se carga al desplegarlo."
               : "Viajes asignados, ordenados por fecha."}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <SectionTabs />
           <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />
-          {isPrivileged && (
-            <Link to="/records/new">
+          {isPrivileged && sectionConfig.allowCreate && (
+            <Link to={sectionConfig.newPath}>
               <Button className="w-auto px-5">Nuevo servicio</Button>
             </Link>
           )}
@@ -240,13 +338,13 @@ export const RecordsListPage = () => {
 
       <Alert>{error}</Alert>
 
-      {records === null && !error && (
+      {!isPrivileged && records === null && !error && (
         <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-white/20 border-t-white" />
+          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
         </div>
       )}
 
-      {visibleRecords?.length === 0 && (
+      {!isPrivileged && visibleRecords?.length === 0 && (
         <GlassCard className="text-center text-[14px] text-ink-300">
           {tab === "en_proceso"
             ? "No tienes registros en proceso."
@@ -255,59 +353,92 @@ export const RecordsListPage = () => {
       )}
 
       {isPrivileged ? (
-        <div className="flex flex-col gap-3">
-          {groupByMonthDay(visibleRecords ?? []).map((month) => {
-            const monthOpen = openMonths.has(month.key);
-            return (
-              <GlassCard key={month.key} className="!p-0">
-                <DisclosureHeader
-                  open={monthOpen}
-                  onClick={() => toggleMonth(month.key)}
-                  className="px-5 py-4 text-[15px] font-semibold text-ink-100"
-                >
-                  {monthLabel(month.date)}
-                </DisclosureHeader>
+        <GlassCard className="!p-0">
+          <div className="flex items-center justify-between gap-2 px-5 py-4">
+            <button
+              type="button"
+              onClick={() => setViewDate((v) => shiftMonth(v, -1))}
+              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+            >
+              &larr; Mes anterior
+            </button>
+            <h2 className="text-[15px] font-semibold uppercase text-ink-100">
+              {monthLabel(viewDate.year, viewDate.month)}
+            </h2>
+            <button
+              type="button"
+              onClick={() => setViewDate((v) => shiftMonth(v, 1))}
+              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+            >
+              Mes siguiente &rarr;
+            </button>
+          </div>
 
-                {monthOpen && (
-                  <div className="flex flex-col gap-2 border-t border-white/10 px-5 pb-4 pt-3">
-                    {month.days.map((day) => {
-                      const dayOpen = openDays.has(day.key);
-                      return (
-                        <div key={day.key} className="rounded-2xl glass-surface-sm">
-                          <DisclosureHeader
-                            open={dayOpen}
-                            onClick={() => toggleDay(day.key)}
-                            className="px-4 py-3 text-[14px] text-ink-100"
-                          >
-                            <span>
-                              {dayLabel(day.date)}{" "}
-                              <span className="text-ink-400">
-                                ({day.records.length} servicio{day.records.length === 1 ? "" : "s"})
-                              </span>
-                            </span>
-                          </DisclosureHeader>
+          <div className="flex flex-col gap-2 border-t border-line/10 px-5 pb-4 pt-3">
+            {summary === null && (
+              <div className="flex justify-center py-8">
+                <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+              </div>
+            )}
 
-                          {dayOpen && (
-                            <div className="overflow-x-auto border-t border-white/10 pb-2">
-                              <div className="min-w-[720px]">
-                                <CompactRowHeader />
-                                <div className="flex flex-col gap-0.5 px-2">
-                                  {day.records.map((record) => (
-                                    <RecordRow key={record.id} record={record} />
-                                  ))}
-                                </div>
-                              </div>
-                            </div>
-                          )}
+            {summaryDays?.length === 0 && (
+              <p className="py-4 text-center text-[14px] text-ink-300">
+                No hay servicios {tab === "en_proceso" ? "en proceso" : "terminados"} este mes.
+              </p>
+            )}
+
+            {summaryDays?.map((day) => {
+              const dayOpen = openDays.has(day.key);
+              const loaded = dayRecords.get(day.key);
+              const dayVisibleRecords = loaded
+                ?.filter(
+                  (r) =>
+                    TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
+                )
+                .sort((a, b) => driverName(a).localeCompare(driverName(b)));
+
+              return (
+                <div key={day.key} className="rounded-2xl glass-surface-sm">
+                  <DisclosureHeader
+                    open={dayOpen}
+                    onClick={() => toggleDay(day)}
+                    className="px-4 py-3 text-[14px] text-ink-100"
+                  >
+                    <span>
+                      {dayLabel(day.date)}{" "}
+                      <span className="text-ink-400">
+                        ({day.count} servicio{day.count === 1 ? "" : "s"})
+                      </span>
+                    </span>
+                  </DisclosureHeader>
+
+                  {dayOpen && (
+                    <div className="border-t border-line/10 pb-2">
+                      {loadingDays.has(day.key) && (
+                        <div className="flex justify-center py-6">
+                          <Spinner className="h-5 w-5 border-line/20 border-t-line" />
                         </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </GlassCard>
-            );
-          })}
-        </div>
+                      )}
+                      {dayErrors.has(day.key) && <Alert>{dayErrors.get(day.key)}</Alert>}
+                      {dayVisibleRecords && (
+                        <div className="overflow-x-auto">
+                          <div className="min-w-[720px]">
+                            <CompactRowHeader />
+                            <div className="flex flex-col gap-0.5 px-2">
+                              {dayVisibleRecords.map((record) => (
+                                <RecordRow key={record.id} record={record} />
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </GlassCard>
       ) : (
         <div className="flex flex-col gap-3">
           {visibleRecords?.map((record) => (

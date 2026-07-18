@@ -1,36 +1,196 @@
 @import "tailwindcss";
 
-@theme {
+/* Activa el prefijo dark: cuando el elemento <html> (o un ancestro) tiene la
+   clase "dark" (ver ThemeContext). Paleta adaptada del style pack Express
+   Dispatch: navy/yellow de marca + colores de estado semanticos. */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
   --font-sans:
     -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
     "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 
-  /* Apple-style neutral & accent palette */
-  --color-ink-950: #0b0b0d;
-  --color-ink-900: #111114;
-  --color-ink-800: #1c1c1f;
-  --color-ink-700: #2c2c30;
-  --color-ink-600: #48484c;
-  --color-ink-400: #8e8e93;
-  --color-ink-300: #aeaeb2;
-  --color-ink-200: #d1d1d6;
-  --color-ink-100: #e5e5ea;
-  --color-ink-50: #f5f5f7;
+  /* Fondo/texto base de la app (body, AppShell, SlideOverPanel, etc). Faltaba
+     registrarlas aca: sin esto bg-background/text-foreground no generan clase
+     (Tailwind las descarta en silencio) y quedan sin efecto. */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
 
-  --color-accent-600: #0058c7;
-  --color-accent-500: #0071e3;
-  --color-accent-400: #2997ff;
-  --color-accent-300: #64b5ff;
+  /* Escala "ink" (texto): mismos nombres de siempre, valor resuelto via
+     variable de tema (ver :root / .dark mas abajo) para que cada rol de texto
+     se adapte solo entre claro y oscuro sin tocar los componentes. */
+  --color-ink-50: var(--ink-50);
+  --color-ink-100: var(--ink-100);
+  --color-ink-200: var(--ink-200);
+  --color-ink-300: var(--ink-300);
+  --color-ink-400: var(--ink-400);
+  --color-ink-500: var(--ink-500);
 
-  --color-danger-500: #ff3b30;
-  --color-success-500: #30d158;
+  /* Superficie solida (dropdowns/popovers/opciones de <select>): opaca,
+     no glass, para que se lea bien flotando sobre cualquier contenido. */
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
 
-  --shadow-glass:
+  /* Base de los bordes/hovers "glass": blanco en oscuro (como siempre),
+     navy tenue en claro. Reemplaza los border-white/X, bg-white/X sueltos. */
+  --color-line: var(--line);
+
+  /* Marca Express Dispatch: navy + yellow, fijos en ambos temas. */
+  --color-brand-navy: #0a1628;
+  --color-brand-yellow: #ffd000;
+
+  /* Sidebar: siempre navy oscuro, no cambia entre temas (igual que el pack). */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-active: var(--color-brand-yellow);
+  --color-sidebar-active-foreground: var(--color-brand-navy);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-border: var(--sidebar-border);
+
+  /* Accent (azul, links/foco/info): identico al actual en oscuro, mas
+     oscuro/legible en claro. */
+  --color-accent-600: var(--accent-600);
+  --color-accent-500: var(--accent-500);
+  --color-accent-400: var(--accent-400);
+  --color-accent-300: var(--accent-300);
+
+  /* Rojo/verde: version clara (mas oscura, legible sobre blanco) y version
+     oscura (identica a la actual, Apple red/green). */
+  --color-danger-500: var(--danger-500);
+  --color-success-500: var(--success-500);
+
+  /* Estados de envio/vehiculo: colores solidos fijos (mismo criterio que el
+     style pack: un badge de fondo solido no necesita variante por tema). */
+  --color-status-consegnato: #16a34a;
+  --color-status-annullato: #dc2626;
+  --color-status-rischedulato: #ea580c;
+  --color-status-in-corso: #2563eb;
+  --color-status-pendiente: #6b7280;
+  --color-status-ritirato: #0d9488;
+
+  /* Paleta categorica para graficos (recharts), con variante por tema. */
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --shadow-glass: var(--shadow-glass-tokens);
+  --shadow-glass-sm: var(--shadow-glass-sm-tokens);
+
+  /* Backdrop de SlideOverPanel (mas tenue en claro que en oscuro, ver :root/.dark). */
+  --color-backdrop: var(--backdrop);
+}
+
+:root {
+  color-scheme: light;
+
+  --background: #ffffff;
+  --foreground: #1a2030;
+  --popover: #ffffff;
+  --popover-foreground: #1a2030;
+
+  --ink-50: #1a2030;
+  --ink-100: #232a3d;
+  --ink-200: #333c54;
+  --ink-300: #5b6274;
+  --ink-400: #7d8494;
+  --ink-500: #9298a8;
+
+  --line: #0a1628;
+
+  --sidebar: #0a1628;
+  --sidebar-foreground: #e8eaf0;
+  --sidebar-accent: #16223a;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --accent-600: #003f8f;
+  --accent-500: #0058c7;
+  --accent-400: #1d6fe0;
+  --accent-300: #4f8fe8;
+
+  --danger-500: #dc2626;
+  --success-500: #16a34a;
+
+  --chart-1: #e4643a;
+  --chart-2: #3c9c93;
+  --chart-3: #2b4a6b;
+  --chart-4: #e4b93f;
+  --chart-5: #e8a23d;
+
+  /* Sin drop-shadow hacia afuera en claro: con superficies blancas lisas, esa
+     sombra se ve como una segunda capa gris flotando alrededor de la tarjeta
+     (se nota sobre todo en fondos tambien blancos, ej. el panel deslizante).
+     El borde ya alcanza para marcar el limite de la tarjeta. */
+  --shadow-glass-tokens: 0 1px 1px 0 rgba(255, 255, 255, 0.6) inset;
+  --shadow-glass-sm-tokens: 0 1px 1px 0 rgba(255, 255, 255, 0.5) inset;
+
+  /* Backdrop del panel deslizante (SlideOverPanel): mas tenue en claro, un negro
+     60% ahi se ve como un apagon; en oscuro un fondo casi negro ya se nota poco
+     mas oscuro, asi que puede quedar mas fuerte. */
+  --backdrop: rgba(15, 23, 42, 0.28);
+
+  /* En claro las superficies van blancas lisas (el borde alcanza para marcar
+     el limite); en oscuro se mantiene el glass translucido de siempre. */
+  --glass-surface-bg: #ffffff;
+  --glass-surface-sm-bg: #ffffff;
+  --glass-input-bg: #ffffff;
+  --glass-input-focus-bg: #ffffff;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #000000;
+  --foreground: #f5f5f7;
+  --popover: #111114;
+  --popover-foreground: #f5f5f7;
+
+  --ink-50: #f5f5f7;
+  --ink-100: #e5e5ea;
+  --ink-200: #d1d1d6;
+  --ink-300: #aeaeb2;
+  --ink-400: #8e8e93;
+  --ink-500: #6b6b6f;
+
+  --line: #ffffff;
+
+  --sidebar: #0a1628;
+  --sidebar-foreground: #e8eaf0;
+  --sidebar-accent: #16223a;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+
+  --accent-600: #0058c7;
+  --accent-500: #0071e3;
+  --accent-400: #2997ff;
+  --accent-300: #64b5ff;
+
+  --danger-500: #ff3b30;
+  --success-500: #30d158;
+
+  --chart-1: #6f7bf7;
+  --chart-2: #2fb675;
+  --chart-3: #e8a23d;
+  --chart-4: #b34fe0;
+  --chart-5: #e8543f;
+
+  --shadow-glass-tokens:
     0 1px 1px 0 rgba(255, 255, 255, 0.35) inset,
     0 8px 32px -8px rgba(0, 0, 0, 0.35);
-  --shadow-glass-sm:
+  --shadow-glass-sm-tokens:
     0 1px 1px 0 rgba(255, 255, 255, 0.3) inset,
     0 4px 16px -4px rgba(0, 0, 0, 0.25);
+
+  --backdrop: rgba(0, 0, 0, 0.6);
+
+  --glass-surface-bg: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--line) 14%, transparent),
+    color-mix(in srgb, var(--line) 5%, transparent)
+  );
+  --glass-surface-sm-bg: color-mix(in srgb, var(--line) 6%, transparent);
+  --glass-input-bg: color-mix(in srgb, var(--line) 6%, transparent);
+  --glass-input-focus-bg: color-mix(in srgb, var(--line) 9%, transparent);
 }
 
 @layer base {
@@ -38,18 +198,15 @@
     -webkit-tap-highlight-color: transparent;
   }
 
-  html {
-    color-scheme: dark;
-  }
-
   body {
     margin: 0;
     font-family: var(--font-sans);
-    background: #000;
-    color: var(--color-ink-50);
+    background: var(--color-background);
+    color: var(--color-foreground);
     min-height: 100dvh;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 
   input:-webkit-autofill,
@@ -62,28 +219,24 @@
 
 @layer components {
   .glass-surface {
-    background: linear-gradient(
-      180deg,
-      rgba(255, 255, 255, 0.14),
-      rgba(255, 255, 255, 0.05)
-    );
+    background: var(--glass-surface-bg);
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    border: 1px solid color-mix(in srgb, var(--line) 18%, transparent);
     box-shadow: var(--shadow-glass);
   }
 
   .glass-surface-sm {
-    background: rgba(255, 255, 255, 0.06);
+    background: var(--glass-surface-sm-bg);
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    border: 1px solid color-mix(in srgb, var(--line) 14%, transparent);
     box-shadow: var(--shadow-glass-sm);
   }
 
   .glass-input {
-    background: rgba(255, 255, 255, 0.06);
-    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: var(--glass-input-bg);
+    border: 1px solid color-mix(in srgb, var(--line) 14%, transparent);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     transition:
@@ -94,12 +247,27 @@
 
   .glass-input:focus {
     outline: none;
-    border-color: rgba(41, 151, 255, 0.65);
-    background: rgba(255, 255, 255, 0.09);
-    box-shadow: 0 0 0 4px rgba(41, 151, 255, 0.18);
+    border-color: color-mix(in srgb, var(--accent-500) 65%, transparent);
+    background: var(--glass-input-focus-bg);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent-500) 18%, transparent);
   }
 
   .glass-input::placeholder {
     color: var(--color-ink-400);
   }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Definido como @utility (no @layer components) para poder usarlo con el
+   prefijo lg: en SlideOverPanel (solo anima el panel deslizante en desktop). */
+@utility animate-slide-in-right {
+  animation: slide-in-right 0.25s ease-out;
 }

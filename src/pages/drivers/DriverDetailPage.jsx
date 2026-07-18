@@ -5,6 +5,7 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatCard } from "../../components/ui/StatCard";
 import { Switch } from "../../components/ui/Switch";
@@ -95,7 +96,7 @@ const DocumentRow = ({
         </div>
 
         {editing && (
-          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full glass-input px-3 py-1.5 text-[12px] font-medium text-ink-50 hover:bg-white/10">
+          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full glass-input px-3 py-1.5 text-[12px] font-medium text-ink-50 hover:bg-line/10">
             {uploading ? <Spinner className="h-3.5 w-3.5" /> : hasDoc ? "Reemplazar" : "Subir"}
             <input
               type="file"
@@ -109,7 +110,7 @@ const DocumentRow = ({
       </div>
 
       {hasDoc && (
-        <div className="mt-2 border-t border-white/10 pt-2">
+        <div className="mt-2 border-t border-line/10 pt-2">
           {editing ? (
             <label className="flex items-center gap-2">
               <span className="shrink-0 text-[11px] uppercase tracking-wide text-ink-400">
@@ -281,14 +282,20 @@ export const DriverDetailPage = () => {
   };
 
   if (loadError) {
-    return <Alert>{loadError}</Alert>;
+    return (
+      <SlideOverPanel closeTo="/choferes">
+        <Alert>{loadError}</Alert>
+      </SlideOverPanel>
+    );
   }
 
   if (!driver || !form || !documents) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner className="h-6 w-6 border-white/20 border-t-white" />
-      </div>
+      <SlideOverPanel closeTo="/choferes">
+        <div className="flex justify-center py-16">
+          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
+        </div>
+      </SlideOverPanel>
     );
   }
 
@@ -298,6 +305,7 @@ export const DriverDetailPage = () => {
   }, {});
 
   return (
+    <SlideOverPanel closeTo="/choferes">
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <Link to="/choferes" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
@@ -331,7 +339,7 @@ export const DriverDetailPage = () => {
 
         {editing && (
           <div className="mt-4 flex flex-col items-center gap-2 sm:items-start">
-            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full glass-input px-4 py-2 text-[13px] font-medium text-ink-50 hover:bg-white/10">
+            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-full glass-input px-4 py-2 text-[13px] font-medium text-ink-50 hover:bg-line/10">
               {uploadingAvatar ? <Spinner /> : "Cambiar foto de perfil"}
               <input
                 type="file"
@@ -439,7 +447,7 @@ export const DriverDetailPage = () => {
             </div>
 
             {driver.id !== user.id && (
-              <div className="border-t border-white/10 pt-5">
+              <div className="border-t border-line/10 pt-5">
                 <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
                   Permisos
                 </h3>
@@ -508,5 +516,6 @@ export const DriverDetailPage = () => {
         </div>
       </GlassCard>
     </div>
+    </SlideOverPanel>
   );
 };

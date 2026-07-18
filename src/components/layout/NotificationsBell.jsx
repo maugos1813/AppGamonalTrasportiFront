@@ -18,10 +18,14 @@ const BellIcon = (props) => (
   </svg>
 );
 
-export const NotificationsBell = () => {
+// variant="sidebar": el boton vive dentro del sidebar/bottom-nav, que es navy
+// fijo (no cambia con el tema), asi que no puede usar los tokens ink-*/line
+// (pensados para el fondo de la app) o se volveria invisible en tema claro.
+export const NotificationsBell = ({ variant = "default" }) => {
   const { alerts, loading } = useChoferAlerts();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
+  const isSidebar = variant === "sidebar";
 
   useEffect(() => {
     if (!open) return;
@@ -44,8 +48,16 @@ export const NotificationsBell = () => {
         aria-label="Notificaciones"
         title="Notificaciones"
         className={clsx(
-          "relative flex h-10 w-10 items-center justify-center rounded-full glass-surface-sm transition-colors hover:bg-white/10 hover:text-ink-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/20",
-          open ? "text-ink-50" : "text-ink-300"
+          "relative flex h-10 w-10 items-center justify-center rounded-full transition-colors focus:outline-none focus-visible:ring-4",
+          isSidebar
+            ? clsx(
+                "hover:bg-sidebar-accent focus-visible:ring-sidebar-active/30",
+                open ? "text-sidebar-foreground" : "text-sidebar-foreground/75"
+              )
+            : clsx(
+                "glass-surface-sm hover:bg-line/10 hover:text-ink-50 focus-visible:ring-line/20",
+                open ? "text-ink-50" : "text-ink-300"
+              )
         )}
       >
         <BellIcon className="h-[18px] w-[18px]" />
@@ -62,7 +74,7 @@ export const NotificationsBell = () => {
 
           {loading ? (
             <div className="flex justify-center py-4">
-              <Spinner className="h-5 w-5 border-white/20 border-t-white" />
+              <Spinner className="h-5 w-5 border-line/20 border-t-line" />
             </div>
           ) : alerts.length === 0 ? (
             <p className="px-1 py-2 text-[13px] text-ink-400">Sin alertas pendientes.</p>
@@ -71,7 +83,7 @@ export const NotificationsBell = () => {
               {alerts.map((alert) => (
                 <li
                   key={alert.id}
-                  className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-3 py-2.5 text-[13px] text-amber-200"
+                  className="rounded-xl border border-status-rischedulato/25 bg-status-rischedulato/10 px-3 py-2.5 text-[13px] text-status-rischedulato"
                 >
                   {alert.message}
                 </li>

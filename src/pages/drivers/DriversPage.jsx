@@ -20,7 +20,7 @@ const PhoneIcon = ({ className }) => (
 
 const DriverCard = ({ driver }) => (
   <Link to={`/choferes/${driver.id}`} className="block">
-    <GlassCard className="transition-colors hover:bg-white/[0.09]">
+    <GlassCard className="transition-colors hover:bg-line/[0.09]">
       <div className="flex items-center gap-4">
         <Avatar user={driver} className="h-12 w-12 text-[15px]" />
         <div className="min-w-0">
@@ -32,8 +32,8 @@ const DriverCard = ({ driver }) => (
         <span
           className={`ml-auto shrink-0 rounded-full border px-3 py-1 text-[12px] font-medium ${
             driver.estado === "ACTIVO"
-              ? "border-success-500/25 bg-success-500/15 text-[#4ddb6e]"
-              : "border-danger-500/25 bg-danger-500/15 text-[#ff6961]"
+              ? "border-success-500/25 bg-success-500/15 text-success-500"
+              : "border-danger-500/25 bg-danger-500/15 text-danger-500"
           }`}
         >
           {driver.estado === "ACTIVO" ? "Activo" : "Inactivo"}
@@ -55,7 +55,7 @@ const DriverCard = ({ driver }) => (
                 onClick={(e) => e.stopPropagation()}
                 aria-label={`Llamar a ${driver.nombre} ${driver.apellido}`}
                 title="Llamar"
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500/15 text-[#4ddb6e] hover:bg-success-500/25"
+                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500/15 text-success-500 hover:bg-success-500/25"
               >
                 <PhoneIcon className="h-3.5 w-3.5" />
               </a>
@@ -125,7 +125,7 @@ export const DriversPage = () => {
 
       {drivers === null && !error && (
         <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-white/20 border-t-white" />
+          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
         </div>
       )}
 

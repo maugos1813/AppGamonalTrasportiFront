@@ -9,7 +9,7 @@ export const SegmentedControl = ({ options, value, onChange, className }) => (
         onClick={() => onChange(opt.value)}
         className={clsx(
           "rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors",
-          value === opt.value ? "bg-white/15 text-ink-50" : "text-ink-300 hover:text-ink-50"
+          value === opt.value ? "bg-line/15 text-ink-50" : "text-ink-300 hover:text-ink-50"
         )}
       >
         {opt.label}

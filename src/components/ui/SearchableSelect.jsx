@@ -127,7 +127,7 @@ export const SearchableSelect = ({
         />
         {creating && (
           <span className="absolute inset-y-0 right-3 flex items-center">
-            <Spinner className="h-4 w-4 border-white/20 border-t-white" />
+            <Spinner className="h-4 w-4 border-line/20 border-t-line" />
           </span>
         )}
       </div>
@@ -138,14 +138,14 @@ export const SearchableSelect = ({
       )}
 
       {open && (
-        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-white/15 bg-ink-900 p-1 shadow-2xl">
+        <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56 overflow-y-auto rounded-xl border border-line/15 bg-popover p-1 shadow-2xl">
           {filtered.map((opt) => (
             <button
               key={opt.value}
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleSelect(opt)}
-              className="block w-full rounded-lg px-3 py-2 text-left text-[14px] text-ink-50 hover:bg-white/10"
+              className="block w-full rounded-lg px-3 py-2 text-left text-[14px] text-ink-50 hover:bg-line/10"
             >
               {opt.label}
             </button>
@@ -159,7 +159,7 @@ export const SearchableSelect = ({
                 setOpen(false);
                 commitQuery();
               }}
-              className="block w-full rounded-lg px-3 py-2 text-left text-[14px] text-accent-400 hover:bg-white/10"
+              className="block w-full rounded-lg px-3 py-2 text-left text-[14px] text-accent-400 hover:bg-line/10"
             >
               {createLabel(query.trim())}
             </button>

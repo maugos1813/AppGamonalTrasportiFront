@@ -112,7 +112,7 @@ export const ProfilePage = () => {
         </div>
 
         {user?.cargo === "CHOFER" && (
-          <div className="mt-6 border-t border-white/10 pt-6">
+          <div className="mt-6 border-t border-line/10 pt-6">
             <Alert>{locationError}</Alert>
             <Switch
               id="compartir-ubicacion"

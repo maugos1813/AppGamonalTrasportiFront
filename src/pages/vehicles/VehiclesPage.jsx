@@ -15,7 +15,7 @@ const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.la
 
 const VehicleCard = ({ vehicle }) => (
   <Link to={`/vehiculos/${vehicle.id}`} className="block">
-    <GlassCard className="transition-colors hover:bg-white/[0.09]">
+    <GlassCard className="transition-colors hover:bg-line/[0.09]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <span className="text-[13px] font-medium text-ink-400">{vehicle.targa}</span>
@@ -98,7 +98,7 @@ export const VehiclesPage = () => {
 
       {vehicles === null && !error && (
         <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-white/20 border-t-white" />
+          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
         </div>
       )}
 

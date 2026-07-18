@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
+import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
@@ -8,12 +9,10 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { Spinner } from "../../components/ui/Spinner";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
-import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
-import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
+import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -24,24 +23,30 @@ const INITIAL_FORM = {
   driverId: "",
   vehicleId: "",
   aplicativo: "",
-  stops: [{ direccion: "", cap: "" }],
-  descripcion: "",
+  spedizzione: "DHL",
+  estado: "IN_SOSPESO",
   fechaServicio: "",
   eta: "",
-  estado: "IN_SOSPESO",
+  descripcion: "",
+  comentarios: "",
+  ciudad: "",
+  calle: "",
+  cap: "",
   kilometros: "",
-  precioKm: "",
-  pagoRecibido: "",
-  costoCombustible: "",
-  peajes: "",
-  vignetta: "",
-  costoHotel: "",
-  costoTraforoFrejusBrennero: "",
   areaC: "",
   costoEspera: "",
 };
 
-export const NewRecordPage = () => {
+// Arma la direccion de la parada final a partir de calle/CAP/ciudad, en el mismo
+// formato que ya geocodifica el backend (ej: "Via Roma 5, 20100 Milano").
+const buildAddress = ({ calle, cap, ciudad }) => {
+  const parts = [calle.trim()];
+  const capCiudad = [cap.trim(), ciudad.trim()].filter(Boolean).join(" ");
+  if (capCiudad) parts.push(capCiudad);
+  return parts.filter(Boolean).join(", ");
+};
+
+export const NewDhlAbServiceRecordPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
@@ -76,12 +81,11 @@ export const NewRecordPage = () => {
     setFormError("");
     setFieldErrors({});
 
-    const trimmedStops = form.stops.map(combineStopAddress).filter(Boolean);
+    const { calle, cap, ciudad, ...rest } = form;
+    const direccion = buildAddress({ calle, cap, ciudad });
 
-    // Esta pantalla solo se usa hoy para la seccion "Extras Piazza" (DHL/AB Service
-    // todavia no tiene su propia alta), asi que el spedizzione queda fijo aca.
     const payload = Object.fromEntries(
-      Object.entries({ ...form, stops: trimmedStops, spedizzione: "EXTRA_PIAZZA" }).filter(
+      Object.entries({ ...rest, ciudad, stops: [direccion] }).filter(
         ([key, value]) => key === "stops" || value !== ""
       )
     );
@@ -98,11 +102,11 @@ export const NewRecordPage = () => {
     }
   };
 
-  if (!isPrivileged) return <Navigate to="/records/extras-piazza" replace />;
+  if (!isPrivileged) return <Navigate to="/records/dhl-ab-service" replace />;
 
   if (loadError) {
     return (
-      <SlideOverPanel closeTo="/records/extras-piazza">
+      <SlideOverPanel closeTo="/records/dhl-ab-service">
         <Alert>{loadError}</Alert>
       </SlideOverPanel>
     );
@@ -112,7 +116,7 @@ export const NewRecordPage = () => {
 
   if (!loaded) {
     return (
-      <SlideOverPanel closeTo="/records/extras-piazza">
+      <SlideOverPanel closeTo="/records/dhl-ab-service">
         <div className="flex justify-center py-16">
           <Spinner className="h-6 w-6 border-line/20 border-t-line" />
         </div>
@@ -127,11 +131,11 @@ export const NewRecordPage = () => {
   }));
 
   return (
-    <SlideOverPanel closeTo="/records/extras-piazza">
+    <SlideOverPanel closeTo="/records/dhl-ab-service">
     <div className="flex flex-col gap-6">
       <div>
         <Link
-          to="/records/extras-piazza"
+          to="/records/dhl-ab-service"
           className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
         >
           &larr; Mis registros
@@ -139,7 +143,7 @@ export const NewRecordPage = () => {
       </div>
 
       <div>
-        <h1 className="text-[24px] font-semibold text-ink-50">Nuevo servicio</h1>
+        <h1 className="text-[24px] font-semibold text-ink-50">Nuevo servicio - DHL / AB Service</h1>
         <p className="mt-1 text-[14px] text-ink-300">Completa los datos para crear un servicio.</p>
       </div>
 
@@ -153,21 +157,20 @@ export const NewRecordPage = () => {
             <TextField
               id="codigo"
               label="Codigo"
-              placeholder="Ej: GT-0001"
+              placeholder="Ej: DHL-0001"
               value={form.codigo}
               onChange={handleChange("codigo")}
               error={fieldErrors.codigo?.[0]}
               required
             />
 
-            <ClientAutocomplete
-              id="clientId"
-              label="Cliente"
-              clients={clients}
-              value={form.clientId}
-              onChange={(clientId) => setField("clientId", clientId)}
-              onClientCreated={(client) => setClients((prev) => [...prev, client])}
-              error={fieldErrors.clientId?.[0]}
+            <SearchableSelect
+              id="estado"
+              label="Estado"
+              placeholder="Escribe para buscar un estado"
+              options={RECORD_STATUS_OPTIONS}
+              value={form.estado}
+              onChange={(v) => setField("estado", v)}
             />
 
             <SearchableSelect
@@ -182,36 +185,17 @@ export const NewRecordPage = () => {
 
             <SearchableSelect
               id="vehicleId"
-              label="Vehiculo"
-              placeholder="Escribe para buscar un vehiculo"
+              label="Targa"
+              placeholder="Escribe para buscar una targa"
               options={vehicleOptions}
               value={form.vehicleId}
               onChange={(v) => setField("vehicleId", v)}
               error={fieldErrors.vehicleId?.[0]}
             />
 
-            <SearchableSelect
-              id="estado"
-              label="Estado inicial"
-              placeholder="Escribe para buscar un estado"
-              options={RECORD_STATUS_OPTIONS}
-              value={form.estado}
-              onChange={(v) => setField("estado", v)}
-            />
-
-            <SearchableSelect
-              id="aplicativo"
-              label="Numero de aplicativo"
-              placeholder="Escribe para buscar un aplicativo"
-              options={APLICATIVO_OPTIONS}
-              value={form.aplicativo}
-              onChange={(v) => setField("aplicativo", v)}
-              error={fieldErrors.aplicativo?.[0]}
-            />
-
             <TextField
               id="fechaServicio"
-              label="Fecha de servicio"
+              label="Data"
               type="datetime-local"
               value={form.fechaServicio}
               onChange={handleChange("fechaServicio")}
@@ -228,14 +212,35 @@ export const NewRecordPage = () => {
               error={fieldErrors.eta?.[0]}
               required
             />
-          </div>
 
-          <div className="mt-5">
-            <StopListEditor
-              stops={form.stops}
-              onChange={(stops) => setField("stops", stops)}
-              error={fieldErrors.stops?.[0]}
-              disabled={submitting}
+            <SearchableSelect
+              id="spedizzione"
+              label="Spedizzione"
+              placeholder="Escribe para buscar una spedizzione"
+              options={SPEDIZZIONE_OPTIONS}
+              value={form.spedizzione}
+              onChange={(v) => setField("spedizzione", v)}
+              error={fieldErrors.spedizzione?.[0]}
+            />
+
+            <ClientAutocomplete
+              id="clientId"
+              label="Cliente"
+              clients={clients}
+              value={form.clientId}
+              onChange={(clientId) => setField("clientId", clientId)}
+              onClientCreated={(client) => setClients((prev) => [...prev, client])}
+              error={fieldErrors.clientId?.[0]}
+            />
+
+            <SearchableSelect
+              id="aplicativo"
+              label="Numero de aplicativo"
+              placeholder="Escribe para buscar un aplicativo"
+              options={APLICATIVO_OPTIONS}
+              value={form.aplicativo}
+              onChange={(v) => setField("aplicativo", v)}
+              error={fieldErrors.aplicativo?.[0]}
             />
           </div>
 
@@ -250,86 +255,73 @@ export const NewRecordPage = () => {
               required
             />
           </div>
+
+          <div className="mt-5">
+            <Textarea
+              id="comentarios"
+              label="Notas"
+              placeholder="Notas adicionales del servicio..."
+              value={form.comentarios}
+              onChange={handleChange("comentarios")}
+              error={fieldErrors.comentarios?.[0]}
+            />
+          </div>
         </GlassCard>
 
         <GlassCard>
-          <h2 className="text-[17px] font-medium text-ink-50">Datos economicos (planificados)</h2>
+          <h2 className="text-[17px] font-medium text-ink-50">Destinazzione</h2>
           <p className="mt-1 text-[13px] text-ink-300">
-            Opcional. El chofer despues carga los kilometros reales para comparar.
+            Lugar de consegna. Completa calle, CAP y ciudad por separado para que la busqueda en el
+            mapa sea mas precisa.
+          </p>
+
+          <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            <TextField
+              id="calle"
+              label="Calle / direccion"
+              placeholder="Ej: Via delle Industrie, 2e"
+              className="sm:col-span-2"
+              value={form.calle}
+              onChange={handleChange("calle")}
+              error={fieldErrors.stops?.[0]}
+              required
+            />
+            <TextField
+              id="cap"
+              label="CAP"
+              placeholder="Ej: 26014"
+              value={form.cap}
+              onChange={handleChange("cap")}
+            />
+            <TextField
+              id="ciudad"
+              label="Ciudad"
+              placeholder="Ej: Romanengo CR"
+              className="sm:col-span-3"
+              value={form.ciudad}
+              onChange={handleChange("ciudad")}
+              error={fieldErrors.ciudad?.[0]}
+              required
+            />
+          </div>
+        </GlassCard>
+
+        <GlassCard>
+          <h2 className="text-[17px] font-medium text-ink-50">Kilometraje y costos</h2>
+          <p className="mt-1 text-[13px] text-ink-300">
+            Kilometros planificados. El chofer carga despues los kilometros reales para la
+            comparativa.
           </p>
 
           <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
             <TextField
               id="kilometros"
-              label="Kilometros planificados"
+              label="Km planificados"
               type="number"
               step="0.1"
               min="0"
               value={form.kilometros}
               onChange={handleChange("kilometros")}
-            />
-            <TextField
-              id="precioKm"
-              label="Precio por km"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.precioKm}
-              onChange={handleChange("precioKm")}
-            />
-            <TextField
-              id="pagoRecibido"
-              label="Pago previsto"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.pagoRecibido}
-              onChange={handleChange("pagoRecibido")}
-            />
-            <TextField
-              id="costoCombustible"
-              label="Costo combustible"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.costoCombustible}
-              onChange={handleChange("costoCombustible")}
-            />
-            <TextField
-              id="peajes"
-              label="Peajes"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.peajes}
-              onChange={handleChange("peajes")}
-            />
-            <TextField
-              id="vignetta"
-              label="Vignetta"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.vignetta}
-              onChange={handleChange("vignetta")}
-            />
-            <TextField
-              id="costoHotel"
-              label="Costo de hotel"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.costoHotel}
-              onChange={handleChange("costoHotel")}
-            />
-            <TextField
-              id="costoTraforoFrejusBrennero"
-              label="Traforo Frejus/Brennero"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.costoTraforoFrejusBrennero}
-              onChange={handleChange("costoTraforoFrejusBrennero")}
             />
             <TextField
               id="areaC"

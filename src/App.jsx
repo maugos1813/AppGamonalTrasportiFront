@@ -12,6 +12,7 @@ import { DriversPage } from "./pages/drivers/DriversPage";
 import { NewDriverPage } from "./pages/drivers/NewDriverPage";
 import { MapPage } from "./pages/map/MapPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
+import { NewDhlAbServiceRecordPage } from "./pages/records/NewDhlAbServiceRecordPage";
 import { NewRecordPage } from "./pages/records/NewRecordPage";
 import { RecordDetailPage } from "./pages/records/RecordDetailPage";
 import { RecordsListPage } from "./pages/records/RecordsListPage";
@@ -33,8 +34,11 @@ function App() {
         <Route element={<AppShell />}>
           <Route path="/" element={<DashboardPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/records" element={<RecordsListPage />} />
-          <Route path="/records/new" element={<NewRecordPage />} />
+          <Route path="/records" element={<Navigate to="/records/extras-piazza" replace />} />
+          <Route path="/records/extras-piazza" element={<RecordsListPage section="extras-piazza" />} />
+          <Route path="/records/extras-piazza/new" element={<NewRecordPage />} />
+          <Route path="/records/dhl-ab-service" element={<RecordsListPage section="dhl-ab-service" />} />
+          <Route path="/records/dhl-ab-service/new" element={<NewDhlAbServiceRecordPage />} />
           <Route path="/records/:id" element={<RecordDetailPage />} />
           <Route path="/choferes" element={<DriversPage />} />
           <Route path="/choferes/new" element={<NewDriverPage />} />

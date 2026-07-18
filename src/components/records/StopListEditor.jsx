@@ -2,18 +2,29 @@ import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
 import { DEPOT_ORIGIN_LABEL } from "../../lib/constants";
 
+// Arma la direccion final que recibe el backend a partir de la parada (texto
+// libre, puede incluir el CAP) + el campo CAP aparte (ayuda opcional para que
+// la busqueda en el mapa sea mas precisa). Si el CAP ya esta en el texto no lo
+// duplica.
+export const combineStopAddress = ({ direccion, cap }) => {
+  const trimmedDireccion = direccion.trim();
+  const trimmedCap = cap.trim();
+  if (!trimmedCap || trimmedDireccion.includes(trimmedCap)) return trimmedDireccion;
+  return [trimmedDireccion, trimmedCap].filter(Boolean).join(", ");
+};
+
 // Lista ordenada de paradas de un servicio (siempre arranca en el deposito fijo,
-// que se muestra solo como referencia, no es editable). Cada parada es una direccion
-// de texto libre (con CAP incluido, ej: "Via delle Industrie, 2e, 26014 Romanengo CR"),
-// que el backend geocodifica y encadena en una ruta.
+// que se muestra solo como referencia, no es editable). Cada parada tiene una
+// direccion de texto libre y un CAP opcional aparte (ayuda para que el backend
+// geocodifique mejor); se combinan en un solo string antes de enviar al backend.
 export const StopListEditor = ({ stops, onChange, error, disabled }) => {
-  const updateStop = (index, value) => {
+  const updateStop = (index, field, value) => {
     const next = [...stops];
-    next[index] = value;
+    next[index] = { ...next[index], [field]: value };
     onChange(next);
   };
 
-  const addStop = () => onChange([...stops, ""]);
+  const addStop = () => onChange([...stops, { direccion: "", cap: "" }]);
 
   const removeStop = (index) => {
     if (stops.length === 1) return;
@@ -39,13 +50,22 @@ export const StopListEditor = ({ stops, onChange, error, disabled }) => {
 
       {stops.map((stop, index) => (
         <div key={index} className="flex items-start gap-2">
-          <TextField
-            className="flex-1"
-            placeholder="Ej: Via delle Industrie, 2e, 26014 Romanengo CR"
-            value={stop}
-            disabled={disabled}
-            onChange={(e) => updateStop(index, e.target.value)}
-          />
+          <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+            <TextField
+              className="flex-1"
+              placeholder="Ej: Via delle Industrie, 2e, Romanengo CR"
+              value={stop.direccion}
+              disabled={disabled}
+              onChange={(e) => updateStop(index, "direccion", e.target.value)}
+            />
+            <TextField
+              className="sm:w-28"
+              placeholder="CAP"
+              value={stop.cap}
+              disabled={disabled}
+              onChange={(e) => updateStop(index, "cap", e.target.value)}
+            />
+          </div>
           <div className="flex shrink-0 items-center gap-3 pt-3">
             <Button
               variant="link"

@@ -7,8 +7,8 @@ export const GuestRoute = () => {
 
   if (initializing) {
     return (
-      <div className="flex min-h-dvh items-center justify-center bg-black">
-        <Spinner className="h-6 w-6 border-white/20 border-t-white" />
+      <div className="flex min-h-dvh items-center justify-center bg-background">
+        <Spinner className="h-6 w-6 border-line/20 border-t-line" />
       </div>
     );
   }

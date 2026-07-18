@@ -4,6 +4,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
@@ -73,6 +74,7 @@ export const NewVehiclePage = () => {
   if (!isPrivileged) return <Navigate to="/" replace />;
 
   return (
+    <SlideOverPanel closeTo="/vehiculos">
     <div className="flex flex-col gap-6">
       <div>
         <Link to="/vehiculos" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
@@ -144,7 +146,7 @@ export const NewVehiclePage = () => {
             />
           </div>
 
-          <div className="border-t border-white/10 pt-5">
+          <div className="border-t border-line/10 pt-5">
             <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
               Documentos (opcional)
             </h3>
@@ -152,7 +154,7 @@ export const NewVehiclePage = () => {
               {FILE_FIELDS.map(({ name, label, accept }) => (
                 <label
                   key={name}
-                  className="flex cursor-pointer flex-col gap-1 rounded-xl glass-input px-4 py-3 text-[13px] text-ink-50 hover:bg-white/10"
+                  className="flex cursor-pointer flex-col gap-1 rounded-xl glass-input px-4 py-3 text-[13px] text-ink-50 hover:bg-line/10"
                 >
                   <span className="font-medium">{label}</span>
                   <span className="truncate text-ink-400">
@@ -175,5 +177,6 @@ export const NewVehiclePage = () => {
         </form>
       </GlassCard>
     </div>
+    </SlideOverPanel>
   );
 };

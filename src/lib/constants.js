@@ -28,6 +28,13 @@ export const GRUPO_LABELS = Object.fromEntries(
   GRUPO_OPTIONS.map((opt) => [opt.value, opt.label])
 );
 
+// Spedizzione seleccionable al crear un servicio en la seccion DHL - AB Service
+// (Extras Piazza sigue quedando fijo como EXTRA_PIAZZA).
+export const SPEDIZZIONE_OPTIONS = [
+  { value: "DHL", label: "DHL" },
+  { value: "AB_SERVICE", label: "AB Service" },
+];
+
 export const RECORD_STATUS_OPTIONS = [
   { value: "IN_SOSPESO", label: "En suspenso" },
   { value: "IN_CONSEGNA", label: "En camino" },
@@ -52,14 +59,16 @@ export const RECORD_STATUS_LABELS = Object.fromEntries(
   RECORD_STATUS_OPTIONS.map((opt) => [opt.value, opt.label])
 );
 
-// Tono de badge por estado: se mapea a clases utilitarias en <StatusBadge />.
+// Color de estado (badge solido y grafico de barras), tomado de la paleta de
+// estados de envio del style pack Express Dispatch. RITIRATO no tiene
+// equivalente en el pack, se le asigna un teal propio para diferenciarlo.
 export const RECORD_STATUS_TONE = {
-  IN_SOSPESO: "amber",
-  IN_CONSEGNA: "blue",
-  CONSEGNATO: "green",
-  RITIRATO: "slate",
-  RISCHEDULATO: "purple",
-  ANNULLATO: "red",
+  IN_SOSPESO: "pendiente",
+  IN_CONSEGNA: "in-corso",
+  CONSEGNATO: "consegnato",
+  RITIRATO: "ritirato",
+  RISCHEDULATO: "rischedulato",
+  ANNULLATO: "annullato",
 };
 
 // Division de la seccion Registros en 2 pestanias, y de "Servicio actual" en el
@@ -68,22 +77,23 @@ export const RECORD_STATUS_TONE = {
 export const EN_PROCESO_STATUSES = ["IN_SOSPESO", "IN_CONSEGNA", "RITIRATO"];
 export const TERMINADOS_STATUSES = ["CONSEGNATO", "ANNULLATO", "RISCHEDULATO"];
 
-// Paleta categorica validada (contraste + separacion CVD) para el grafico de
-// estados en el dashboard OWNER. Mismo orden que RECORD_STATUS_OPTIONS.
+// Mismos colores que los badges de estado (RECORD_STATUS_TONE + STATUS_COLORS
+// en StatusBadge), para que el grafico de barras del dashboard OWNER use la
+// misma paleta que el resto de la app.
 export const RECORD_STATUS_CHART_COLOR = {
-  IN_SOSPESO: "#c98500",
-  IN_CONSEGNA: "#3987e5",
-  CONSEGNATO: "#008300",
-  RITIRATO: "#199e70",
-  RISCHEDULATO: "#9085e9",
-  ANNULLATO: "#e66767",
+  IN_SOSPESO: "#6b7280",
+  IN_CONSEGNA: "#2563eb",
+  CONSEGNATO: "#16a34a",
+  RITIRATO: "#0d9488",
+  RISCHEDULATO: "#ea580c",
+  ANNULLATO: "#dc2626",
 };
 
 export const CHART_COLORS = {
-  facturacion: "#199e70",
-  costos: "#9085e9",
-  gananciaPositiva: "#0ca30c",
-  gananciaNegativa: "#d03b3b",
+  facturacion: "#0d9488",
+  costos: "#7c3aed",
+  gananciaPositiva: "#16a34a",
+  gananciaNegativa: "#dc2626",
 };
 
 export const VEHICLE_STATUS_OPTIONS = [
@@ -97,9 +107,9 @@ export const VEHICLE_STATUS_LABELS = Object.fromEntries(
 );
 
 export const VEHICLE_STATUS_TONE = {
-  DISPONIBLE: "green",
-  EN_MANTENIMIENTO: "amber",
-  FUERA_DE_SERVICIO: "red",
+  DISPONIBLE: "consegnato",
+  EN_MANTENIMIENTO: "rischedulato",
+  FUERA_DE_SERVICIO: "annullato",
 };
 
 export const TIPO_ARCHIVO_LABELS = {

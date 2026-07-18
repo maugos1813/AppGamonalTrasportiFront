@@ -9,7 +9,8 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
-import { StopListEditor } from "../../components/records/StopListEditor";
+import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
+import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
@@ -43,6 +44,7 @@ const OWNER_FIELDS = [
   "aplicativo",
   "stops",
   "descripcion",
+  "ciudad",
   "fechaServicio",
   "eta",
   "kilometros",
@@ -70,8 +72,11 @@ const toFormState = (record) => ({
   driverId: record.driver?.id ?? "",
   vehicleId: record.vehicle?.id ?? "",
   aplicativo: record.aplicativo ?? "",
-  stops: record.stops?.length ? record.stops.map((s) => s.direccion) : [""],
+  stops: record.stops?.length
+    ? record.stops.map((s) => ({ direccion: s.direccion, cap: "" }))
+    : [{ direccion: "", cap: "" }],
   descripcion: record.descripcion ?? "",
+  ciudad: record.ciudad ?? "",
   fechaServicio: toDateTimeInputValue(record.fechaServicio),
   eta: toDateTimeInputValue(record.eta),
   kilometros: record.kilometros ?? "",
@@ -154,7 +159,7 @@ export const RecordDetailPage = () => {
       fieldsToSubmit
         .map((field) => [
           field,
-          field === "stops" ? form.stops.map((s) => s.trim()).filter(Boolean) : form[field],
+          field === "stops" ? form.stops.map(combineStopAddress).filter(Boolean) : form[field],
         ])
         .filter(([, value]) => value !== "" && value !== undefined)
     );
@@ -190,16 +195,22 @@ export const RecordDetailPage = () => {
   };
 
   if (loadError) {
-    return <Alert>{loadError}</Alert>;
+    return (
+      <SlideOverPanel closeTo="/records/extras-piazza">
+        <Alert>{loadError}</Alert>
+      </SlideOverPanel>
+    );
   }
 
   const dropdownsLoaded = isChofer || (drivers && vehicles && clients);
 
   if (!record || !form || !dropdownsLoaded) {
     return (
-      <div className="flex justify-center py-16">
-        <Spinner className="h-6 w-6 border-white/20 border-t-white" />
-      </div>
+      <SlideOverPanel closeTo="/records/extras-piazza">
+        <div className="flex justify-center py-16">
+          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
+        </div>
+      </SlideOverPanel>
     );
   }
 
@@ -210,10 +221,16 @@ export const RecordDetailPage = () => {
     ? vehicles.map((v) => ({ value: v.id, label: `${v.targa} - ${v.modelo}` }))
     : [];
 
+  const backTo =
+    record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE"
+      ? "/records/dhl-ab-service"
+      : "/records/extras-piazza";
+
   return (
+    <SlideOverPanel closeTo={backTo}>
     <div className="flex flex-col gap-6">
       <div>
-        <Link to="/records" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
+        <Link to={backTo} className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
           &larr; Mis registros
         </Link>
       </div>
@@ -237,6 +254,7 @@ export const RecordDetailPage = () => {
             value={`${record.vehicle?.targa ?? "-"} - ${record.vehicle?.modelo ?? ""}`}
           />
           <InfoRow label="Cliente" value={record.client?.nombre} />
+          {record.ciudad && <InfoRow label="Ciudad" value={record.ciudad} />}
           <InfoRow
             label="Chofer"
             value={`${record.driver?.nombre ?? ""} ${record.driver?.apellido ?? ""}`}
@@ -249,7 +267,7 @@ export const RecordDetailPage = () => {
           )}
         </div>
 
-        <div className="mt-6 border-t border-white/10 pt-6">
+        <div className="mt-6 border-t border-line/10 pt-6">
           <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
             Kilometraje
           </h3>
@@ -273,7 +291,7 @@ export const RecordDetailPage = () => {
         </div>
 
         {!isChofer && (
-          <div className="mt-6 border-t border-white/10 pt-6">
+          <div className="mt-6 border-t border-line/10 pt-6">
             <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
               Detalle economico
             </h3>
@@ -296,7 +314,7 @@ export const RecordDetailPage = () => {
         <Alert>{uploadError}</Alert>
 
         {isChofer && (
-          <label className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl glass-input px-4 py-3 text-[14px] font-medium text-ink-50 hover:bg-white/10">
+          <label className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl glass-input px-4 py-3 text-[14px] font-medium text-ink-50 hover:bg-line/10">
             {uploading ? <Spinner /> : "Subir foto de entrega"}
             <input
               type="file"
@@ -318,7 +336,7 @@ export const RecordDetailPage = () => {
                 href={file.archivoUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="flex items-center justify-between rounded-xl glass-surface-sm px-4 py-3 text-[14px] text-ink-50 hover:bg-white/10"
+                className="flex items-center justify-between rounded-xl glass-surface-sm px-4 py-3 text-[14px] text-ink-50 hover:bg-line/10"
               >
                 <span>{TIPO_ARCHIVO_LABELS[file.tipoArchivo] ?? file.tipoArchivo}</span>
                 <span className="text-[12px] text-ink-400">{formatDateTime(file.createdAt)}</span>
@@ -382,6 +400,12 @@ export const RecordDetailPage = () => {
                   options={APLICATIVO_OPTIONS}
                   value={form.aplicativo}
                   onChange={(v) => setField("aplicativo", v)}
+                />
+                <TextField
+                  id="ciudad"
+                  label="Ciudad"
+                  value={form.ciudad}
+                  onChange={handleChange("ciudad")}
                 />
                 <TextField
                   id="fechaServicio"
@@ -473,7 +497,7 @@ export const RecordDetailPage = () => {
           />
 
           {!isChofer && (
-            <div className="border-t border-white/10 pt-5">
+            <div className="border-t border-line/10 pt-5">
               <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
                 Datos economicos (planificados)
               </h3>
@@ -576,7 +600,7 @@ export const RecordDetailPage = () => {
                   type="checkbox"
                   checked={form.clienteConfirmado}
                   onChange={handleCheckboxChange("clienteConfirmado")}
-                  className="h-4 w-4 rounded border-white/20 bg-transparent accent-accent-500"
+                  className="h-4 w-4 rounded border-line/20 bg-transparent accent-accent-500"
                 />
                 Cliente confirmado
               </label>
@@ -589,11 +613,12 @@ export const RecordDetailPage = () => {
         </form>
       </GlassCard>
     </div>
+    </SlideOverPanel>
   );
 };
 
 const TONE_CLASSES = {
-  amber: "text-amber-300",
+  amber: "text-status-rischedulato",
   blue: "text-accent-300",
 };
 

@@ -5,6 +5,7 @@ import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { PasswordField } from "../../components/ui/PasswordField";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
@@ -57,6 +58,7 @@ export const NewDriverPage = () => {
   if (!isPrivileged) return <Navigate to="/" replace />;
 
   return (
+    <SlideOverPanel closeTo="/choferes">
     <div className="flex flex-col gap-6">
       <div>
         <Link to="/choferes" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
@@ -145,5 +147,6 @@ export const NewDriverPage = () => {
         </form>
       </GlassCard>
     </div>
+    </SlideOverPanel>
   );
 };

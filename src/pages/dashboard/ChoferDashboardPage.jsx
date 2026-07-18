@@ -17,12 +17,12 @@ import { listRecordsRequest, updateRecordRequest, uploadRecordFileRequest } from
 
 // Solo el color de texto del estado, sin fondo ni borde (se usa en el resumen simple).
 const STATUS_TEXT_TONE = {
-  amber: "text-amber-300",
-  blue: "text-accent-300",
-  green: "text-[#4ddb6e]",
-  slate: "text-ink-300",
-  purple: "text-fuchsia-300",
-  red: "text-[#ff6961]",
+  pendiente: "text-status-pendiente",
+  "in-corso": "text-status-in-corso",
+  consegnato: "text-status-consegnato",
+  ritirato: "text-status-ritirato",
+  rischedulato: "text-status-rischedulato",
+  annullato: "text-status-annullato",
 };
 
 export const ChoferDashboardPage = () => {
@@ -50,7 +50,7 @@ export const ChoferDashboardPage = () => {
   if (!records) {
     return (
       <div className="flex justify-center py-16">
-        <Spinner className="h-6 w-6 border-white/20 border-t-white" />
+        <Spinner className="h-6 w-6 border-line/20 border-t-line" />
       </div>
     );
   }
@@ -99,7 +99,7 @@ export const ChoferDashboardPage = () => {
             No tienes servicios en curso ni pendientes.
           </p>
         ) : (
-          <div className="mt-4 flex flex-col divide-y divide-white/10">
+          <div className="mt-4 flex flex-col divide-y divide-line/10">
             {currentServices.map((service) => (
               <div key={service.id} className="py-4 first:pt-0 last:pb-0">
                 <p className="text-[13px] text-ink-200">
@@ -128,7 +128,7 @@ export const ChoferDashboardPage = () => {
                     Finalizar servicio
                   </Button>
 
-                  <label className="flex cursor-pointer items-center gap-2 rounded-full glass-surface-sm px-5 py-2 text-[13px] font-medium text-ink-50 hover:bg-white/10">
+                  <label className="flex cursor-pointer items-center gap-2 rounded-full glass-surface-sm px-5 py-2 text-[13px] font-medium text-ink-50 hover:bg-line/10">
                     {uploadingId === service.id ? <Spinner className="h-3.5 w-3.5" /> : "Subir evidencia"}
                     <input
                       type="file"

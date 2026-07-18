@@ -21,12 +21,12 @@ export const Select = forwardRef(
         {...props}
       >
         {placeholder && (
-          <option value="" disabled className="bg-ink-900 text-ink-400">
+          <option value="" disabled className="bg-popover text-ink-400">
             {placeholder}
           </option>
         )}
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value} className="bg-ink-900 text-ink-50">
+          <option key={opt.value} value={opt.value} className="bg-popover text-ink-50">
             {opt.label}
           </option>
         ))}
