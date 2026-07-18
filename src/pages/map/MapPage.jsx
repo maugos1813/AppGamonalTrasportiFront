@@ -1,21 +1,9 @@
-import L from "leaflet";
-import "leaflet/dist/leaflet.css";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
-import { useEffect, useState } from "react";
+import { GoogleMap, InfoWindow, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
+import { useEffect, useMemo, useState } from "react";
 import { Navigate } from "react-router-dom";
-import {
-  CircleMarker,
-  MapContainer,
-  Marker,
-  Polyline,
-  Popup,
-  TileLayer,
-  useMap,
-} from "react-leaflet";
 import { Alert } from "../../components/ui/Alert";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { EN_PROCESO_STATUSES } from "../../lib/constants";
@@ -23,35 +11,16 @@ import { addMinutes } from "../../lib/format";
 import { listRecordsRequest } from "../../lib/records.api";
 import { listDriverLocationsRequest } from "../../lib/users.api";
 
-// Vite rompe las URLs por defecto de los iconos de Leaflet; se apuntan a mano.
-delete L.Icon.Default.prototype._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
-});
+// Modulo estable fuera del componente: si se recrea en cada render, useJsApiLoader
+// recarga el script de Google Maps una y otra vez.
+const GOOGLE_MAPS_LIBRARIES = [];
 
-const MILAN_CENTER = [45.4642, 9.19];
+const MILAN_CENTER = { lat: 45.4642, lng: 9.19 };
 const REFRESH_INTERVAL_MS = 20000;
 const STATIC_ROUTE_COLOR = "#3987e5";
 const LIVE_ROUTE_COLOR = "#22c55e";
 const DESTINATION_COLOR = "#f59e0b";
-
-// Centra y ajusta el zoom del mapa para que la ruta seleccionada (que ya incluye la
-// posicion del chofer como primer punto) quede completamente visible. Solo se
-// reajusta cuando cambia la seleccion (routeKey), no en cada refresco de datos, para
-// no pelearse con el pan/zoom manual del usuario mientras mira el mapa.
-const FitToRoute = ({ positions, routeKey }) => {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!positions?.length) return;
-    map.fitBounds(L.latLngBounds(positions), { padding: [40, 40], maxZoom: 14 });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, routeKey]);
-
-  return null;
-};
+const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
 
 const minutesAgo = (dateString) => {
   const diffMs = Date.now() - new Date(dateString).getTime();
@@ -61,6 +30,13 @@ const minutesAgo = (dateString) => {
 export const MapPage = () => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+
+  const { isLoaded, loadError } = useJsApiLoader({
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY,
+    libraries: GOOGLE_MAPS_LIBRARIES,
+  });
+  const [map, setMap] = useState(null);
+  const [openInfoId, setOpenInfoId] = useState(null);
 
   const [locations, setLocations] = useState(null);
   const [records, setRecords] = useState(null);
@@ -96,11 +72,6 @@ export const MapPage = () => {
     };
   }, [isPrivileged]);
 
-  if (!isPrivileged) return <Navigate to="/" replace />;
-
-  const center =
-    locations && locations.length > 0 ? [locations[0].lat, locations[0].lng] : MILAN_CENTER;
-
   const pendingRecords = (records ?? [])
     .filter((r) => EN_PROCESO_STATUSES.includes(r.estado))
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
@@ -111,10 +82,30 @@ export const MapPage = () => {
   const selectedRecord = pendingRecords.find((r) => r.id === selectedRecordId);
   const selectedLiveEta = findLiveLocation(selectedRecord)?.etaEnVivo;
   const selectedRouteGeometry = selectedLiveEta?.geometria ?? selectedRecord?.ruta?.geometria;
-  const selectedRoutePositions = selectedRouteGeometry?.coordinates?.map(
-    ([lon, lat]) => [lat, lon]
+  const selectedRoutePositions = useMemo(
+    () => selectedRouteGeometry?.coordinates?.map(([lng, lat]) => ({ lat, lng })),
+    [selectedRouteGeometry]
   );
   const selectedDestination = selectedRecord?.stops?.[selectedRecord.stops.length - 1];
+
+  // Centra y ajusta el zoom del mapa para que la ruta seleccionada (que ya incluye la
+  // posicion del chofer como primer punto) quede completamente visible. Solo se
+  // reajusta cuando cambia la seleccion, no en cada refresco de datos, para no
+  // pelearse con el pan/zoom manual del usuario mientras mira el mapa.
+  useEffect(() => {
+    if (!map || !selectedRoutePositions?.length) return;
+    const bounds = new window.google.maps.LatLngBounds();
+    selectedRoutePositions.forEach((point) => bounds.extend(point));
+    map.fitBounds(bounds, 40);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, selectedRecordId]);
+
+  if (!isPrivileged) return <Navigate to="/" replace />;
+
+  const center =
+    locations && locations.length > 0
+      ? { lat: locations[0].lat, lng: locations[0].lng }
+      : MILAN_CENTER;
 
   return (
     <div className="flex flex-col gap-4">
@@ -125,7 +116,7 @@ export const MapPage = () => {
         </p>
       </div>
 
-      <Alert>{error}</Alert>
+      <Alert>{error || (loadError ? "No se pudo cargar Google Maps." : "")}</Alert>
 
       {locations?.length === 0 && (
         <GlassCard className="text-center text-[14px] text-ink-300">
@@ -190,54 +181,82 @@ export const MapPage = () => {
 
         <div className="glass-surface overflow-hidden rounded-3xl">
           <div className="h-[calc(100dvh-300px)] min-h-[420px] w-full sm:h-[calc(100dvh-260px)] lg:h-[calc(100dvh-220px)]">
-            <MapContainer center={center} zoom={12} className="h-full w-full" scrollWheelZoom>
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-              {locations?.map((loc) => (
-                <Marker key={loc.id} position={[loc.lat, loc.lng]}>
-                  <Popup>
-                    <div className="text-[13px]">
-                      <strong>
-                        {loc.nombre} {loc.apellido}
-                      </strong>
-                      <br />
-                      {loc.servicio?.codigo} - {loc.servicio?.destinazione}
-                      <br />
-                      Actualizado hace {minutesAgo(loc.actualizada)} min
-                      <br />
-                      {loc.etaEnVivo ? (
-                        <>
-                          <strong>En vivo:</strong> le faltan ~{Math.round(loc.etaEnVivo.duracionMin)} min (
-                          {loc.etaEnVivo.distanciaKm.toFixed(1)} km)
-                        </>
-                      ) : (
-                        "ETA en vivo no disponible"
-                      )}
-                    </div>
-                  </Popup>
-                </Marker>
-              ))}
-              {selectedRoutePositions && (
-                <>
+            {!isLoaded ? (
+              <div className="flex h-full items-center justify-center">
+                <Spinner className="h-6 w-6 border-line/20 border-t-line" />
+              </div>
+            ) : (
+              <GoogleMap
+                mapContainerStyle={MAP_CONTAINER_STYLE}
+                center={center}
+                zoom={12}
+                onLoad={setMap}
+                onUnmount={() => setMap(null)}
+                options={{ streetViewControl: false, mapTypeControl: false }}
+              >
+                {locations?.map((loc) => (
+                  <Marker
+                    key={loc.id}
+                    position={{ lat: loc.lat, lng: loc.lng }}
+                    onClick={() => setOpenInfoId(loc.id)}
+                  >
+                    {openInfoId === loc.id && (
+                      <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
+                        <div className="text-[13px]">
+                          <strong>
+                            {loc.nombre} {loc.apellido}
+                          </strong>
+                          <br />
+                          {loc.servicio?.codigo} - {loc.servicio?.destinazione}
+                          <br />
+                          Actualizado hace {minutesAgo(loc.actualizada)} min
+                          <br />
+                          {loc.etaEnVivo ? (
+                            <>
+                              <strong>En vivo:</strong> le faltan ~{Math.round(loc.etaEnVivo.duracionMin)} min (
+                              {loc.etaEnVivo.distanciaKm.toFixed(1)} km)
+                            </>
+                          ) : (
+                            "ETA en vivo no disponible"
+                          )}
+                        </div>
+                      </InfoWindow>
+                    )}
+                  </Marker>
+                ))}
+
+                {selectedRoutePositions && (
                   <Polyline
-                    positions={selectedRoutePositions}
-                    pathOptions={{ color: selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR, weight: 4 }}
+                    path={selectedRoutePositions}
+                    options={{
+                      strokeColor: selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR,
+                      strokeWeight: 4,
+                    }}
                   />
-                  <FitToRoute positions={selectedRoutePositions} routeKey={selectedRecordId} />
-                </>
-              )}
-              {selectedDestination?.lat != null && selectedDestination?.lng != null && (
-                <CircleMarker
-                  center={[selectedDestination.lat, selectedDestination.lng]}
-                  radius={8}
-                  pathOptions={{ color: DESTINATION_COLOR, fillColor: DESTINATION_COLOR, fillOpacity: 0.8 }}
-                >
-                  <Popup>Destino: {selectedDestination.direccion}</Popup>
-                </CircleMarker>
-              )}
-            </MapContainer>
+                )}
+
+                {selectedDestination?.lat != null && selectedDestination?.lng != null && (
+                  <Marker
+                    position={{ lat: selectedDestination.lat, lng: selectedDestination.lng }}
+                    onClick={() => setOpenInfoId("destination")}
+                    icon={{
+                      path: window.google.maps.SymbolPath.CIRCLE,
+                      scale: 8,
+                      fillColor: DESTINATION_COLOR,
+                      fillOpacity: 0.8,
+                      strokeColor: DESTINATION_COLOR,
+                      strokeWeight: 1,
+                    }}
+                  >
+                    {openInfoId === "destination" && (
+                      <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
+                        <div className="text-[13px]">Destino: {selectedDestination.direccion}</div>
+                      </InfoWindow>
+                    )}
+                  </Marker>
+                )}
+              </GoogleMap>
+            )}
           </div>
         </div>
       </div>

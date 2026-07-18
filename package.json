@@ -17,12 +17,11 @@
     "@capacitor/app": "^8.1.0",
     "@capacitor/core": "^8.4.1",
     "@capacitor/geolocation": "^8.2.0",
+    "@react-google-maps/api": "^2.20.8",
     "axios": "^1.18.1",
     "clsx": "^2.1.1",
-    "leaflet": "^1.9.4",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
-    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.18.1",
     "recharts": "^3.9.2"
   },
