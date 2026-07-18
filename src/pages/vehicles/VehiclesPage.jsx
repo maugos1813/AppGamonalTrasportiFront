@@ -13,30 +13,23 @@ import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 
+// Card compacta: pensada para verse bien en grillas de 2 (mobile) a 4 (desktop
+// grande) columnas, asi que prioriza targa/modelo/estado y deja el resto en
+// una sola fila chica en vez del layout mas espacioso de antes (2 en fila, siempre).
 const VehicleCard = ({ vehicle }) => (
   <Link to={`/vehiculos/${vehicle.id}`} className="block">
-    <GlassCard className="transition-colors hover:bg-line/[0.09]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className="text-[13px] font-medium text-ink-400">{vehicle.targa}</span>
-          <h2 className="mt-0.5 text-[17px] font-medium text-ink-50">{vehicle.modelo}</h2>
+    <GlassCard className="!p-4 transition-colors hover:bg-line/[0.09]">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <span className="block truncate text-[11px] font-medium text-ink-400">{vehicle.targa}</span>
+          <h2 className="truncate text-[15px] font-medium text-ink-50">{vehicle.modelo}</h2>
         </div>
-        <VehicleStatusBadge status={vehicle.estado} />
+        <VehicleStatusBadge status={vehicle.estado} className="shrink-0" />
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
-        <div>
-          <span className="block text-ink-400">Area</span>
-          <span className="text-ink-50">{areaLabel(vehicle.area)}</span>
-        </div>
-        <div>
-          <span className="block text-ink-400">Poliza</span>
-          <span className="text-ink-50">{formatDate(vehicle.poliza)}</span>
-        </div>
-        <div>
-          <span className="block text-ink-400">Revision tecnica</span>
-          <span className="text-ink-50">{formatDate(vehicle.rTecnica)}</span>
-        </div>
+      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-400">
+        <span className="truncate">{areaLabel(vehicle.area)}</span>
+        <span className="truncate">Poliza: {formatDate(vehicle.poliza)}</span>
       </div>
     </GlassCard>
   </Link>
@@ -55,7 +48,7 @@ const GroupSection = ({ title, members }) => (
         Todavia no hay vehiculos asignados a este grupo.
       </GlassCard>
     ) : (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
         {members.map((vehicle) => (
           <VehicleCard key={vehicle.id} vehicle={vehicle} />
         ))}

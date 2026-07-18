@@ -18,49 +18,45 @@ const PhoneIcon = ({ className }) => (
   </svg>
 );
 
+// Card compacta: pensada para verse bien en grillas de 2 (mobile) a 4 (desktop
+// grande) columnas, asi que prioriza nombre/estado y deja el resto en una sola
+// fila chica en vez del layout mas espacioso de antes (2 en fila, siempre).
 const DriverCard = ({ driver }) => (
   <Link to={`/choferes/${driver.id}`} className="block">
-    <GlassCard className="transition-colors hover:bg-line/[0.09]">
-      <div className="flex items-center gap-4">
-        <Avatar user={driver} className="h-12 w-12 text-[15px]" />
-        <div className="min-w-0">
-          <h2 className="truncate text-[16px] font-medium text-ink-50">
+    <GlassCard className="!p-4 transition-colors hover:bg-line/[0.09]">
+      <div className="flex items-center gap-3">
+        <Avatar user={driver} className="h-10 w-10 shrink-0 text-[13px]" />
+        <div className="min-w-0 flex-1">
+          <h2 className="truncate text-[14px] font-medium text-ink-50">
             {driver.nombre} {driver.apellido}
           </h2>
-          <p className="truncate text-[13px] text-ink-300">{driver.correoElectronico}</p>
+          <p className="truncate text-[12px] text-ink-300">{driver.correoElectronico}</p>
         </div>
-        <span
-          className={`ml-auto shrink-0 rounded-full border px-3 py-1 text-[12px] font-medium ${
-            driver.estado === "ACTIVO"
-              ? "border-success-500/25 bg-success-500/15 text-success-500"
-              : "border-danger-500/25 bg-danger-500/15 text-danger-500"
-          }`}
-        >
-          {driver.estado === "ACTIVO" ? "Activo" : "Inactivo"}
-        </span>
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-3 text-[13px]">
-        <div>
-          <span className="block text-ink-400">Area</span>
-          <span className="text-ink-50">{areaLabel(driver.area)}</span>
-        </div>
-        <div>
-          <span className="block text-ink-400">Celular</span>
-          <div className="flex items-center gap-2">
-            <span className="text-ink-50">{driver.numeroCelular}</span>
-            {driver.numeroCelular && (
-              <a
-                href={`tel:${driver.numeroCelular.replace(/\s+/g, "")}`}
-                onClick={(e) => e.stopPropagation()}
-                aria-label={`Llamar a ${driver.nombre} ${driver.apellido}`}
-                title="Llamar"
-                className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500/15 text-success-500 hover:bg-success-500/25"
-              >
-                <PhoneIcon className="h-3.5 w-3.5" />
-              </a>
-            )}
-          </div>
+      <div className="mt-3 flex items-center justify-between gap-2">
+        <span className="truncate text-[11px] text-ink-400">{areaLabel(driver.area)}</span>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+              driver.estado === "ACTIVO"
+                ? "border-success-500/25 bg-success-500/15 text-success-500"
+                : "border-danger-500/25 bg-danger-500/15 text-danger-500"
+            }`}
+          >
+            {driver.estado === "ACTIVO" ? "Activo" : "Inactivo"}
+          </span>
+          {driver.numeroCelular && (
+            <a
+              href={`tel:${driver.numeroCelular.replace(/\s+/g, "")}`}
+              onClick={(e) => e.stopPropagation()}
+              aria-label={`Llamar a ${driver.nombre} ${driver.apellido}`}
+              title="Llamar"
+              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500/15 text-success-500 hover:bg-success-500/25"
+            >
+              <PhoneIcon className="h-3.5 w-3.5" />
+            </a>
+          )}
         </div>
       </div>
     </GlassCard>
@@ -80,7 +76,7 @@ const GroupSection = ({ title, members }) => (
         Todavia no hay nadie asignado a este grupo.
       </GlassCard>
     ) : (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
         {members.map((driver) => (
           <DriverCard key={driver.id} driver={driver} />
         ))}

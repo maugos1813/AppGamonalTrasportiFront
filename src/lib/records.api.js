@@ -21,6 +21,10 @@ export const getRecordRequest = (id) =>
 export const updateRecordRequest = (id, payload) =>
   api.patch(`/records/${id}`, payload).then((res) => res.data.data.record);
 
+// Solo OWNER/ADMIN (el backend lo restringe igual). El registro se elimina
+// definitivamente, con sus paradas y archivos asociados.
+export const deleteRecordRequest = (id) => api.delete(`/records/${id}`);
+
 export const listRecordFilesRequest = (id) =>
   api.get(`/records/${id}/files`).then((res) => res.data.data.files);
 

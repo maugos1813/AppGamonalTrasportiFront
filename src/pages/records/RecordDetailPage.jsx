@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
+import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { Spinner } from "../../components/ui/Spinner";
@@ -14,9 +15,16 @@ import { combineStopAddress, StopListEditor } from "../../components/records/Sto
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, TIPO_ARCHIVO_LABELS } from "../../lib/constants";
+import {
+  APLICATIVO_OPTIONS,
+  EXTRAS_PIAZZA_ZONA_LABELS,
+  EXTRAS_PIAZZA_ZONA_OPTIONS,
+  RECORD_STATUS_OPTIONS,
+  TIPO_ARCHIVO_LABELS,
+} from "../../lib/constants";
 import { formatDateTime, toDateTimeInputValue } from "../../lib/format";
 import {
+  deleteRecordRequest,
   getRecordRequest,
   listRecordFilesRequest,
   updateRecordRequest,
@@ -42,6 +50,7 @@ const OWNER_FIELDS = [
   "driverId",
   "vehicleId",
   "aplicativo",
+  "extrasPiazzaZona",
   "stops",
   "descripcion",
   "ciudad",
@@ -72,6 +81,7 @@ const toFormState = (record) => ({
   driverId: record.driver?.id ?? "",
   vehicleId: record.vehicle?.id ?? "",
   aplicativo: record.aplicativo ?? "",
+  extrasPiazzaZona: record.extrasPiazzaZona ?? "",
   stops: record.stops?.length
     ? record.stops.map((s) => ({ direccion: s.direccion, cap: "" }))
     : [{ direccion: "", cap: "" }],
@@ -92,15 +102,44 @@ const toFormState = (record) => ({
   clienteConfirmado: record.clienteConfirmado ?? false,
 });
 
+// A que lista volver segun el tipo de servicio (tambien usado tras eliminar uno).
+const backToSection = (record) =>
+  record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE"
+    ? "/records/dhl-ab-service"
+    : "/records/extras-piazza";
+
+const TrashIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M4 7h16" />
+    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+    <path d="M10 11v6M14 11v6" />
+  </svg>
+);
+
 export const RecordDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isChofer = user?.cargo === "CHOFER";
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
 
   const [record, setRecord] = useState(null);
   const [files, setFiles] = useState([]);
   const [form, setForm] = useState(null);
   const [loadError, setLoadError] = useState("");
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const [drivers, setDrivers] = useState(null);
   const [vehicles, setVehicles] = useState(null);
@@ -194,6 +233,18 @@ export const RecordDetailPage = () => {
     }
   };
 
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteRecordRequest(id);
+      navigate(backToSection(record), { replace: true });
+    } catch (err) {
+      setDeleteError(parseApiError(err).message);
+      setDeleting(false);
+    }
+  };
+
   if (loadError) {
     return (
       <SlideOverPanel closeTo="/records/extras-piazza">
@@ -221,10 +272,8 @@ export const RecordDetailPage = () => {
     ? vehicles.map((v) => ({ value: v.id, label: `${v.targa} - ${v.modelo}` }))
     : [];
 
-  const backTo =
-    record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE"
-      ? "/records/dhl-ab-service"
-      : "/records/extras-piazza";
+  const backTo = backToSection(record);
+  const isExtrasPiazza = record.spedizzione !== "DHL" && record.spedizzione !== "AB_SERVICE";
 
   return (
     <SlideOverPanel closeTo={backTo}>
@@ -241,7 +290,23 @@ export const RecordDetailPage = () => {
             <span className="text-[13px] font-medium text-ink-400">{record.codigo}</span>
             <h1 className="mt-0.5 text-[22px] font-semibold text-ink-50">{record.destinazione}</h1>
           </div>
-          <StatusBadge status={record.estado} />
+          <div className="flex shrink-0 items-center gap-2">
+            <StatusBadge status={record.estado} />
+            {isPrivileged && (
+              <button
+                type="button"
+                aria-label="Eliminar servicio"
+                title="Eliminar servicio"
+                onClick={() => {
+                  setDeleteError("");
+                  setShowDeleteConfirm(true);
+                }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-danger-500/15 hover:text-danger-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-danger-500/20"
+              >
+                <TrashIcon className="h-[17px] w-[17px]" />
+              </button>
+            )}
+          </div>
         </div>
 
         <p className="mt-3 text-[15px] text-ink-200">{record.descripcion}</p>
@@ -255,6 +320,9 @@ export const RecordDetailPage = () => {
           />
           <InfoRow label="Cliente" value={record.client?.nombre} />
           {record.ciudad && <InfoRow label="Ciudad" value={record.ciudad} />}
+          {record.extrasPiazzaZona && (
+            <InfoRow label="Zona" value={EXTRAS_PIAZZA_ZONA_LABELS[record.extrasPiazzaZona]} />
+          )}
           <InfoRow
             label="Chofer"
             value={`${record.driver?.nombre ?? ""} ${record.driver?.apellido ?? ""}`}
@@ -401,6 +469,16 @@ export const RecordDetailPage = () => {
                   value={form.aplicativo}
                   onChange={(v) => setField("aplicativo", v)}
                 />
+                {isExtrasPiazza && (
+                  <SearchableSelect
+                    id="extrasPiazzaZona"
+                    label="Zona"
+                    placeholder="Escribe para buscar una zona"
+                    options={EXTRAS_PIAZZA_ZONA_OPTIONS}
+                    value={form.extrasPiazzaZona}
+                    onChange={(v) => setField("extrasPiazzaZona", v)}
+                  />
+                )}
                 <TextField
                   id="ciudad"
                   label="Ciudad"
@@ -613,6 +691,17 @@ export const RecordDetailPage = () => {
         </form>
       </GlassCard>
     </div>
+
+    <ConfirmModal
+      open={showDeleteConfirm}
+      title="Eliminar servicio"
+      description={`Esta accion no se puede deshacer. Se va a eliminar el servicio ${record.codigo} - ${record.destinazione}.`}
+      confirmLabel="Eliminar"
+      error={deleteError}
+      loading={deleting}
+      onConfirm={handleDelete}
+      onCancel={() => setShowDeleteConfirm(false)}
+    />
     </SlideOverPanel>
   );
 };

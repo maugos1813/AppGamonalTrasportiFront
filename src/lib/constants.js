@@ -35,6 +35,17 @@ export const SPEDIZZIONE_OPTIONS = [
   { value: "AB_SERVICE", label: "AB Service" },
 ];
 
+// Sub-clasificacion de los servicios Extras Piazza (Milano vs Roma), para poder
+// filtrar/reportar por zona mas adelante. No aplica a DHL/AB Service.
+export const EXTRAS_PIAZZA_ZONA_OPTIONS = [
+  { value: "MILANO", label: "Extras Milano" },
+  { value: "ROMA", label: "Extras Roma" },
+];
+
+export const EXTRAS_PIAZZA_ZONA_LABELS = Object.fromEntries(
+  EXTRAS_PIAZZA_ZONA_OPTIONS.map((opt) => [opt.value, opt.label])
+);
+
 export const RECORD_STATUS_OPTIONS = [
   { value: "IN_SOSPESO", label: "En suspenso" },
   { value: "IN_CONSEGNA", label: "En camino" },

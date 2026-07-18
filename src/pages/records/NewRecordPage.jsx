@@ -13,7 +13,7 @@ import { combineStopAddress, StopListEditor } from "../../components/records/Sto
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
+import { APLICATIVO_OPTIONS, EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -24,6 +24,7 @@ const INITIAL_FORM = {
   driverId: "",
   vehicleId: "",
   aplicativo: "",
+  extrasPiazzaZona: "",
   stops: [{ direccion: "", cap: "" }],
   descripcion: "",
   fechaServicio: "",
@@ -207,6 +208,16 @@ export const NewRecordPage = () => {
               value={form.aplicativo}
               onChange={(v) => setField("aplicativo", v)}
               error={fieldErrors.aplicativo?.[0]}
+            />
+
+            <SearchableSelect
+              id="extrasPiazzaZona"
+              label="Zona"
+              placeholder="Escribe para buscar una zona"
+              options={EXTRAS_PIAZZA_ZONA_OPTIONS}
+              value={form.extrasPiazzaZona}
+              onChange={(v) => setField("extrasPiazzaZona", v)}
+              error={fieldErrors.extrasPiazzaZona?.[0]}
             />
 
             <TextField
