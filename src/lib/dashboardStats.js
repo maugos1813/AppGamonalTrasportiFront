@@ -1,4 +1,4 @@
-import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS } from "./constants";
+import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS, getTagliandoStatus } from "./constants";
 import { formatDate } from "./format";
 
 const isSameDay = (a, b) => {
@@ -375,6 +375,32 @@ export const computeVehicleDocumentAlerts = (vehicles, now = new Date()) => {
 
   return alerts.sort((a, b) => new Date(a.date) - new Date(b.date));
 };
+
+// Estado de Tagliando de un vehiculo puntual (mismos umbrales que la seccion Mecanica).
+// Se expone aparte del listado para el aviso individual del chofer sobre "su" vehiculo.
+// withLink=false para el chofer: la seccion Mecanica es solo OWNER/ADMIN, asi que no
+// tiene sentido darle un link que lo termine mandando de vuelta al inicio.
+export const getVehicleMaintenanceAlert = (vehicle, { withLink = true } = {}) => {
+  const status = getTagliandoStatus(vehicle.kmUltimoMantenimiento, vehicle.kmActual);
+  if (!status || status.level === "ok") return null;
+
+  return {
+    id: `vehicle-tagliando-${vehicle.id}`,
+    severity: status.level === "urgente" ? "urgent" : "warning",
+    message:
+      status.level === "urgente"
+        ? `${vehicle.targa} ya paso el km de Tagliando (${Math.round(status.usado).toLocaleString("es-AR")} km desde el ultimo mantenimiento).`
+        : `${vehicle.targa} esta cerca del Tagliando: quedan ${Math.round(status.restante).toLocaleString("es-AR")} km.`,
+    ...(withLink ? { link: "/mecanica" } : {}),
+  };
+};
+
+// Aviso de Tagliando de toda la flota, para la campanita OWNER/ADMIN (urgentes primero).
+export const computeVehicleMaintenanceAlerts = (vehicles) =>
+  vehicles
+    .map(getVehicleMaintenanceAlert)
+    .filter(Boolean)
+    .sort((a, b) => (a.severity === "urgent" ? -1 : b.severity === "urgent" ? 1 : 0));
 
 // Choferes activos cuyo celular reporto que el permiso de ubicacion en segundo plano
 // no esta en "Permitir todo el tiempo" (ver useLocationSharing). Urgente si en este

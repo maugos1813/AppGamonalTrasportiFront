@@ -1,5 +1,7 @@
+import clsx from "clsx";
 import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 // Envoltorio de las pantallas de crear/editar (registros, choferes, vehiculos):
 // en desktop (lg+) se ve como un panel que entra deslizando desde la derecha y
@@ -8,6 +10,10 @@ import { Link, useNavigate } from "react-router-dom";
 // pantalla completa.
 export const SlideOverPanel = ({ children, closeTo }) => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  // OWNER/ADMIN tienen la topbar fija (h-16 + borde) por encima del panel: mismo
+  // pt-24 que usa el <main> de AppShell para que no tape el titulo/boton de arriba.
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
 
   useEffect(() => {
     const onKeyDown = (e) => {
@@ -25,7 +31,14 @@ export const SlideOverPanel = ({ children, closeTo }) => {
         className="hidden lg:block lg:absolute lg:inset-0 lg:bg-backdrop lg:backdrop-blur-sm"
       />
       <div className="lg:relative lg:z-10 lg:h-dvh lg:w-1/2 lg:animate-slide-in-right lg:overflow-y-auto lg:border-l lg:border-line/10 lg:bg-background lg:shadow-2xl">
-        <div className="lg:min-h-full lg:px-8 lg:py-10">{children}</div>
+        <div
+          className={clsx(
+            "lg:min-h-full lg:px-8 lg:pb-10",
+            isPrivileged ? "lg:pt-24" : "lg:pt-10"
+          )}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );

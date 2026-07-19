@@ -12,6 +12,8 @@ export const getUserRequest = (id) =>
 export const updateUserRequest = (id, payload) =>
   api.patch(`/users/${id}`, payload).then((res) => res.data.data.user);
 
+export const deleteUserRequest = (id) => api.delete(`/users/${id}`);
+
 export const uploadUserAvatarRequest = (id, file) => {
   const formData = new FormData();
   formData.append("imagen", file);

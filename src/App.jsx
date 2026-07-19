@@ -11,6 +11,7 @@ import { DriverDetailPage } from "./pages/drivers/DriverDetailPage";
 import { DriversPage } from "./pages/drivers/DriversPage";
 import { NewDriverPage } from "./pages/drivers/NewDriverPage";
 import { MapPage } from "./pages/map/MapPage";
+import { MecanicaPage } from "./pages/mecanica/MecanicaPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
 import { NewDhlAbServiceRecordPage } from "./pages/records/NewDhlAbServiceRecordPage";
 import { NewRecordPage } from "./pages/records/NewRecordPage";
@@ -47,6 +48,7 @@ function App() {
           <Route path="/vehiculos/new" element={<NewVehiclePage />} />
           <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
           <Route path="/mapa" element={<MapPage />} />
+          <Route path="/mecanica" element={<MecanicaPage />} />
         </Route>
       </Route>
 

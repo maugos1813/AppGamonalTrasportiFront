@@ -9,6 +9,8 @@ import {
   computeLocationPermissionAlerts,
   computeOverdueServices,
   computeVehicleDocumentAlerts,
+  computeVehicleMaintenanceAlerts,
+  getVehicleMaintenanceAlert,
 } from "../lib/dashboardStats";
 import { listDocumentsRequest } from "../lib/documents.api";
 import { formatDate } from "../lib/format";
@@ -50,6 +52,9 @@ const buildChoferAlerts = async () => {
           message: `El vehiculo asignado (${vehicle.targa}) esta en mantenimiento.`,
         });
       }
+
+      const tagliandoAlert = getVehicleMaintenanceAlert(vehicle, { withLink: false });
+      if (tagliandoAlert) list.push(tagliandoAlert);
     } catch {
       // si falla la consulta del vehiculo, no bloquea el resto de las alertas
     }
@@ -93,6 +98,7 @@ const buildOwnerAlerts = async () => {
     ...computeLocationPermissionAlerts(users, records),
     ...computeDriverDocumentAlerts(documents, users),
     ...computeVehicleDocumentAlerts(vehicles),
+    ...computeVehicleMaintenanceAlerts(vehicles),
     ...computeBirthdayAlerts(users),
   ]);
 };

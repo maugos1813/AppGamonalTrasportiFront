@@ -13,23 +13,49 @@ import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 
-// Card compacta: pensada para verse bien en grillas de 2 (mobile) a 4 (desktop
-// grande) columnas, asi que prioriza targa/modelo/estado y deja el resto en
-// una sola fila chica en vez del layout mas espacioso de antes (2 en fila, siempre).
+const TruckIcon = ({ className }) => (
+  <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+    <path
+      d="M2 6.5h10.5v9H2v-9zm10.5 3H17l3.5 3v3h-8v-6zM6 18.5a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5zm11 0a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5z"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
+);
+
+// Card baja de 3 columnas: foto en el primer tercio (izquierda), descripcion
+// clave del vehiculo en los otros dos tercios (derecha) - mas compacta en
+// altura que el banner de foto arriba + texto abajo que tenia antes.
 const VehicleCard = ({ vehicle }) => (
   <Link to={`/vehiculos/${vehicle.id}`} className="block">
-    <GlassCard className="!p-4 transition-colors hover:bg-line/[0.09]">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <span className="block truncate text-[11px] font-medium text-ink-400">{vehicle.targa}</span>
-          <h2 className="truncate text-[15px] font-medium text-ink-50">{vehicle.modelo}</h2>
+    <GlassCard className="!p-0 overflow-hidden transition-colors hover:bg-line/[0.09]">
+      <div className="flex h-32">
+        <div className="w-1/3 shrink-0">
+          {vehicle.imagenUrl ? (
+            <img
+              src={vehicle.imagenUrl}
+              alt={vehicle.targa}
+              className="h-full w-full object-cover"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center bg-accent-500/10 text-accent-300/40">
+              <TruckIcon className="h-9 w-9" />
+            </div>
+          )}
         </div>
-        <VehicleStatusBadge status={vehicle.estado} className="shrink-0" />
-      </div>
 
-      <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-ink-400">
-        <span className="truncate">{areaLabel(vehicle.area)}</span>
-        <span className="truncate">Poliza: {formatDate(vehicle.poliza)}</span>
+        <div className="flex w-2/3 min-w-0 flex-col justify-center gap-1.5 px-3">
+          <h2 className="truncate text-[14px] font-medium text-ink-50">{vehicle.modelo}</h2>
+          <div className="flex items-center justify-between gap-2">
+            <span className="truncate text-[11px] font-medium text-ink-400">{vehicle.targa}</span>
+            <VehicleStatusBadge status={vehicle.estado} className="shrink-0 !px-1.5 !py-0.5 !text-[9px]" />
+          </div>
+          <span className="truncate text-[11px] text-ink-400">
+            {areaLabel(vehicle.area)} &middot; Poliza: {formatDate(vehicle.poliza)}
+          </span>
+        </div>
       </div>
     </GlassCard>
   </Link>
@@ -48,7 +74,7 @@ const GroupSection = ({ title, members }) => (
         Todavia no hay vehiculos asignados a este grupo.
       </GlassCard>
     ) : (
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
         {members.map((vehicle) => (
           <VehicleCard key={vehicle.id} vehicle={vehicle} />
         ))}

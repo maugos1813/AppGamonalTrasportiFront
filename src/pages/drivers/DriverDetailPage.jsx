@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
+import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
@@ -25,7 +26,29 @@ import {
   updateDocumentRequest,
 } from "../../lib/documents.api";
 import { formatDate, toDateInputValue } from "../../lib/format";
-import { getUserRequest, updateUserRequest, uploadUserAvatarRequest } from "../../lib/users.api";
+import {
+  deleteUserRequest,
+  getUserRequest,
+  updateUserRequest,
+  uploadUserAvatarRequest,
+} from "../../lib/users.api";
+
+const TrashIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M4 7h16" />
+    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
+    <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
+    <path d="M10 11v6M14 11v6" />
+  </svg>
+);
 
 const ESTADO_OPTIONS = [
   { value: "ACTIVO", label: "Activo" },
@@ -140,6 +163,7 @@ const DocumentRow = ({
 
 export const DriverDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
 
@@ -152,6 +176,10 @@ export const DriverDetailPage = () => {
   const [saveError, setSaveError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
   const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
 
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -221,6 +249,18 @@ export const DriverDetailPage = () => {
       setFieldErrors(parsed.fieldErrors || {});
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await deleteUserRequest(id);
+      navigate("/choferes", { replace: true });
+    } catch (err) {
+      setDeleteError(parseApiError(err).message);
+      setDeleting(false);
     }
   };
 
@@ -312,9 +352,25 @@ export const DriverDetailPage = () => {
           &larr; Choferes
         </Link>
         {!editing && (
-          <Button variant="ghost" className="sm:w-auto sm:px-8" onClick={startEditing}>
-            Editar chofer
-          </Button>
+          <div className="flex items-center gap-2">
+            {driver.id !== user.id && (
+              <button
+                type="button"
+                aria-label="Eliminar chofer"
+                title="Eliminar chofer"
+                onClick={() => {
+                  setDeleteError("");
+                  setShowDeleteConfirm(true);
+                }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-danger-500/15 hover:text-danger-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-danger-500/20"
+              >
+                <TrashIcon className="h-[17px] w-[17px]" />
+              </button>
+            )}
+            <Button variant="ghost" className="sm:w-auto sm:px-8" onClick={startEditing}>
+              Editar chofer
+            </Button>
+          </div>
         )}
       </div>
 
@@ -516,6 +572,17 @@ export const DriverDetailPage = () => {
         </div>
       </GlassCard>
     </div>
+
+    <ConfirmModal
+      open={showDeleteConfirm}
+      title="Eliminar chofer"
+      description={`Esta accion no se puede deshacer. Se va a eliminar a ${driver.nombre} ${driver.apellido}.`}
+      confirmLabel="Eliminar"
+      error={deleteError}
+      loading={deleting}
+      onConfirm={handleDelete}
+      onCancel={() => setShowDeleteConfirm(false)}
+    />
     </SlideOverPanel>
   );
 };

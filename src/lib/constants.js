@@ -148,3 +148,32 @@ export const TIPO_DOCUMENTO_OPTIONS = [
 export const TIPO_DOCUMENTO_LABELS = Object.fromEntries(
   TIPO_DOCUMENTO_OPTIONS.map((opt) => [opt.value, opt.label])
 );
+
+// Seccion Mecanica: intervalo fijo de Tagliando y umbrales de aviso, medidos en KM
+// restantes (TAGLIANDO_INTERVALO_KM - (kmActual - kmUltimoMantenimiento)).
+export const TAGLIANDO_INTERVALO_KM = 20000;
+export const TAGLIANDO_KM_RECORDATORIO = 3500; // <= esto: pedir repuestos
+export const TAGLIANDO_KM_URGENTE = 1500; // <= esto (o vencido): hacer tagliando ya
+
+// Calcula el estado de mantenimiento de un vehiculo a partir de sus KM cargados.
+// Devuelve null si todavia no se cargaron los dos valores necesarios.
+export const getTagliandoStatus = (kmUltimoMantenimiento, kmActual) => {
+  if (kmUltimoMantenimiento == null || kmActual == null) return null;
+
+  const usado = kmActual - kmUltimoMantenimiento;
+  const restante = TAGLIANDO_INTERVALO_KM - usado;
+
+  if (restante <= TAGLIANDO_KM_URGENTE) {
+    return { level: "urgente", usado, restante };
+  }
+  if (restante <= TAGLIANDO_KM_RECORDATORIO) {
+    return { level: "recordatorio", usado, restante };
+  }
+  return { level: "ok", usado, restante };
+};
+
+export const TAGLIANDO_STATUS_LABELS = {
+  ok: "Al dia",
+  recordatorio: "Pedir repuestos",
+  urgente: "Tagliando urgente",
+};

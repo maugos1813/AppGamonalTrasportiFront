@@ -145,6 +145,20 @@ const ThemeToggleButton = ({ className, iconClassName, label }) => {
   );
 };
 
+const WrenchIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M14.7 6.3a4 4 0 0 0-5.4 4.9L3 17.5V21h3.5l6.3-6.3a4 4 0 0 0 4.9-5.4l-2.8 2.8-2.1-2.1 2.8-2.8z" />
+  </svg>
+);
+
 const MapPinIcon = (props) => (
   <svg
     viewBox="0 0 24 24"
@@ -240,6 +254,7 @@ export const AppShell = () => {
               {isPrivileged && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
               {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
               {isPrivileged && <SidebarNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
+              {isPrivileged && <SidebarNavTab to="/mecanica" label="Mecanica" icon={WrenchIcon} />}
             </nav>
           </div>
 
@@ -340,6 +355,7 @@ export const AppShell = () => {
         {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
         {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
         {isPrivileged && <BottomNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
+        {isPrivileged && <BottomNavTab to="/mecanica" label="Mecanica" icon={WrenchIcon} />}
       </nav>
     </div>
   );
