@@ -1,8 +1,10 @@
 import clsx from "clsx";
+import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
+import { MobileNavDrawer } from "./MobileNavDrawer";
 import { NotificationsBell } from "./NotificationsBell";
 
 const UserIcon = (props) => (
@@ -212,9 +214,19 @@ const BottomNavTab = ({ to, label, icon: Icon }) => (
   </NavLink>
 );
 
+// Secciones que en mobile viven en el nav deslizable (MobileNavDrawer) en vez del
+// nav inferior, para no saturarlo de iconos - se activa tocando el logo GT del
+// header. En desktop siguen en el sidebar fijo de siempre, sin cambios.
+const DRAWER_NAV_ITEMS = [
+  { to: "/mapa", label: "Mapa", icon: MapPinIcon },
+  { to: "/mecanica", label: "Mecanica", icon: WrenchIcon },
+];
+
 export const AppShell = () => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useLocationSharing();
 
@@ -299,15 +311,19 @@ export const AppShell = () => {
 
         <div className="min-w-0 flex-1">
           <header className="flex items-center justify-between gap-4 px-4 py-6 sm:hidden">
-            <Link to="/" className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              aria-label="Abrir menu"
+              title="Abrir menu"
+              className="flex items-center gap-3"
+            >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-yellow">
                 <span className="text-sm font-bold text-brand-navy">GT</span>
               </div>
-            </Link>
+            </button>
 
             <div className="flex items-center gap-2">
-              <ThemeToggleButton className="flex h-10 w-10 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-line/10 hover:text-ink-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-line/20" />
-
               <NavLink
                 to="/profile"
                 aria-label="Ver mi perfil"
@@ -323,16 +339,6 @@ export const AppShell = () => {
               </NavLink>
 
               {(user?.cargo === "CHOFER" || isPrivileged) && <NotificationsBell />}
-
-              <button
-                type="button"
-                onClick={logout}
-                aria-label="Cerrar sesion"
-                title="Cerrar sesion"
-                className="flex h-10 w-10 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-line/10 hover:text-ink-50 focus:outline-none focus-visible:ring-4 focus-visible:ring-line/20"
-              >
-                <LogoutIcon className="h-[18px] w-[18px]" />
-              </button>
             </div>
           </header>
 
@@ -354,9 +360,16 @@ export const AppShell = () => {
         <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
         {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
         {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
-        {isPrivileged && <BottomNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
-        {isPrivileged && <BottomNavTab to="/mecanica" label="Mecanica" icon={WrenchIcon} />}
       </nav>
+
+      <MobileNavDrawer
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        items={isPrivileged ? DRAWER_NAV_ITEMS : []}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onLogout={logout}
+      />
     </div>
   );
 };
