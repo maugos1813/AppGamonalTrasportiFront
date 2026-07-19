@@ -1,7 +1,23 @@
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
-import { useChoferAlerts } from "../../hooks/useChoferAlerts";
+import { Link } from "react-router-dom";
+import { useNotifications } from "../../hooks/useNotifications";
 import { Spinner } from "../ui/Spinner";
+
+// Colores segun severidad: rojo = urgente (ETA por vencer), naranja = por vencer
+// (documentos), amarillo = recordatorio (cumpleanios). "warning" queda como
+// default para las alertas del chofer, que no traen severity propia.
+const SEVERITY_ITEM_CLASSES = {
+  urgent: "border-danger-500/25 bg-danger-500/10 text-danger-500",
+  warning: "border-status-rischedulato/25 bg-status-rischedulato/10 text-status-rischedulato",
+  reminder: "border-yellow-500/25 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
+};
+
+const SEVERITY_DOT_CLASSES = {
+  urgent: "bg-danger-500",
+  warning: "bg-status-rischedulato",
+  reminder: "bg-yellow-500",
+};
 
 const BellIcon = (props) => (
   <svg
@@ -22,10 +38,18 @@ const BellIcon = (props) => (
 // fijo (no cambia con el tema), asi que no puede usar los tokens ink-*/line
 // (pensados para el fondo de la app) o se volveria invisible en tema claro.
 export const NotificationsBell = ({ variant = "default" }) => {
-  const { alerts, loading } = useChoferAlerts();
+  const { alerts, loading } = useNotifications();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const isSidebar = variant === "sidebar";
+
+  // El punto del boton toma el color de la alerta mas grave presente (urgente >
+  // por vencer > recordatorio), asi de un vistazo se sabe si algo es realmente urgente.
+  const topSeverity = alerts.some((a) => a.severity === "urgent")
+    ? "urgent"
+    : alerts.some((a) => a.severity === "warning")
+      ? "warning"
+      : "reminder";
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +86,12 @@ export const NotificationsBell = ({ variant = "default" }) => {
       >
         <BellIcon className="h-[18px] w-[18px]" />
         {alerts.length > 0 && (
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-danger-500" />
+          <span
+            className={clsx(
+              "absolute right-1.5 top-1.5 h-2 w-2 rounded-full",
+              SEVERITY_DOT_CLASSES[topSeverity]
+            )}
+          />
         )}
       </button>
 
@@ -80,14 +109,23 @@ export const NotificationsBell = ({ variant = "default" }) => {
             <p className="px-1 py-2 text-[13px] text-ink-400">Sin alertas pendientes.</p>
           ) : (
             <ul className="flex max-h-80 flex-col gap-2 overflow-y-auto">
-              {alerts.map((alert) => (
-                <li
-                  key={alert.id}
-                  className="rounded-xl border border-status-rischedulato/25 bg-status-rischedulato/10 px-3 py-2.5 text-[13px] text-status-rischedulato"
-                >
-                  {alert.message}
-                </li>
-              ))}
+              {alerts.map((alert) => {
+                const itemClassName = clsx(
+                  "block rounded-xl border px-3 py-2.5 text-[13px]",
+                  SEVERITY_ITEM_CLASSES[alert.severity] ?? SEVERITY_ITEM_CLASSES.warning
+                );
+                return (
+                  <li key={alert.id}>
+                    {alert.link ? (
+                      <Link to={alert.link} onClick={() => setOpen(false)} className={clsx(itemClassName, "hover:brightness-110")}>
+                        {alert.message}
+                      </Link>
+                    ) : (
+                      <div className={itemClassName}>{alert.message}</div>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

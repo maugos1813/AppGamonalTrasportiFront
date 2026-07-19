@@ -13,8 +13,10 @@ import { parseApiError } from "../../lib/api";
 import { RECORD_STATUS_LABELS } from "../../lib/constants";
 import {
   computeClientDistribution,
+  computeDriverKmRanking,
   computeDriverStats,
   computeEconomicStats,
+  computeFleetKmUsage,
   computeServiceStats,
   computeVehicleStats,
 } from "../../lib/dashboardStats";
@@ -33,6 +35,12 @@ const PERIOD_DELTA_LABEL = {
   hoy: "vs ayer",
   semana: "vs semana pasada",
   mes: "vs mes pasado",
+};
+
+const PERIOD_LABEL = {
+  hoy: "hoy",
+  semana: "esta semana",
+  mes: "este mes",
 };
 
 export const OwnerDashboardPage = () => {
@@ -79,6 +87,14 @@ export const OwnerDashboardPage = () => {
   );
   const clientDistribution = useMemo(
     () => (loaded ? computeClientDistribution(records, period) : null),
+    [loaded, records, period]
+  );
+  const driverKmRanking = useMemo(
+    () => (loaded ? computeDriverKmRanking(records, period) : null),
+    [loaded, records, period]
+  );
+  const fleetKmUsage = useMemo(
+    () => (loaded ? computeFleetKmUsage(records, period) : null),
     [loaded, records, period]
   );
 
@@ -184,6 +200,16 @@ export const OwnerDashboardPage = () => {
         </GlassCard>
 
         <GlassCard>
+          <h2 className="text-[17px] font-medium text-ink-50">Ranking de choferes (KM)</h2>
+          <p className="mt-1 text-[13px] text-ink-300">
+            Extras Piazza cuenta 1x, DHL y AB Service cuentan 2x. Periodo: {PERIOD_LABEL[period]}.
+          </p>
+          <div className="mt-4">
+            <KmRankingList items={driverKmRanking.slice(0, 8)} />
+          </div>
+        </GlassCard>
+
+        <GlassCard>
           <h2 className="text-[17px] font-medium text-ink-50">Control operativo</h2>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
             <StatCard label="Total vehiculos" value={vehicleStats.total} />
@@ -193,8 +219,48 @@ export const OwnerDashboardPage = () => {
             <StatCard label="Fuera de servicio" value={vehicleStats.fueraDeServicio} tone="red" />
           </div>
         </GlassCard>
+
+        <GlassCard>
+          <h2 className="text-[17px] font-medium text-ink-50">Uso de flota (KM)</h2>
+          <p className="mt-1 text-[13px] text-ink-300">
+            Extras Piazza cuenta 1x, DHL y AB Service cuentan 2x. Periodo: {PERIOD_LABEL[period]}.
+          </p>
+          <div className="mt-4">
+            <KmRankingList items={fleetKmUsage.slice(0, 8)} />
+          </div>
+        </GlassCard>
       </div>
     </div>
+  );
+};
+
+const KmRankingList = ({ items }) => {
+  const max = items[0]?.km ?? 0;
+
+  if (items.length === 0) {
+    return <p className="text-[13px] text-ink-400">Sin datos en este periodo.</p>;
+  }
+
+  return (
+    <ul className="flex flex-col gap-3">
+      {items.map((item, index) => (
+        <li key={item.id}>
+          <div className="flex items-center justify-between gap-2 text-[13px]">
+            <span className="truncate text-ink-50">
+              <span className="mr-2 text-ink-400">#{index + 1}</span>
+              {item.nombre}
+            </span>
+            <span className="shrink-0 font-medium text-ink-50">{Math.round(item.km)} km</span>
+          </div>
+          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-line/10">
+            <div
+              className="h-full rounded-full bg-accent-500"
+              style={{ width: `${max > 0 ? (item.km / max) * 100 : 0}%` }}
+            />
+          </div>
+        </li>
+      ))}
+    </ul>
   );
 };
 

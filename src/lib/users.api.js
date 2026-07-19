@@ -21,5 +21,13 @@ export const uploadUserAvatarRequest = (id, file) => {
 export const updateMyLocationRequest = (lat, lng) =>
   api.patch("/users/me/ubicacion", { lat, lng });
 
+export const reportLocationPermissionRequest = (denegado) =>
+  api.patch("/users/me/ubicacion-permiso", { denegado });
+
 export const listDriverLocationsRequest = () =>
   api.get("/users/ubicaciones").then((res) => res.data.data.ubicaciones);
+
+// A demanda desde el mapa: solo se pide para el chofer libre abierto/seleccionado, no
+// para todos los choferes libres en cada refresco de posiciones.
+export const getDriverReturnEtaRequest = (id) =>
+  api.get(`/users/${id}/eta-regreso`).then((res) => res.data.data.eta);

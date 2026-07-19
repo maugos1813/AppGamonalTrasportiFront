@@ -1,4 +1,5 @@
-import { EN_PROCESO_STATUSES } from "./constants";
+import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS } from "./constants";
+import { formatDate } from "./format";
 
 const isSameDay = (a, b) => {
   const dateA = new Date(a);
@@ -236,6 +237,56 @@ export const computeWorkHours = (records, now = new Date()) => {
   };
 };
 
+// DHL/AB Service pesan el doble que Extras Piazza en los rankings de KM (mas
+// exigentes para el chofer/vehiculo que un trayecto de Extras Piazza equivalente).
+// Pedido explicito del negocio, no una medida real de distancia recorrida.
+const kmMultiplier = (record) =>
+  record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE" ? 2 : 1;
+
+// Km reales si el chofer ya los cargo, si no los planificados - asi un servicio
+// recien creado no queda en cero solo porque todavia no se cerro.
+const recordKm = (record) => (record.kilometrosReales ?? record.kilometros ?? 0) * kmMultiplier(record);
+
+export const computeDriverKmRanking = (records, period, now = new Date()) => {
+  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
+  const totals = new Map();
+
+  scoped.forEach((r) => {
+    if (!r.driver?.id) return;
+    const entry = totals.get(r.driver.id) ?? {
+      id: r.driver.id,
+      nombre: `${r.driver.nombre} ${r.driver.apellido}`,
+      km: 0,
+      servicios: 0,
+    };
+    entry.km += recordKm(r);
+    entry.servicios += 1;
+    totals.set(r.driver.id, entry);
+  });
+
+  return Array.from(totals.values()).sort((a, b) => b.km - a.km);
+};
+
+export const computeFleetKmUsage = (records, period, now = new Date()) => {
+  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
+  const totals = new Map();
+
+  scoped.forEach((r) => {
+    if (!r.vehicle?.id) return;
+    const entry = totals.get(r.vehicle.id) ?? {
+      id: r.vehicle.id,
+      nombre: `${r.vehicle.targa}${r.vehicle.modelo ? ` - ${r.vehicle.modelo}` : ""}`,
+      km: 0,
+      servicios: 0,
+    };
+    entry.km += recordKm(r);
+    entry.servicios += 1;
+    totals.set(r.vehicle.id, entry);
+  });
+
+  return Array.from(totals.values()).sort((a, b) => b.km - a.km);
+};
+
 // Servicios en curso o pendientes cuya fecha de servicio ya paso sin cerrarse.
 export const computeOverdueServices = (records, now = new Date()) =>
   records.filter(
@@ -243,3 +294,135 @@ export const computeOverdueServices = (records, now = new Date()) =>
       (r.estado === "IN_CONSEGNA" || r.estado === "IN_SOSPESO") &&
       new Date(r.fechaServicio) < now
   );
+
+// --- Notificaciones OWNER/ADMIN (campanita) ---------------------------------
+
+const MINUTE_MS = 60 * 1000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+
+const ETA_WARNING_MS = 45 * MINUTE_MS;
+const DOCUMENT_WARNING_DAYS = 30;
+const BIRTHDAY_WARNING_DAYS = 7;
+
+const daysUntil = (dateValue, now) => (new Date(dateValue).getTime() - now.getTime()) / DAY_MS;
+
+// Servicios todavia abiertos cuya ETA vence en <=45min (o ya vencio: la resta da
+// negativo, que tambien es <=45min, asi que quedan igual de urgentes).
+export const computeEtaAlerts = (records, now = new Date()) =>
+  records
+    .filter((r) => EN_PROCESO_STATUSES.includes(r.estado) && r.eta)
+    .filter((r) => new Date(r.eta).getTime() - now.getTime() <= ETA_WARNING_MS)
+    .sort((a, b) => new Date(a.eta) - new Date(b.eta))
+    .map((r) => {
+      const diffMin = Math.round((new Date(r.eta).getTime() - now.getTime()) / MINUTE_MS);
+      return {
+        id: `eta-${r.id}`,
+        severity: "urgent",
+        message: `${r.codigo} - ${r.destinazione}: ${
+          diffMin <= 0 ? "la ETA ya vencio" : `ETA vence en ${diffMin} min`
+        }`,
+        link: `/records/${r.id}`,
+        date: r.eta,
+      };
+    });
+
+// Documentos de choferes (no OWNER/ADMIN) que vencen dentro de 30 dias, o ya vencidos.
+export const computeDriverDocumentAlerts = (documents, users, now = new Date()) => {
+  const choferIds = new Set(users.filter((u) => u.cargo === "CHOFER").map((u) => u.id));
+
+  return documents
+    .filter((d) => d.fechaScadenza && choferIds.has(d.usuarioId))
+    .filter((d) => daysUntil(d.fechaScadenza, now) <= DOCUMENT_WARNING_DAYS)
+    .sort((a, b) => new Date(a.fechaScadenza) - new Date(b.fechaScadenza))
+    .map((d) => {
+      const user = users.find((u) => u.id === d.usuarioId);
+      const nombre = user ? `${user.nombre} ${user.apellido}` : "un chofer";
+      const tipo = TIPO_DOCUMENTO_LABELS[d.tipoDocumento] ?? d.tipoDocumento;
+      return {
+        id: `driver-doc-${d.id}`,
+        severity: "warning",
+        message: `${tipo} de ${nombre} vence el ${formatDate(d.fechaScadenza)}`,
+        link: `/choferes/${d.usuarioId}`,
+        date: d.fechaScadenza,
+      };
+    });
+};
+
+// Poliza de seguro y revision tecnica de cada vehiculo, mismo umbral de 30 dias.
+export const computeVehicleDocumentAlerts = (vehicles, now = new Date()) => {
+  const alerts = [];
+
+  vehicles.forEach((v) => {
+    if (v.poliza && daysUntil(v.poliza, now) <= DOCUMENT_WARNING_DAYS) {
+      alerts.push({
+        id: `vehicle-poliza-${v.id}`,
+        severity: "warning",
+        message: `Poliza de seguro de ${v.targa} vence el ${formatDate(v.poliza)}`,
+        link: `/vehiculos/${v.id}`,
+        date: v.poliza,
+      });
+    }
+    if (v.rTecnica && daysUntil(v.rTecnica, now) <= DOCUMENT_WARNING_DAYS) {
+      alerts.push({
+        id: `vehicle-rtecnica-${v.id}`,
+        severity: "warning",
+        message: `Revision tecnica de ${v.targa} vence el ${formatDate(v.rTecnica)}`,
+        link: `/vehiculos/${v.id}`,
+        date: v.rTecnica,
+      });
+    }
+  });
+
+  return alerts.sort((a, b) => new Date(a.date) - new Date(b.date));
+};
+
+// Choferes activos cuyo celular reporto que el permiso de ubicacion en segundo plano
+// no esta en "Permitir todo el tiempo" (ver useLocationSharing). Urgente si en este
+// momento tienen un servicio "en camino" (no se los puede rastrear ahora mismo),
+// si no, queda como aviso para resolverlo antes del proximo servicio.
+export const computeLocationPermissionAlerts = (users, records) => {
+  const activeDriverIds = new Set(
+    records.filter((r) => r.estado === "IN_CONSEGNA").map((r) => r.driver?.id)
+  );
+
+  return users
+    .filter((u) => u.cargo === "CHOFER" && u.estado === "ACTIVO" && u.ubicacionPermisoDenegado)
+    .map((u) => {
+      const nombre = `${u.nombre} ${u.apellido}`;
+      const isActiveNow = activeDriverIds.has(u.id);
+      return {
+        id: `location-permission-${u.id}`,
+        severity: isActiveNow ? "urgent" : "warning",
+        message: isActiveNow
+          ? `${nombre} tiene un servicio en camino pero su GPS no comparte en segundo plano.`
+          : `${nombre} no tiene el permiso de ubicacion en "Permitir todo el tiempo".`,
+        link: `/choferes/${u.id}`,
+      };
+    });
+};
+
+// Proxima fecha en la que cumple anios (este anio si todavia no paso, si no el que viene).
+const nextBirthday = (fechaNacimiento, now) => {
+  const birth = new Date(fechaNacimiento);
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const next = new Date(now.getFullYear(), birth.getUTCMonth(), birth.getUTCDate());
+  if (next < today) next.setFullYear(next.getFullYear() + 1);
+  return next;
+};
+
+// Cumpleanios de cualquier usuario (chofer, admin u owner) dentro de los proximos 7 dias.
+export const computeBirthdayAlerts = (users, now = new Date()) =>
+  users
+    .filter((u) => u.fechaNacimiento)
+    .map((u) => ({ user: u, next: nextBirthday(u.fechaNacimiento, now) }))
+    .filter(({ next }) => (next.getTime() - now.getTime()) / DAY_MS <= BIRTHDAY_WARNING_DAYS)
+    .sort((a, b) => a.next - b.next)
+    .map(({ user, next }) => ({
+      id: `birthday-${user.id}`,
+      severity: "reminder",
+      message: isSameDay(next, now)
+        ? `Hoy es el cumpleanios de ${user.nombre} ${user.apellido}`
+        : `${user.nombre} ${user.apellido} cumple anios el ${formatDate(next)}`,
+      link: user.cargo === "CHOFER" ? `/choferes/${user.id}` : undefined,
+      date: next,
+    }));

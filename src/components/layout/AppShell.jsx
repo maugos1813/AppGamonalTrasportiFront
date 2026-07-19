@@ -211,6 +211,16 @@ export const AppShell = () => {
         <div className="hidden dark:block absolute bottom-[-20%] right-[-10%] h-[55vh] w-[55vh] rounded-full bg-cyan-400/10 blur-[140px]" />
       </div>
 
+      {/* Topbar fija de desktop para OWNER/ADMIN: ocupa todo el ancho a la derecha del
+          sidebar, siempre arriba de todo (z-40, por encima incluso de los paneles
+          deslizantes de formularios en z-30) para que nada la tape nunca. Ademas de la
+          campanita, es donde va cualquier otro boton global que se agregue a futuro. */}
+      {isPrivileged && (
+        <header className="fixed left-0 right-0 top-0 z-40 hidden h-16 items-center justify-end gap-2 border-b border-line/10 bg-background px-6 sm:left-60 sm:flex">
+          <NotificationsBell />
+        </header>
+      )}
+
       <div className="relative z-10 sm:flex">
         {/* Sidebar fija a la izquierda en desktop; en celular se reemplaza por el
             header + nav inferior de abajo. Navy fijo (no cambia con el tema),
@@ -297,7 +307,7 @@ export const AppShell = () => {
                 <UserIcon className="h-[18px] w-[18px]" />
               </NavLink>
 
-              {user?.cargo === "CHOFER" && <NotificationsBell />}
+              {(user?.cargo === "CHOFER" || isPrivileged) && <NotificationsBell />}
 
               <button
                 type="button"
@@ -311,7 +321,14 @@ export const AppShell = () => {
             </div>
           </header>
 
-          <main className="px-4 pb-28 sm:px-6 sm:py-10">
+          {/* sm:pt-24 en vez de sm:pt-10 cuando es OWNER/ADMIN: deja espacio para que la
+              topbar fija (h-16 + borde) nunca tape el contenido de la pagina. */}
+          <main
+            className={clsx(
+              "px-4 pb-28 sm:px-6 sm:pb-10",
+              isPrivileged ? "sm:pt-24" : "sm:pt-10"
+            )}
+          >
             <Outlet />
           </main>
         </div>

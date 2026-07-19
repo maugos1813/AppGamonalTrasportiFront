@@ -144,3 +144,7 @@ export const TIPO_DOCUMENTO_OPTIONS = [
   { value: "SOGGIORNO", label: "Soggiorno" },
   { value: "TREDICESIMA_QUATTORDICESIMA", label: "13ma/14ma" },
 ];
+
+export const TIPO_DOCUMENTO_LABELS = Object.fromEntries(
+  TIPO_DOCUMENTO_OPTIONS.map((opt) => [opt.value, opt.label])
+);

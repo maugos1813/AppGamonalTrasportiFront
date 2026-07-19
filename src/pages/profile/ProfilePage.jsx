@@ -24,7 +24,7 @@ const requestLocationPermission = () =>
       let watcherId;
       BackgroundGeolocation.addWatcher(
         {
-          backgroundMessage: "Gamonal Trasporti puede compartir tu ubicacion mientras tenes un servicio en camino.",
+          backgroundMessage: "Gamonal Trasporti puede compartir tu ubicacion durante tu horario laboral.",
           backgroundTitle: "Compartir ubicacion",
           requestPermissions: true,
           stale: true,
@@ -114,6 +114,25 @@ export const ProfilePage = () => {
         {user?.cargo === "CHOFER" && (
           <div className="mt-6 border-t border-line/10 pt-6">
             <Alert>{locationError}</Alert>
+
+            {user?.ubicacionPermisoDenegado && (
+              <div className="mb-4 flex flex-col gap-2 rounded-xl border border-danger-500/25 bg-danger-500/10 px-4 py-3 text-[13px] text-danger-500 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  El permiso de ubicacion no esta en "Permitir todo el tiempo": el GPS deja de
+                  compartirse apenas apagas la pantalla o salis de la app.
+                </span>
+                {Capacitor.isNativePlatform() && (
+                  <button
+                    type="button"
+                    onClick={() => BackgroundGeolocation.openSettings()}
+                    className="shrink-0 rounded-lg border border-danger-500/40 px-3 py-1.5 text-[13px] font-medium hover:bg-danger-500/15"
+                  >
+                    Abrir configuracion
+                  </button>
+                )}
+              </div>
+            )}
+
             <Switch
               id="compartir-ubicacion"
               label="Compartir ubicacion GPS"

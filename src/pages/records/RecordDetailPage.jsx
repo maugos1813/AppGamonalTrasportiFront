@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
@@ -128,6 +128,7 @@ const TrashIcon = (props) => (
 export const RecordDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const isChofer = user?.cargo === "CHOFER";
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
@@ -238,16 +239,18 @@ export const RecordDetailPage = () => {
     setDeleteError("");
     try {
       await deleteRecordRequest(id);
-      navigate(backToSection(record), { replace: true });
+      navigate(location.state?.from ?? backToSection(record), { replace: true });
     } catch (err) {
       setDeleteError(parseApiError(err).message);
       setDeleting(false);
     }
   };
 
+  const fallbackCloseTo = location.state?.from ?? "/records/extras-piazza";
+
   if (loadError) {
     return (
-      <SlideOverPanel closeTo="/records/extras-piazza">
+      <SlideOverPanel closeTo={fallbackCloseTo}>
         <Alert>{loadError}</Alert>
       </SlideOverPanel>
     );
@@ -257,7 +260,7 @@ export const RecordDetailPage = () => {
 
   if (!record || !form || !dropdownsLoaded) {
     return (
-      <SlideOverPanel closeTo="/records/extras-piazza">
+      <SlideOverPanel closeTo={fallbackCloseTo}>
         <div className="flex justify-center py-16">
           <Spinner className="h-6 w-6 border-line/20 border-t-line" />
         </div>
@@ -272,7 +275,7 @@ export const RecordDetailPage = () => {
     ? vehicles.map((v) => ({ value: v.id, label: `${v.targa} - ${v.modelo}` }))
     : [];
 
-  const backTo = backToSection(record);
+  const backTo = location.state?.from ?? backToSection(record);
   const isExtrasPiazza = record.spedizzione !== "DHL" && record.spedizzione !== "AB_SERVICE";
 
   return (
@@ -280,7 +283,7 @@ export const RecordDetailPage = () => {
     <div className="flex flex-col gap-6">
       <div>
         <Link to={backTo} className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
-          &larr; Mis registros
+          &larr; {location.state?.from === "/mapa" ? "Mapa" : "Mis registros"}
         </Link>
       </div>
 

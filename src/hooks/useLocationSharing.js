@@ -1,8 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { listRecordsRequest } from "../lib/records.api";
-import { updateMyLocationRequest } from "../lib/users.api";
+import { reportLocationPermissionRequest, updateMyLocationRequest } from "../lib/users.api";
 
 // Solo existe implementacion nativa (Android/iOS); en el navegador normal no se usa.
 const BackgroundGeolocation = registerPlugin("BackgroundGeolocation");
@@ -19,26 +18,33 @@ const isWithinWorkSchedule = () => {
   return isWorkDay && isWorkHour;
 };
 
-// Comparte la ubicacion del chofer mientras tiene un servicio IN_CONSEGNA activo, y
-// ademas se cumple una de estas dos condiciones: esta dentro del horario laboral
-// (lunes a sabado, 7:00 a 19:00), o tiene activado manualmente el switch "Compartir
-// ubicacion GPS" de su perfil (compartirUbicacion) para servicios fuera de horario.
+// Comparte la ubicacion del chofer durante todo su horario laboral (lunes a sabado,
+// 7:00 a 19:00), o si tiene activado manualmente el switch "Compartir ubicacion GPS"
+// de su perfil (para cuando le sale un servicio fuera de horario). No depende de tener
+// un servicio "En camino" activo: asi tambien se lo ve en el mapa volviendo de una
+// entrega o esperando el proximo pedido, para poder mandarle el mas cercano.
 // Dentro del APK (Capacitor) usa el plugin nativo de background geolocation, que sigue
 // funcionando con la app minimizada o la pantalla bloqueada (muestra una notificacion
 // persistente, obligatoria en Android). En la version web normal solo funciona
 // mientras la pestania esta abierta y visible.
 export const useLocationSharing = () => {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
 
   useEffect(() => {
     if (user?.cargo !== "CHOFER") return;
 
     let cancelled = false;
     let watcherId = null;
+    // Arranca con lo que ya sabiamos del usuario (por si el permiso quedo denegado en
+    // una sesion anterior) y solo reporta al backend/UI cuando el estado realmente
+    // cambia, para no mandar el mismo valor en cada tick de 20s.
+    let lastReportedDenied = Boolean(user?.ubicacionPermisoDenegado);
 
-    const hasActiveService = async () => {
-      const records = await listRecordsRequest();
-      return records.some((r) => r.estado === "IN_CONSEGNA");
+    const reportPermission = (denegado) => {
+      if (denegado === lastReportedDenied) return;
+      lastReportedDenied = denegado;
+      setUser((prev) => (prev ? { ...prev, ubicacionPermisoDenegado: denegado } : prev));
+      reportLocationPermissionRequest(denegado).catch(() => {});
     };
 
     const startNativeTracking = async () => {
@@ -46,14 +52,22 @@ export const useLocationSharing = () => {
       watcherId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage:
-            "Gamonal Trasporti esta compartiendo tu ubicacion mientras tenes un servicio en camino.",
-          backgroundTitle: "Servicio en camino",
+            "Gamonal Trasporti esta compartiendo tu ubicacion durante tu horario laboral.",
+          backgroundTitle: "Compartiendo ubicacion",
           requestPermissions: true,
           stale: false,
           distanceFilter: 30,
         },
         (location, error) => {
-          if (error || !location) return;
+          if (error) {
+            // NOT_AUTHORIZED: el permiso de ubicacion no esta en "Permitir todo el
+            // tiempo" (o fue revocado). Antes esto se ignoraba en silencio - ahora
+            // se avisa en Mi perfil y a OWNER/ADMIN por notificacion.
+            if (error.code === "NOT_AUTHORIZED") reportPermission(true);
+            return;
+          }
+          if (!location) return;
+          reportPermission(false);
           updateMyLocationRequest(location.latitude, location.longitude).catch(() => {});
         }
       );
@@ -81,18 +95,12 @@ export const useLocationSharing = () => {
     const tick = async () => {
       try {
         const canShare = isWithinWorkSchedule() || user?.compartirUbicacion;
-        if (!canShare) {
-          stopNativeTracking();
-          return;
-        }
-
-        const active = await hasActiveService();
         if (cancelled) return;
 
         if (Capacitor.isNativePlatform()) {
-          if (active) await startNativeTracking();
+          if (canShare) await startNativeTracking();
           else stopNativeTracking();
-        } else if (active) {
+        } else if (canShare) {
           sendLocationOnceWeb();
         }
       } catch {
@@ -108,5 +116,10 @@ export const useLocationSharing = () => {
       clearInterval(intervalId);
       stopNativeTracking();
     };
+    // user.ubicacionPermisoDenegado y setUser se omiten a proposito: el propio efecto
+    // actualiza ese campo via setUser, y si estuviera en las deps se reiniciaria el
+    // watcher (recreando el permiso nativo) cada vez que cambia, en vez de una vez
+    // por sesion segun cargo/compartirUbicacion.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.cargo, user?.compartirUbicacion]);
 };

@@ -1,15 +1,18 @@
-import { GoogleMap, InfoWindow, Marker, Polyline, useJsApiLoader } from "@react-google-maps/api";
-import { useEffect, useMemo, useState } from "react";
-import { Navigate } from "react-router-dom";
+import { GoogleMap, InfoWindow, Marker, Polygon, useJsApiLoader } from "@react-google-maps/api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, Navigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Spinner } from "../../components/ui/Spinner";
+import { StatusBadge } from "../../components/ui/StatusBadge";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { EN_PROCESO_STATUSES } from "../../lib/constants";
-import { addMinutes } from "../../lib/format";
-import { listRecordsRequest } from "../../lib/records.api";
-import { listDriverLocationsRequest } from "../../lib/users.api";
+import { EN_PROCESO_STATUSES, TERMINADOS_STATUSES } from "../../lib/constants";
+import { addMinutes, formatDateTime } from "../../lib/format";
+import MILANO_ZONES from "../../lib/geo/milanoZones.json";
+import { getRecordLiveEtaRequest, listRecordsRequest } from "../../lib/records.api";
+import { getDriverReturnEtaRequest, listDriverLocationsRequest } from "../../lib/users.api";
 
 // Modulo estable fuera del componente: si se recrea en cada render, useJsApiLoader
 // recarga el script de Google Maps una y otra vez.
@@ -20,12 +23,45 @@ const REFRESH_INTERVAL_MS = 20000;
 const STATIC_ROUTE_COLOR = "#3987e5";
 const LIVE_ROUTE_COLOR = "#22c55e";
 const DESTINATION_COLOR = "#f59e0b";
+// Chofer con ubicacion fresca pero sin servicio "en camino" ahora mismo (volviendo de
+// una entrega o esperando el proximo): mismo gris que el estado "En suspenso" en el
+// resto de la app, para diferenciarlo del pin rojo por defecto de los que si reparten.
+const IDLE_DRIVER_COLOR = "#6b7280";
 const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
+
+// Perimetros oficiales de Area B y Area C (Comune di Milano, portal GIS
+// gisportal.comune.milano.it - capas "Confine Area B" y "Confine Area C").
+// Area B viene como MultiPolygon (el contorno grande mas varios enclaves chicos
+// separados), por eso son varios "paths" en el mismo Polygon.
+const AREA_C_COLOR = "#ef4444";
+const AREA_B_COLOR = "#a855f7";
+const AREA_C_PATH = MILANO_ZONES.areaC;
+const AREA_B_PATHS = MILANO_ZONES.areaB;
+
+const SECTION_OPTIONS = [
+  { value: "pendientes", label: "Pendientes" },
+  { value: "terminados", label: "Terminados" },
+];
 
 const minutesAgo = (dateString) => {
   const diffMs = Date.now() - new Date(dateString).getTime();
   return Math.max(0, Math.round(diffMs / 60000));
 };
+
+const PencilIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
 
 export const MapPage = () => {
   const { user } = useAuth();
@@ -36,12 +72,31 @@ export const MapPage = () => {
     libraries: GOOGLE_MAPS_LIBRARIES,
   });
   const [map, setMap] = useState(null);
+  // Instancia nativa de la linea de ruta dibujada a mano (ver el useEffect mas abajo),
+  // para poder borrarla explicitamente antes de dibujar la siguiente.
+  const polylineRef = useRef(null);
   const [openInfoId, setOpenInfoId] = useState(null);
+  const [showAreaC, setShowAreaC] = useState(true);
+  const [showAreaB, setShowAreaB] = useState(true);
+  const [section, setSection] = useState("pendientes");
 
   const [locations, setLocations] = useState(null);
   const [records, setRecords] = useState(null);
   const [selectedRecordId, setSelectedRecordId] = useState(null);
+  // ETA en vivo del servicio seleccionado en la lista (ruta + linea en el mapa) y del
+  // marcador que tiene el InfoWindow abierto (puede ser el mismo servicio u otro, o el
+  // regreso de un chofer libre). Se piden a demanda -ver los 2 useEffect mas abajo-, no
+  // se calculan para todos los choferes en cada refresco de posiciones: recalcular la
+  // ruta de 30 choferes cada 20s aunque nadie los este mirando sale caro de mas.
+  const [selectedLiveEta, setSelectedLiveEta] = useState(null);
+  // undefined = todavia no se pidio nada, null = se pidio pero no hay ETA disponible.
+  const [openMarkerEta, setOpenMarkerEta] = useState(undefined);
   const [error, setError] = useState("");
+
+  const changeSection = (value) => {
+    setSection(value);
+    setSelectedRecordId(null);
+  };
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -76,17 +131,117 @@ export const MapPage = () => {
     .filter((r) => EN_PROCESO_STATUSES.includes(r.estado))
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
-  const findLiveLocation = (record) =>
-    locations?.find((loc) => loc.servicio?.driverId === record?.driver?.id);
+  // Terminados: mas reciente primero, es historial (al reves que pendientes).
+  const finishedRecords = (records ?? [])
+    .filter((r) => TERMINADOS_STATUSES.includes(r.estado))
+    .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio));
 
-  const selectedRecord = pendingRecords.find((r) => r.id === selectedRecordId);
-  const selectedLiveEta = findLiveLocation(selectedRecord)?.etaEnVivo;
+  const listRecords = section === "pendientes" ? pendingRecords : finishedRecords;
+
+  const selectedRecord = listRecords.find((r) => r.id === selectedRecordId);
+
+  // ETA en vivo del servicio elegido en la lista: se pide solo mientras ese servicio
+  // sigue seleccionado, y se repite cada 20s para mantenerlo al dia - apenas se cambia
+  // de seleccion o de seccion, se corta (no sigue pidiendo de fondo). En "Terminados"
+  // nunca se pide (no tiene sentido, ya no hay ubicacion en vivo que mostrar).
+  useEffect(() => {
+    if (section !== "pendientes" || !selectedRecordId) {
+      setSelectedLiveEta(null);
+      return;
+    }
+
+    let cancelled = false;
+    const fetchEta = () => {
+      getRecordLiveEtaRequest(selectedRecordId)
+        .then((eta) => {
+          if (!cancelled) setSelectedLiveEta(eta);
+        })
+        .catch(() => {
+          if (!cancelled) setSelectedLiveEta(null);
+        });
+    };
+
+    fetchEta();
+    const intervalId = setInterval(fetchEta, REFRESH_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [selectedRecordId, section]);
+
+  // Mismo patron para el marcador que tiene el InfoWindow abierto en el mapa (puede
+  // ser un servicio en camino o un chofer libre volviendo a la base) - solo se pide
+  // mientras ese InfoWindow sigue abierto. undefined = todavia no llego la primera
+  // respuesta ("Calculando..."), null = ya se pidio pero no hay ETA disponible.
+  useEffect(() => {
+    if (section !== "pendientes" || !openInfoId || openInfoId === "destination") {
+      setOpenMarkerEta(undefined);
+      return;
+    }
+
+    setOpenMarkerEta(undefined);
+    const isIdleDriver = openInfoId.startsWith("idle-");
+    let cancelled = false;
+    const fetchEta = () => {
+      const request = isIdleDriver
+        ? getDriverReturnEtaRequest(openInfoId.slice("idle-".length))
+        : getRecordLiveEtaRequest(openInfoId);
+      request
+        .then((eta) => {
+          if (!cancelled) setOpenMarkerEta(eta ?? null);
+        })
+        .catch(() => {
+          if (!cancelled) setOpenMarkerEta(null);
+        });
+    };
+
+    fetchEta();
+    const intervalId = setInterval(fetchEta, REFRESH_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [openInfoId, section]);
+
+  // selectedLiveEta ya queda en null en "Terminados" (el effect de arriba lo corta),
+  // asi que ahi esto cae directo al recorrido planificado del formulario.
   const selectedRouteGeometry = selectedLiveEta?.geometria ?? selectedRecord?.ruta?.geometria;
   const selectedRoutePositions = useMemo(
     () => selectedRouteGeometry?.coordinates?.map(([lng, lat]) => ({ lat, lng })),
     [selectedRouteGeometry]
   );
   const selectedDestination = selectedRecord?.stops?.[selectedRecord.stops.length - 1];
+
+  // Dibuja la ruta seleccionada a mano (sin el componente <Polyline>): asi se
+  // controla directo la instancia nativa de Google Maps y se garantiza que nunca haya
+  // 2 lineas superpuestas. Antes de dibujar la nueva (o si no queda nada
+  // seleccionado), siempre se borra la anterior primero - asi cumple la regla de "solo
+  // la linea del servicio actual, nunca la del anterior" al cambiar de seleccion, de
+  // seccion (Pendientes/Terminados), o al pasar de ruta estatica a ETA en vivo.
+  // @react-google-maps/api (el componente <Polyline> declarativo) no garantiza esto de
+  // forma confiable al cambiar de instancia, sobre todo con StrictMode en desarrollo.
+  useEffect(() => {
+    if (!map) return;
+
+    if (polylineRef.current) {
+      polylineRef.current.setMap(null);
+      polylineRef.current = null;
+    }
+
+    if (!selectedRoutePositions?.length) return;
+
+    polylineRef.current = new window.google.maps.Polyline({
+      path: selectedRoutePositions,
+      strokeColor: selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR,
+      strokeWeight: 4,
+      map,
+    });
+
+    return () => {
+      polylineRef.current?.setMap(null);
+      polylineRef.current = null;
+    };
+  }, [map, selectedRoutePositions, selectedLiveEta]);
 
   // Centra y ajusta el zoom del mapa para que la ruta seleccionada (que ya incluye la
   // posicion del chofer como primer punto) quede completamente visible. Solo se
@@ -103,22 +258,27 @@ export const MapPage = () => {
   if (!isPrivileged) return <Navigate to="/" replace />;
 
   const center =
-    locations && locations.length > 0
+    section === "pendientes" && locations && locations.length > 0
       ? { lat: locations[0].lat, lng: locations[0].lng }
       : MILAN_CENTER;
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-[24px] font-semibold text-ink-50">Mapa</h1>
-        <p className="mt-1 text-[14px] text-ink-300">
-          Choferes con un servicio en camino ahora mismo.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[24px] font-semibold text-ink-50">Mapa</h1>
+          <p className="mt-1 text-[14px] text-ink-300">
+            {section === "pendientes"
+              ? "Choferes compartiendo ubicacion ahora mismo: repartiendo o disponibles."
+              : "Recorrido planificado de servicios ya finalizados."}
+          </p>
+        </div>
+        <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={changeSection} />
       </div>
 
       <Alert>{error || (loadError ? "No se pudo cargar Google Maps." : "")}</Alert>
 
-      {locations?.length === 0 && (
+      {section === "pendientes" && locations?.length === 0 && (
         <GlassCard className="text-center text-[14px] text-ink-300">
           Ningun chofer esta compartiendo su ubicacion en este momento.
         </GlassCard>
@@ -129,57 +289,124 @@ export const MapPage = () => {
           (lista primero, despues el mapa). */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr] lg:items-start">
         <GlassCard className="lg:h-[calc(100dvh-220px)] lg:overflow-y-auto">
-          <h2 className="text-[17px] font-medium text-ink-50">Pronostico de llegada</h2>
+          <h2 className="text-[17px] font-medium text-ink-50">
+            {section === "pendientes" ? "Pronostico de llegada" : "Servicios finalizados"}
+          </h2>
           <p className="mt-1 text-[13px] text-ink-300">
-            Servicios pendientes. Si el chofer ya esta en camino, se muestra el tiempo en vivo desde su
-            ubicacion actual; si todavia no salio, se muestra el estimado planificado. Toca uno para ver la
-            ruta en el mapa.
+            {section === "pendientes"
+              ? "Servicios pendientes. Si el chofer ya esta en camino, se muestra el tiempo en vivo desde su ubicacion actual; si todavia no salio, se muestra el estimado planificado. Toca uno para ver la ruta en el mapa."
+              : "Servicios entregados, retirados, anulados o reprogramados. Toca uno para ver en el mapa el recorrido planificado a partir de las direcciones cargadas (no la ubicacion en vivo del chofer)."}
           </p>
 
-          {pendingRecords.length === 0 && (
-            <p className="mt-4 text-[14px] text-ink-300">No hay servicios pendientes.</p>
+          {listRecords.length === 0 && (
+            <p className="mt-4 text-[14px] text-ink-300">
+              {section === "pendientes" ? "No hay servicios pendientes." : "No hay servicios finalizados."}
+            </p>
           )}
 
           <ul className="mt-4 flex flex-col gap-2">
-            {pendingRecords.map((record) => {
-              const liveEta = findLiveLocation(record)?.etaEnVivo;
+            {listRecords.map((record) => {
+              const isSelected = record.id === selectedRecordId;
+              // El ETA en vivo solo se pidio para el servicio seleccionado (ver el
+              // useEffect de mas arriba) - los demas siempre muestran el planificado.
+              const liveEta = section === "pendientes" && isSelected ? selectedLiveEta : undefined;
               return (
-                <li key={record.id}>
+                <li key={record.id} className="relative">
                   <button
                     type="button"
-                    onClick={() =>
-                      setSelectedRecordId(record.id === selectedRecordId ? null : record.id)
-                    }
+                    onClick={() => setSelectedRecordId(isSelected ? null : record.id)}
                     className={`flex w-full flex-col items-start gap-1 rounded-xl px-4 py-3 text-left text-[14px] transition-colors ${
-                      record.id === selectedRecordId
-                        ? "bg-accent-500/20 text-ink-50"
+                      isSelected
+                        ? "bg-accent-500/20 pr-12 text-ink-50"
                         : "glass-surface-sm text-ink-200 hover:bg-line/10"
                     }`}
                   >
-                    <span>
-                      <strong>{record.codigo}</strong> - {record.destinazione}
-                    </span>
-                    {liveEta ? (
-                      <span className="text-[13px] text-emerald-400">
-                        En vivo: {liveEta.distanciaKm.toFixed(1)} km - {Math.round(liveEta.duracionMin)} min -
-                        llega ~{addMinutes(new Date(), liveEta.duracionMin)}
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span>
+                        <strong>{record.codigo}</strong> - {record.destinazione}
                       </span>
+                      {section === "terminados" && <StatusBadge status={record.estado} />}
+                    </span>
+                    {section === "pendientes" ? (
+                      liveEta ? (
+                        <span className="text-[13px] text-emerald-400">
+                          En vivo: {liveEta.distanciaKm.toFixed(1)} km - {Math.round(liveEta.duracionMin)} min -
+                          llega ~{addMinutes(new Date(), liveEta.duracionMin)}
+                        </span>
+                      ) : record.ruta?.duracionMin != null ? (
+                        <span className="text-[13px] text-ink-300">
+                          {record.ruta.distanciaKm.toFixed(1)} km - {Math.round(record.ruta.duracionMin)} min -
+                          llega ~{addMinutes(record.fechaServicio, record.ruta.duracionMin)}
+                        </span>
+                      ) : (
+                        <span className="text-[13px] text-ink-400">ETA no disponible</span>
+                      )
                     ) : record.ruta?.duracionMin != null ? (
                       <span className="text-[13px] text-ink-300">
-                        {record.ruta.distanciaKm.toFixed(1)} km - {Math.round(record.ruta.duracionMin)} min -
-                        llega ~{addMinutes(record.fechaServicio, record.ruta.duracionMin)}
+                        {record.ruta.distanciaKm.toFixed(1)} km - {Math.round(record.ruta.duracionMin)} min -{" "}
+                        {formatDateTime(record.fechaServicio)}
                       </span>
                     ) : (
-                      <span className="text-[13px] text-ink-400">ETA no disponible</span>
+                      <span className="text-[13px] text-ink-400">
+                        Ruta no disponible - {formatDateTime(record.fechaServicio)}
+                      </span>
                     )}
                   </button>
+
+                  {isSelected && (
+                    // Abre el registro en el panel deslizante de siempre (derecha a
+                    // izquierda), con state.from para que al cerrarlo vuelva al mapa
+                    // en vez de a la lista de registros.
+                    <Link
+                      to={`/records/${record.id}`}
+                      state={{ from: "/mapa" }}
+                      aria-label="Editar ubicaciones del servicio"
+                      title="Editar ubicaciones del servicio"
+                      className="absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/20 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20"
+                    >
+                      <PencilIcon className="h-3.5 w-3.5" />
+                    </Link>
+                  )}
                 </li>
               );
             })}
           </ul>
         </GlassCard>
 
-        <div className="glass-surface overflow-hidden rounded-3xl">
+        <div className="glass-surface relative overflow-hidden rounded-3xl">
+          {isLoaded && (
+            <div className="glass-surface-sm absolute right-3 top-3 z-10 flex flex-col gap-1.5 rounded-xl px-3 py-2 text-[12px] text-ink-200">
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showAreaC}
+                  onChange={(e) => setShowAreaC(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-[#ef4444]"
+                />
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AREA_C_COLOR }} />
+                Area C
+              </label>
+              <label className="flex cursor-pointer items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={showAreaB}
+                  onChange={(e) => setShowAreaB(e.target.checked)}
+                  className="h-3.5 w-3.5 accent-[#a855f7]"
+                />
+                <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AREA_B_COLOR }} />
+                Area B
+              </label>
+              {section === "pendientes" && (
+                <div className="flex items-center gap-2 border-t border-line/10 pt-1.5">
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-full"
+                    style={{ backgroundColor: IDLE_DRIVER_COLOR }}
+                  />
+                  Chofer disponible
+                </div>
+              )}
+            </div>
+          )}
           <div className="h-[calc(100dvh-300px)] min-h-[420px] w-full sm:h-[calc(100dvh-260px)] lg:h-[calc(100dvh-220px)]">
             {!isLoaded ? (
               <div className="flex h-full items-center justify-center">
@@ -194,46 +421,106 @@ export const MapPage = () => {
                 onUnmount={() => setMap(null)}
                 options={{ streetViewControl: false, mapTypeControl: false }}
               >
-                {locations?.map((loc) => (
-                  <Marker
-                    key={loc.id}
-                    position={{ lat: loc.lat, lng: loc.lng }}
-                    onClick={() => setOpenInfoId(loc.id)}
-                  >
-                    {openInfoId === loc.id && (
-                      <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
-                        <div className="text-[13px]">
-                          <strong>
-                            {loc.nombre} {loc.apellido}
-                          </strong>
-                          <br />
-                          {loc.servicio?.codigo} - {loc.servicio?.destinazione}
-                          <br />
-                          Actualizado hace {minutesAgo(loc.actualizada)} min
-                          <br />
-                          {loc.etaEnVivo ? (
-                            <>
-                              <strong>En vivo:</strong> le faltan ~{Math.round(loc.etaEnVivo.duracionMin)} min (
-                              {loc.etaEnVivo.distanciaKm.toFixed(1)} km)
-                            </>
-                          ) : (
-                            "ETA en vivo no disponible"
-                          )}
-                        </div>
-                      </InfoWindow>
-                    )}
-                  </Marker>
-                ))}
-
-                {selectedRoutePositions && (
-                  <Polyline
-                    path={selectedRoutePositions}
+                {showAreaC && (
+                  <Polygon
+                    paths={AREA_C_PATH}
                     options={{
-                      strokeColor: selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR,
-                      strokeWeight: 4,
+                      strokeColor: AREA_C_COLOR,
+                      strokeWeight: 2,
+                      fillColor: AREA_C_COLOR,
+                      fillOpacity: 0.06,
+                      clickable: false,
+                      zIndex: 1,
                     }}
                   />
                 )}
+
+                {showAreaB && (
+                  <Polygon
+                    paths={AREA_B_PATHS}
+                    options={{
+                      strokeColor: AREA_B_COLOR,
+                      strokeWeight: 2,
+                      fillColor: AREA_B_COLOR,
+                      fillOpacity: 0.05,
+                      clickable: false,
+                      zIndex: 0,
+                    }}
+                  />
+                )}
+
+                {section === "pendientes" && locations?.map((loc) => {
+                  // key/estado por loc.servicio.id cuando hay servicio (un mismo chofer
+                  // puede tener varias entradas si tiene mas de un servicio "en camino"
+                  // a la vez, viajes compactados, todas con el mismo loc.id); si esta
+                  // libre (sin servicio) usa loc.id, que ahi si es unico por chofer.
+                  const markerId = loc.servicio?.id ?? `idle-${loc.id}`;
+                  return (
+                    <Marker
+                      key={markerId}
+                      position={{ lat: loc.lat, lng: loc.lng }}
+                      onClick={() => setOpenInfoId(markerId)}
+                      icon={
+                        loc.servicio
+                          ? undefined
+                          : {
+                              path: window.google.maps.SymbolPath.CIRCLE,
+                              scale: 8,
+                              fillColor: IDLE_DRIVER_COLOR,
+                              fillOpacity: 0.9,
+                              strokeColor: "#ffffff",
+                              strokeWeight: 2,
+                            }
+                      }
+                    >
+                      {openInfoId === markerId && (
+                        <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
+                          <div className="text-[13px]">
+                            <strong>
+                              {loc.nombre} {loc.apellido}
+                            </strong>
+                            <br />
+                            {loc.servicio ? (
+                              <>
+                                {loc.servicio.codigo} - {loc.servicio.destinazione}
+                                <br />
+                                Actualizado hace {minutesAgo(loc.actualizada)} min
+                                <br />
+                                {openMarkerEta === undefined ? (
+                                  "Calculando ETA en vivo..."
+                                ) : openMarkerEta ? (
+                                  <>
+                                    <strong>En vivo:</strong> le faltan ~{Math.round(openMarkerEta.duracionMin)} min
+                                    ({openMarkerEta.distanciaKm.toFixed(1)} km)
+                                  </>
+                                ) : (
+                                  "ETA en vivo no disponible"
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                Sin servicio activo - disponible
+                                <br />
+                                Actualizado hace {minutesAgo(loc.actualizada)} min
+                                <br />
+                                {openMarkerEta === undefined ? (
+                                  "Calculando tiempo de regreso..."
+                                ) : openMarkerEta ? (
+                                  <>
+                                    <strong>Volviendo a la base:</strong> ~{Math.round(openMarkerEta.duracionMin)}{" "}
+                                    min ({openMarkerEta.distanciaKm.toFixed(1)} km)
+                                  </>
+                                ) : (
+                                  "Tiempo de regreso no disponible"
+                                )}
+                              </>
+                            )}
+                          </div>
+                        </InfoWindow>
+                      )}
+                    </Marker>
+                  );
+                })}
 
                 {selectedDestination?.lat != null && selectedDestination?.lng != null && (
                   <Marker

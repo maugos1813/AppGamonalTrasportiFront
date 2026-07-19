@@ -28,6 +28,11 @@ export const deleteRecordRequest = (id) => api.delete(`/records/${id}`);
 export const listRecordFilesRequest = (id) =>
   api.get(`/records/${id}/files`).then((res) => res.data.data.files);
 
+// A demanda desde el mapa: solo se pide para el servicio abierto/seleccionado, no para
+// todos los servicios activos en cada refresco de posiciones.
+export const getRecordLiveEtaRequest = (id) =>
+  api.get(`/records/${id}/eta-en-vivo`).then((res) => res.data.data.eta);
+
 export const uploadRecordFileRequest = (id, file, tipoArchivo) => {
   const formData = new FormData();
   formData.append("archivo", file);
