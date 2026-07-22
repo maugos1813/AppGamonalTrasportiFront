@@ -1,3 +1,4 @@
+import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
@@ -8,6 +9,9 @@ import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, GRUPO_OPTIONS } from "../../lib/constants";
+import { computeDriverDocumentAlerts, computeDriverKmRanking } from "../../lib/dashboardStats";
+import { listDocumentsRequest } from "../../lib/documents.api";
+import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
@@ -63,8 +67,10 @@ const DriverCard = ({ driver }) => (
   </Link>
 );
 
+// @container (no breakpoints de viewport): la grilla vive en una columna de 2/3 de
+// pantalla, no en el ancho completo - ver el mismo ajuste en VehiclesPage.
 const GroupSection = ({ title, members }) => (
-  <div className="flex flex-col gap-4">
+  <div className="@container flex flex-col gap-4">
     <h2 className="text-[15px] font-medium text-ink-100">
       {title}{" "}
       <span className="text-ink-400">
@@ -76,7 +82,7 @@ const GroupSection = ({ title, members }) => (
         Todavia no hay nadie asignado a este grupo.
       </GlassCard>
     ) : (
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 lg:gap-4 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @md:grid-cols-3 @xl:grid-cols-4">
         {members.map((driver) => (
           <DriverCard key={driver.id} driver={driver} />
         ))}
@@ -85,17 +91,113 @@ const GroupSection = ({ title, members }) => (
   </div>
 );
 
+// Top de choferes por KM recorrido este mes (planificado o real, ver
+// computeDriverKmRanking) - misma logica que se usaba antes en el dashboard.
+const DriverRankingPanel = ({ records }) => {
+  const ranking = records ? computeDriverKmRanking(records, "mes").slice(0, 10) : undefined;
+
+  return (
+    <GlassCard className="flex flex-col !p-4 lg:max-h-[45vh]">
+      <h2 className="px-1 text-[15px] font-semibold text-ink-50">Ranking de choferes</h2>
+      <p className="mb-3 px-1 text-[12px] text-ink-400">KM recorridos este mes, de mayor a menor.</p>
+
+      <div className="flex flex-col gap-2 overflow-y-auto">
+        {ranking === undefined && (
+          <div className="flex justify-center py-6">
+            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+          </div>
+        )}
+        {ranking?.length === 0 && (
+          <p className="py-3 text-center text-[13px] text-ink-300">Sin servicios este mes todavia.</p>
+        )}
+        {ranking?.map((entry, idx) => (
+          <Link
+            key={entry.id}
+            to={`/choferes/${entry.id}`}
+            className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2 text-[13px] transition-colors hover:bg-line/[0.08]"
+          >
+            <span className="w-4 shrink-0 text-center text-[12px] font-medium text-ink-400">{idx + 1}</span>
+            <span className="min-w-0 flex-1 truncate text-ink-50">{entry.nombre}</span>
+            <span className="shrink-0 text-[12px] text-ink-300">
+              {Math.round(entry.km).toLocaleString("es-AR")} km
+            </span>
+          </Link>
+        ))}
+      </div>
+    </GlassCard>
+  );
+};
+
+// Documentos de choferes por vencer (naranja) o ya vencidos (rojo) - misma logica
+// que alimenta la campanita de notificaciones (computeDriverDocumentAlerts).
+const DriverDocumentAlertsPanel = ({ users, documents }) => {
+  const alerts = users && documents ? computeDriverDocumentAlerts(documents, users) : undefined;
+
+  return (
+    <GlassCard className="flex flex-col !p-4 lg:max-h-[45vh]">
+      <h2 className="px-1 text-[15px] font-semibold text-ink-50">Documentos</h2>
+      <p className="mb-3 px-1 text-[12px] text-ink-400">Choferes con documentos por vencer o vencidos.</p>
+
+      <div className="flex flex-col gap-2 overflow-y-auto">
+        {alerts === undefined && (
+          <div className="flex justify-center py-6">
+            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+          </div>
+        )}
+        {alerts?.length === 0 && (
+          <p className="py-3 text-center text-[13px] text-ink-300">Ningun documento por vencer.</p>
+        )}
+        {alerts?.map((alert) => {
+          const vencido = new Date(alert.date) < new Date();
+          return (
+            <Link
+              key={alert.id}
+              to={alert.link}
+              className="flex items-center gap-2.5 rounded-xl glass-surface-sm px-3 py-2.5 text-[13px] transition-colors hover:bg-line/[0.08]"
+            >
+              <span
+                className={clsx(
+                  "h-2.5 w-2.5 shrink-0 rounded-full",
+                  vencido ? "bg-danger-500" : "bg-status-rischedulato"
+                )}
+              />
+              <p className="min-w-0 flex-1 truncate text-ink-50">{alert.message}</p>
+            </Link>
+          );
+        })}
+      </div>
+    </GlassCard>
+  );
+};
+
 export const DriversPage = () => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
 
   const [drivers, setDrivers] = useState(null);
+  const [monthlyRecords, setMonthlyRecords] = useState(null);
+  const [documents, setDocuments] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isPrivileged) return;
     listUsersRequest()
       .then(setDrivers)
+      .catch((err) => setError(parseApiError(err).message));
+  }, [isPrivileged]);
+
+  useEffect(() => {
+    if (!isPrivileged) return;
+    const now = new Date();
+    listRecordsByMonthRequest(now.getFullYear(), now.getMonth() + 1)
+      .then(setMonthlyRecords)
+      .catch((err) => setError(parseApiError(err).message));
+  }, [isPrivileged]);
+
+  useEffect(() => {
+    if (!isPrivileged) return;
+    listDocumentsRequest()
+      .then(setDocuments)
       .catch((err) => setError(parseApiError(err).message));
   }, [isPrivileged]);
 
@@ -132,23 +234,30 @@ export const DriversPage = () => {
       )}
 
       {drivers !== null && drivers.length > 0 && (
-        <>
-          {GRUPO_OPTIONS.map((grupo) => (
-            <GroupSection
-              key={grupo.value}
-              title={grupo.label.toUpperCase()}
-              members={activeUsers.filter((u) => u.grupo === grupo.value)}
-            />
-          ))}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-start">
+          <div className="flex flex-col gap-8">
+            {GRUPO_OPTIONS.map((grupo) => (
+              <GroupSection
+                key={grupo.value}
+                title={grupo.label.toUpperCase()}
+                members={activeUsers.filter((u) => u.grupo === grupo.value)}
+              />
+            ))}
 
-          {unassignedUsers.length > 0 && (
-            <GroupSection title="SIN GRUPO ASIGNAR" members={unassignedUsers} />
-          )}
+            {unassignedUsers.length > 0 && (
+              <GroupSection title="SIN GRUPO ASIGNAR" members={unassignedUsers} />
+            )}
 
-          {inactiveUsers.length > 0 && (
-            <GroupSection title="INACTIVOS" members={inactiveUsers} />
-          )}
-        </>
+            {inactiveUsers.length > 0 && (
+              <GroupSection title="INACTIVOS" members={inactiveUsers} />
+            )}
+          </div>
+
+          <div className="flex flex-col gap-4">
+            <DriverRankingPanel records={monthlyRecords} />
+            <DriverDocumentAlertsPanel users={drivers} documents={documents} />
+          </div>
+        </div>
       )}
     </div>
   );

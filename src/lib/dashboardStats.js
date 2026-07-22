@@ -124,20 +124,68 @@ const ECONOMIC_COST_FIELDS = [
   "costoEspera",
 ];
 
-const recordCost = (record) =>
-  ECONOMIC_COST_FIELDS.reduce((sum, field) => sum + (record[field] ?? 0), 0);
+// DHL/AB Service no carga costos manuales: se paga un monto fijo por KM (ida y
+// vuelta, de ahi el x2) en vez de sumar combustible/peajes/etc. Area C y espera
+// siguen siendo manuales para DHL tambien (no entran en la tarifa por KM).
+export const isDhlAbRecord = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
 
-const recordProfit = (record) => (record.pagoRecibido ?? 0) - recordCost(record);
+// Tarifa de referencia para estimar lo facturado (rimborso km estandar).
+const DHL_KM_RATE = 0.43;
+const DHL_KM_MULTIPLIER = 2;
+
+// Pago al chofer: 10€/hora de manejo, sea cual sea el tipo de servicio.
+const DRIVER_HOURLY_RATE = 10;
+// Si no hay horasDia/horasNoche cargadas (servicios importados, o uno recien
+// creado antes de que el chofer cierre el servicio), se estima la hora manejada a
+// un promedio de ~100km/hora en vez de dejar el pago al chofer en 0 por falta de
+// dato. Sin duplicar por ida/vuelta aca: el KM cargado en el registro ya es el
+// total recorrido (a diferencia de la tarifa de DHL, que si duplica el KM
+// planificado porque ese es de un solo tramo).
+const ASSUMED_KM_PER_HOUR = 100;
+
+const dhlKmCharge = (record, rate) => (record.kilometros ?? 0) * DHL_KM_MULTIPLIER * rate;
+const dhlExtras = (record) => (record.areaC ?? 0) + (record.costoEspera ?? 0);
+
+// Horas manejadas: las reales si el chofer ya las cargo; si no, se estiman a
+// partir del KM total del registro (sin duplicar, ver ASSUMED_KM_PER_HOUR).
+const recordDriverHours = (record) => {
+  const logged = (record.horasDia ?? 0) + (record.horasNoche ?? 0);
+  if (logged > 0) return logged;
+  return (record.kilometros ?? 0) / ASSUMED_KM_PER_HOUR;
+};
+
+const recordDriverPay = (record) => recordDriverHours(record) * DRIVER_HOURLY_RATE;
+
+// "Costos operativos": combustible/peajes/etc (Extras Piazza) o el monto fijo por
+// KM (DHL/AB Service, que no carga esos gastos manualmente), mas en ambos casos el
+// pago al chofer - antes solo se contaban los gastos del vehiculo, sin el costo real
+// de la mano de obra.
+const recordCost = (record) =>
+  recordDriverPay(record) +
+  (isDhlAbRecord(record)
+    ? dhlExtras(record)
+    : ECONOMIC_COST_FIELDS.reduce((sum, field) => sum + (record[field] ?? 0), 0));
+
+// DHL/AB Service tampoco carga facturacion manualmente todavia: mientras no se
+// cargue un pagoRecibido real, se estima con la tarifa de referencia por KM. El dia
+// que se cargue el pago real de un servicio puntual, ese valor pisa la estimacion.
+const recordRevenue = (record) => {
+  if (record.pagoRecibido != null) return record.pagoRecibido;
+  if (isDhlAbRecord(record)) return dhlKmCharge(record, DHL_KM_RATE) + dhlExtras(record);
+  return 0;
+};
+
+const recordProfit = (record) => recordRevenue(record) - recordCost(record);
 
 export const computeEconomicStats = (records, period, now = new Date()) => {
   const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
   const previousScoped = records.filter((r) => isWithinPreviousPeriod(r.fechaServicio, period, now));
 
-  const facturacion = scoped.reduce((sum, r) => sum + (r.pagoRecibido ?? 0), 0);
+  const facturacion = scoped.reduce((sum, r) => sum + recordRevenue(r), 0);
   const costos = scoped.reduce((sum, r) => sum + recordCost(r), 0);
   const ganancia = facturacion - costos;
 
-  const facturacionAnterior = previousScoped.reduce((sum, r) => sum + (r.pagoRecibido ?? 0), 0);
+  const facturacionAnterior = previousScoped.reduce((sum, r) => sum + recordRevenue(r), 0);
   const gananciaAnterior =
     facturacionAnterior - previousScoped.reduce((sum, r) => sum + recordCost(r), 0);
 
@@ -162,6 +210,26 @@ export const computeEconomicStats = (records, period, now = new Date()) => {
   };
 };
 
+const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
+
+// Facturacion y ganancia mes a mes del anio en curso (Ene-Dic), para el grafico de
+// tendencia del dashboard OWNER. A diferencia de computeEconomicStats (que solo mira
+// el periodo elegido en el selector), esto siempre es el anio calendario completo.
+export const computeMonthlyRevenueTrend = (records, now = new Date()) => {
+  const year = now.getFullYear();
+  const buckets = MONTH_LABELS.map((month) => ({ month, facturacion: 0, ganancia: 0 }));
+
+  records.forEach((r) => {
+    const date = new Date(r.fechaServicio);
+    if (date.getFullYear() !== year) return;
+    const bucket = buckets[date.getMonth()];
+    bucket.facturacion += recordRevenue(r);
+    bucket.ganancia += recordProfit(r);
+  });
+
+  return buckets;
+};
+
 const OTROS_LABEL = "Otros";
 const MAX_CLIENT_SLICES = 4;
 
@@ -173,7 +241,7 @@ export const computeClientDistribution = (records, period, now = new Date()) => 
   const totalsByClient = new Map();
   scoped.forEach((r) => {
     const name = r.client?.nombre ?? "Sin cliente";
-    const amount = r.pagoRecibido ?? 0;
+    const amount = recordRevenue(r);
     totalsByClient.set(name, (totalsByClient.get(name) ?? 0) + amount);
   });
 
@@ -300,31 +368,10 @@ export const computeOverdueServices = (records, now = new Date()) =>
 const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
-const ETA_WARNING_MS = 45 * MINUTE_MS;
 const DOCUMENT_WARNING_DAYS = 30;
 const BIRTHDAY_WARNING_DAYS = 7;
 
 const daysUntil = (dateValue, now) => (new Date(dateValue).getTime() - now.getTime()) / DAY_MS;
-
-// Servicios todavia abiertos cuya ETA vence en <=45min (o ya vencio: la resta da
-// negativo, que tambien es <=45min, asi que quedan igual de urgentes).
-export const computeEtaAlerts = (records, now = new Date()) =>
-  records
-    .filter((r) => EN_PROCESO_STATUSES.includes(r.estado) && r.eta)
-    .filter((r) => new Date(r.eta).getTime() - now.getTime() <= ETA_WARNING_MS)
-    .sort((a, b) => new Date(a.eta) - new Date(b.eta))
-    .map((r) => {
-      const diffMin = Math.round((new Date(r.eta).getTime() - now.getTime()) / MINUTE_MS);
-      return {
-        id: `eta-${r.id}`,
-        severity: "urgent",
-        message: `${r.codigo} - ${r.destinazione}: ${
-          diffMin <= 0 ? "la ETA ya vencio" : `ETA vence en ${diffMin} min`
-        }`,
-        link: `/records/${r.id}`,
-        date: r.eta,
-      };
-    });
 
 // Documentos de choferes (no OWNER/ADMIN) que vencen dentro de 30 dias, o ya vencidos.
 export const computeDriverDocumentAlerts = (documents, users, now = new Date()) => {

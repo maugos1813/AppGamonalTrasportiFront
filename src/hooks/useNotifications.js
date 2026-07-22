@@ -5,7 +5,6 @@ import {
   computeBirthdayAlerts,
   computeCurrentService,
   computeDriverDocumentAlerts,
-  computeEtaAlerts,
   computeLocationPermissionAlerts,
   computeOverdueServices,
   computeVehicleDocumentAlerts,
@@ -14,7 +13,7 @@ import {
 } from "../lib/dashboardStats";
 import { listDocumentsRequest } from "../lib/documents.api";
 import { formatDate } from "../lib/format";
-import { listRecordFilesRequest, listRecordsRequest } from "../lib/records.api";
+import { listPendingRecordsRequest, listRecordFilesRequest, listRecordsRequest } from "../lib/records.api";
 import { listUsersRequest } from "../lib/users.api";
 import { getVehicleRequest, listVehiclesRequest } from "../lib/vehicles.api";
 
@@ -83,19 +82,22 @@ const buildChoferAlerts = async () => {
   return list;
 };
 
-// Notificaciones OWNER/ADMIN: servicios con ETA por vencer, documentos de choferes
-// y vehiculos por vencer, y cumpleanios proximos.
+// Notificaciones OWNER/ADMIN: documentos de choferes y vehiculos por vencer, y
+// cumpleanios proximos. Los servicios por vencer (ETA) ya NO estan aca: el panel de
+// Pendientes de Registros los cubre mejor (con colores de urgencia), y traer el
+// historico completo de registros solo para esa alerta hacia que las notificaciones
+// tardaran en cargar. computeLocationPermissionAlerts solo necesita saber que chofer
+// esta "en camino" ahora mismo, asi que le alcanza con los pendientes (+/-3 dias).
 const buildOwnerAlerts = async () => {
-  const [records, users, vehicles, documents] = await Promise.all([
-    listRecordsRequest(),
+  const [pendingRecords, users, vehicles, documents] = await Promise.all([
+    listPendingRecordsRequest(),
     listUsersRequest(),
     listVehiclesRequest(),
     listDocumentsRequest(),
   ]);
 
   return sortBySeverity([
-    ...computeEtaAlerts(records),
-    ...computeLocationPermissionAlerts(users, records),
+    ...computeLocationPermissionAlerts(users, pendingRecords),
     ...computeDriverDocumentAlerts(documents, users),
     ...computeVehicleDocumentAlerts(vehicles),
     ...computeVehicleMaintenanceAlerts(vehicles),

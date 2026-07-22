@@ -13,7 +13,7 @@ import { parseApiError } from "../../lib/api";
 import { EN_PROCESO_STATUSES, TERMINADOS_STATUSES } from "../../lib/constants";
 import { addMinutes, formatDateTime } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
-import { getRecordLiveEtaRequest, listRecordsRequest } from "../../lib/records.api";
+import { getRecordLiveEtaRequest, getRecordRequest, listRecordsRequest } from "../../lib/records.api";
 import { getDriverReturnEtaRequest, listDriverLocationsRequest } from "../../lib/users.api";
 
 // Modulo estable fuera del componente: si se recrea en cada render, useJsApiLoader
@@ -119,6 +119,12 @@ export const MapPage = () => {
   // se calculan para todos los choferes en cada refresco de posiciones: recalcular la
   // ruta de 30 choferes cada 20s aunque nadie los este mirando sale caro de mas.
   const [selectedLiveEta, setSelectedLiveEta] = useState(null);
+  // Detalle completo (con stops geocodificados y el poligono de la ruta) del
+  // servicio seleccionado en la lista - se pide a demanda (ver el useEffect mas
+  // abajo), no viene en el listado general: ese trae todos los registros en cada
+  // polling de 20s y no incluye ni stops ni el poligono para no volar el trafico
+  // de Neon con datos que nadie esta mirando.
+  const [selectedRecordDetail, setSelectedRecordDetail] = useState(null);
   // undefined = todavia no se pidio nada, null = se pidio pero no hay ETA disponible.
   const [openMarkerEta, setOpenMarkerEta] = useState(undefined);
   const [error, setError] = useState("");
@@ -197,8 +203,6 @@ export const MapPage = () => {
     map?.setZoom(15);
   };
 
-  const selectedRecord = listRecords.find((r) => r.id === selectedRecordId);
-
   // ETA en vivo del servicio elegido en la lista: se pide solo mientras ese servicio
   // sigue seleccionado, y se repite cada 20s para mantenerlo al dia - apenas se cambia
   // de seleccion o de seccion, se corta (no sigue pidiendo de fondo). En "Terminados"
@@ -262,14 +266,37 @@ export const MapPage = () => {
     };
   }, [openInfoId, section]);
 
+  // Detalle completo del servicio seleccionado (stops + poligono de ruta): se pide
+  // una sola vez al seleccionar, no se re-poll-ea (a diferencia de la ETA en vivo,
+  // esto no cambia mientras se esta mirando el mapa).
+  useEffect(() => {
+    if (!selectedRecordId) {
+      setSelectedRecordDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+    getRecordRequest(selectedRecordId)
+      .then((record) => {
+        if (!cancelled) setSelectedRecordDetail(record);
+      })
+      .catch(() => {
+        if (!cancelled) setSelectedRecordDetail(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedRecordId]);
+
   // selectedLiveEta ya queda en null en "Terminados" (el effect de arriba lo corta),
   // asi que ahi esto cae directo al recorrido planificado del formulario.
-  const selectedRouteGeometry = selectedLiveEta?.geometria ?? selectedRecord?.ruta?.geometria;
+  const selectedRouteGeometry = selectedLiveEta?.geometria ?? selectedRecordDetail?.ruta?.geometria;
   const selectedRoutePositions = useMemo(
     () => selectedRouteGeometry?.coordinates?.map(([lng, lat]) => ({ lat, lng })),
     [selectedRouteGeometry]
   );
-  const selectedDestination = selectedRecord?.stops?.[selectedRecord.stops.length - 1];
+  const selectedDestination = selectedRecordDetail?.stops?.[selectedRecordDetail.stops.length - 1];
 
   // Dibuja la ruta seleccionada a mano (sin el componente <Polyline>): asi se
   // controla directo la instancia nativa de Google Maps y se garantiza que nunca haya

@@ -58,6 +58,14 @@ export const formatCurrency = (value) =>
     maximumFractionDigits: 2,
   }).format(value ?? 0);
 
+// Sin decimales, para espacios chicos (ej. el centro de un anillo de progreso).
+export const formatCurrencyCompact = (value) =>
+  new Intl.NumberFormat("es-AR", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 0,
+  }).format(value ?? 0);
+
 // Convierte un ISO datetime a "yyyy-MM-ddThh:mm" para <input type="datetime-local">.
 export const toDateTimeInputValue = (value) => {
   if (!value) return "";

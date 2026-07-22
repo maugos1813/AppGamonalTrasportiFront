@@ -3,17 +3,27 @@ import { Link, NavLink } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { Select } from "../../components/ui/Select";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusBadge } from "../../components/ui/StatusBadge";
+import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { APLICATIVO_LABELS, EN_PROCESO_STATUSES, TERMINADOS_STATUSES } from "../../lib/constants";
+import {
+  APLICATIVO_LABELS,
+  EN_PROCESO_STATUSES,
+  RECORD_STATUS_OPTIONS,
+  TERMINADOS_STATUSES,
+} from "../../lib/constants";
 import { formatDate, formatTimeRemaining } from "../../lib/format";
 import {
+  listPendingRecordsRequest,
   listRecordsByDayRequest,
   listRecordsRequest,
   listRecordsSummaryByMonthRequest,
+  searchRecordsRequest,
+  updateRecordRequest,
 } from "../../lib/records.api";
 
 const TAB_OPTIONS = [
@@ -69,6 +79,24 @@ const dayLabel = (value) =>
 
 const driverName = (record) =>
   record.driver ? `${record.driver.nombre} ${record.driver.apellido}` : "Sin chofer asignado";
+
+const isDhlAb = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
+
+// Urgencia por tiempo restante a la ETA: >1h verde, 31-59min naranja, <=30min (o ya
+// vencido) rojo - para que el panel de Pendientes se pueda escanear de un vistazo.
+const URGENCY_STYLES = {
+  verde: "border-l-success-500",
+  naranja: "border-l-amber-500",
+  rojo: "border-l-danger-500",
+};
+
+const urgencyLevel = (etaValue) => {
+  if (!etaValue) return "verde";
+  const diffMin = (new Date(etaValue).getTime() - Date.now()) / 60000;
+  if (diffMin >= 60) return "verde";
+  if (diffMin >= 31) return "naranja";
+  return "rojo";
+};
 
 // Agrupa el resumen (liviano, solo id/fechaServicio/estado) de un mes por dia de
 // SERVICIO (no de creacion: un import historico masivo puede crearse todo el mismo
@@ -193,11 +221,10 @@ const RecordRow = ({ record }) => (
     <span className={ROW_COLUMN_CLASSES.estado}>
       <StatusBadge status={record.estado} className="px-2 py-0.5 text-[11px]" />
     </span>
-    <span
-      className={ROW_COLUMN_CLASSES.eta}
-      title={`${formatDate(record.eta)} - ${formatTimeRemaining(record.eta)}`}
-    >
-      {formatTimeRemaining(record.eta)}
+    <span className={ROW_COLUMN_CLASSES.eta} title={formatDate(record.eta)}>
+      {/* "Vencido hace X" no tiene sentido para un servicio ya terminado - ahi solo
+          se muestra la fecha de referencia, no la cuenta regresiva/vencida. */}
+      {TERMINADOS_STATUSES.includes(record.estado) ? formatDate(record.eta) : formatTimeRemaining(record.eta)}
     </span>
     <span className={ROW_COLUMN_CLASSES.km}>{record.kilometros ?? "-"}</span>
     <span className={ROW_COLUMN_CLASSES.destino} title={record.destinazione}>
@@ -211,6 +238,81 @@ const RecordRow = ({ record }) => (
 
 const now = new Date();
 const CURRENT_VIEW_DATE = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+
+// Fila del panel de Pendientes: sin agrupar por dia (a diferencia del acordeon de la
+// izquierda) para poder escanear la urgencia de todo de un vistazo, ordenado por ETA.
+// El link (abre el detalle completo) y el selector de estado van separados: un
+// <select> no puede anidarse dentro de un <a> (lo que renderiza Link). Es un select
+// (no un boton de "marcar entregado") a proposito: un clic de mas en un boton
+// cambiaria el estado sin querer, mientras que elegir de una lista requiere abrirla
+// primero.
+const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => (
+  <div className={`rounded-xl border-l-4 ${URGENCY_STYLES[urgencyLevel(record.eta)]} glass-surface-sm text-[13px]`}>
+    <Link
+      to={`/records/${record.id}`}
+      state={{ from: closeTo }}
+      className="flex flex-col gap-1 px-3 pt-2.5 transition-colors hover:opacity-90"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="min-w-0 truncate font-medium text-ink-50">{record.codigo}</span>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
+            isDhlAb(record) ? "bg-accent-500/15 text-accent-300" : "bg-line/15 text-ink-300"
+          }`}
+        >
+          {isDhlAb(record) ? "DHL/AB" : "Extras Piazza"}
+        </span>
+      </div>
+      <span className="truncate text-ink-300">{record.destinazione}</span>
+      <div className="flex items-center justify-between gap-2 text-[12px] text-ink-400">
+        <span className="min-w-0 truncate">{driverName(record)}</span>
+        <span className="shrink-0">{formatTimeRemaining(record.eta)}</span>
+      </div>
+    </Link>
+    <div className="px-3 pb-2.5 pt-1.5">
+      <Select
+        id={`estado-${record.id}`}
+        options={RECORD_STATUS_OPTIONS}
+        value={record.estado}
+        disabled={updating}
+        onChange={(e) => onChangeEstado(record.id, e.target.value)}
+        className="!py-1.5 !text-[12px]"
+      />
+    </div>
+  </div>
+);
+
+// El backend ya filtra (en curso, +/-3 dias) y ordena por ETA - solo se renderiza tal cual.
+const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId }) => {
+  return (
+    <GlassCard className="flex flex-col !p-4 lg:h-[calc(100dvh-220px)]">
+      <h2 className="px-1 text-[15px] font-semibold text-ink-50">Pendientes</h2>
+      <p className="mb-3 px-1 text-[12px] text-ink-400">
+        Extras Piazza y DHL - AB Service juntos, ordenado por lo mas urgente.
+      </p>
+
+      <div className="flex flex-col gap-2 overflow-y-auto">
+        {pending === undefined && (
+          <div className="flex justify-center py-8">
+            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+          </div>
+        )}
+        {pending?.length === 0 && (
+          <p className="py-4 text-center text-[13px] text-ink-300">No hay servicios pendientes.</p>
+        )}
+        {pending?.map((record) => (
+          <PendingRow
+            key={record.id}
+            record={record}
+            closeTo={closeTo}
+            updating={updatingId === record.id}
+            onChangeEstado={onChangeEstado}
+          />
+        ))}
+      </div>
+    </GlassCard>
+  );
+};
 
 export const RecordsListPage = ({ section }) => {
   const { user } = useAuth();
@@ -231,6 +333,18 @@ export const RecordsListPage = ({ section }) => {
   // --- Vista CHOFER: lista plana simple, trae todo de una (siempre es poco, son
   // solo sus propios servicios). ---
   const [records, setRecords] = useState(null);
+
+  // Panel de Pendientes (OWNER/ADMIN): junta Extras Piazza y DHL - AB Service sin
+  // separar por seccion, asi que se trae aparte del resumen mensual (que si esta
+  // filtrado por seccion). Se pide una sola vez al entrar a Registros.
+  const [pendingRecords, setPendingRecords] = useState(null);
+  const [updatingId, setUpdatingId] = useState(null);
+
+  // Buscador (codigo/cliente/chofer/destino): reemplaza el acordeon de la izquierda
+  // mientras hay una busqueda activa. null = sin busqueda, [] = sin resultados.
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
 
   // Fuerza un re-render cada minuto para que "tiempo restante antes de vencer" no quede desactualizado.
   const [, setTick] = useState(0);
@@ -255,6 +369,75 @@ export const RecordsListPage = ({ section }) => {
       cancelled = true;
     };
   }, [isPrivileged]);
+
+  useEffect(() => {
+    if (!isPrivileged) return;
+    let cancelled = false;
+
+    listPendingRecordsRequest()
+      .then((data) => {
+        if (!cancelled) setPendingRecords(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(parseApiError(err).message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPrivileged]);
+
+  // Debounce: espera a que se deje de tipear antes de pegarle al backend. Menos de 2
+  // caracteres limpia los resultados en vez de buscar (ver SEARCH_MIN_LENGTH del backend).
+  useEffect(() => {
+    if (!isPrivileged) return;
+    const query = searchQuery.trim();
+    if (query.length < 2) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    let cancelled = false;
+    const timeoutId = setTimeout(() => {
+      searchRecordsRequest(query)
+        .then((data) => {
+          if (!cancelled) setSearchResults(data);
+        })
+        .catch((err) => {
+          if (!cancelled) setError(parseApiError(err).message);
+        })
+        .finally(() => {
+          if (!cancelled) setSearching(false);
+        });
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [isPrivileged, searchQuery]);
+
+  const handleChangeEstado = async (recordId, estado) => {
+    setUpdatingId(recordId);
+    try {
+      await updateRecordRequest(recordId, { estado });
+      setPendingRecords((prev) => {
+        if (!prev) return prev;
+        // Si el nuevo estado ya no es "en proceso" (ej. Entregado/Anulado), sale del
+        // panel de Pendientes; si sigue en curso, se actualiza en el lugar.
+        if (!EN_PROCESO_STATUSES.includes(estado)) {
+          return prev.filter((r) => r.id !== recordId);
+        }
+        return prev.map((r) => (r.id === recordId ? { ...r, estado } : r));
+      });
+    } catch (err) {
+      setError(parseApiError(err).message);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -336,6 +519,16 @@ export const RecordsListPage = ({ section }) => {
         </div>
       </div>
 
+      {isPrivileged && (
+        <TextField
+          id="records-search"
+          placeholder="Buscar por codigo, cliente o chofer..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="sm:max-w-sm"
+        />
+      )}
+
       <Alert>{error}</Alert>
 
       {!isPrivileged && records === null && !error && (
@@ -353,92 +546,137 @@ export const RecordsListPage = ({ section }) => {
       )}
 
       {isPrivileged ? (
-        <GlassCard className="!p-0">
-          <div className="flex items-center justify-between gap-2 px-5 py-4">
-            <button
-              type="button"
-              onClick={() => setViewDate((v) => shiftMonth(v, -1))}
-              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-            >
-              &larr; Mes anterior
-            </button>
-            <h2 className="text-[15px] font-semibold uppercase text-ink-100">
-              {monthLabel(viewDate.year, viewDate.month)}
-            </h2>
-            <button
-              type="button"
-              onClick={() => setViewDate((v) => shiftMonth(v, 1))}
-              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-            >
-              Mes siguiente &rarr;
-            </button>
-          </div>
-
-          <div className="flex flex-col gap-2 border-t border-line/10 px-5 pb-4 pt-3">
-            {summary === null && (
-              <div className="flex justify-center py-8">
-                <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-start">
+          <GlassCard className="!p-0">
+            {searchResults !== null ? (
+              <div className="flex items-center justify-between gap-2 px-5 py-4">
+                <h2 className="text-[15px] font-semibold text-ink-100">
+                  Resultados de busqueda{searching && " - buscando..."}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+                >
+                  Volver al mes
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between gap-2 px-5 py-4">
+                <button
+                  type="button"
+                  onClick={() => setViewDate((v) => shiftMonth(v, -1))}
+                  className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+                >
+                  &larr; Mes anterior
+                </button>
+                <h2 className="text-[15px] font-semibold uppercase text-ink-100">
+                  {monthLabel(viewDate.year, viewDate.month)}
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setViewDate((v) => shiftMonth(v, 1))}
+                  className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+                >
+                  Mes siguiente &rarr;
+                </button>
               </div>
             )}
 
-            {summaryDays?.length === 0 && (
-              <p className="py-4 text-center text-[14px] text-ink-300">
-                No hay servicios {tab === "en_proceso" ? "en proceso" : "terminados"} este mes.
-              </p>
-            )}
+            {searchResults !== null ? (
+              <div className="border-t border-line/10 px-2 pb-4 pt-3">
+                {searchResults.length === 0 ? (
+                  <p className="py-4 text-center text-[14px] text-ink-300">
+                    Sin resultados para "{searchQuery.trim()}".
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[720px]">
+                      <CompactRowHeader />
+                      <div className="flex flex-col gap-0.5 px-2">
+                        {searchResults.map((record) => (
+                          <RecordRow key={record.id} record={record} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+            <div className="flex flex-col gap-2 border-t border-line/10 px-5 pb-4 pt-3">
+              {summary === null && (
+                <div className="flex justify-center py-8">
+                  <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+                </div>
+              )}
 
-            {summaryDays?.map((day) => {
-              const dayOpen = openDays.has(day.key);
-              const loaded = dayRecords.get(day.key);
-              const dayVisibleRecords = loaded
-                ?.filter(
-                  (r) =>
-                    TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
-                )
-                .sort((a, b) => driverName(a).localeCompare(driverName(b)));
+              {summaryDays?.length === 0 && (
+                <p className="py-4 text-center text-[14px] text-ink-300">
+                  No hay servicios {tab === "en_proceso" ? "en proceso" : "terminados"} este mes.
+                </p>
+              )}
 
-              return (
-                <div key={day.key} className="rounded-2xl glass-surface-sm">
-                  <DisclosureHeader
-                    open={dayOpen}
-                    onClick={() => toggleDay(day)}
-                    className="px-4 py-3 text-[14px] text-ink-100"
-                  >
-                    <span>
-                      {dayLabel(day.date)}{" "}
-                      <span className="text-ink-400">
-                        ({day.count} servicio{day.count === 1 ? "" : "s"})
+              {summaryDays?.map((day) => {
+                const dayOpen = openDays.has(day.key);
+                const loaded = dayRecords.get(day.key);
+                const dayVisibleRecords = loaded
+                  ?.filter(
+                    (r) =>
+                      TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
+                  )
+                  .sort((a, b) => driverName(a).localeCompare(driverName(b)));
+
+                return (
+                  <div key={day.key} className="rounded-2xl glass-surface-sm">
+                    <DisclosureHeader
+                      open={dayOpen}
+                      onClick={() => toggleDay(day)}
+                      className="px-4 py-3 text-[14px] text-ink-100"
+                    >
+                      <span>
+                        {dayLabel(day.date)}{" "}
+                        <span className="text-ink-400">
+                          ({day.count} servicio{day.count === 1 ? "" : "s"})
+                        </span>
                       </span>
-                    </span>
-                  </DisclosureHeader>
+                    </DisclosureHeader>
 
-                  {dayOpen && (
-                    <div className="border-t border-line/10 pb-2">
-                      {loadingDays.has(day.key) && (
-                        <div className="flex justify-center py-6">
-                          <Spinner className="h-5 w-5 border-line/20 border-t-line" />
-                        </div>
-                      )}
-                      {dayErrors.has(day.key) && <Alert>{dayErrors.get(day.key)}</Alert>}
-                      {dayVisibleRecords && (
-                        <div className="overflow-x-auto">
-                          <div className="min-w-[720px]">
-                            <CompactRowHeader />
-                            <div className="flex flex-col gap-0.5 px-2">
-                              {dayVisibleRecords.map((record) => (
-                                <RecordRow key={record.id} record={record} />
-                              ))}
+                    {dayOpen && (
+                      <div className="border-t border-line/10 pb-2">
+                        {loadingDays.has(day.key) && (
+                          <div className="flex justify-center py-6">
+                            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+                          </div>
+                        )}
+                        {dayErrors.has(day.key) && <Alert>{dayErrors.get(day.key)}</Alert>}
+                        {dayVisibleRecords && (
+                          <div className="overflow-x-auto">
+                            <div className="min-w-[720px]">
+                              <CompactRowHeader />
+                              <div className="flex flex-col gap-0.5 px-2">
+                                {dayVisibleRecords.map((record) => (
+                                  <RecordRow key={record.id} record={record} />
+                                ))}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </GlassCard>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            )}
+          </GlassCard>
+
+          <PendingPanel
+            records={pendingRecords}
+            closeTo={`/records/${section}`}
+            onChangeEstado={handleChangeEstado}
+            updatingId={updatingId}
+          />
+        </div>
       ) : (
         <div className="flex flex-col gap-3">
           {visibleRecords?.map((record) => (

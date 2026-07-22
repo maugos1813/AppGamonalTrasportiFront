@@ -3,6 +3,17 @@ import { api } from "./api";
 export const listRecordsRequest = () =>
   api.get("/records").then((res) => res.data.data.records);
 
+// Panel de "Pendientes" de Registros: acotado a +/-3 dias en el backend, no el
+// historico completo (no tiene sentido traer miles de registros para filtrar los
+// pocos que estan en curso ahora mismo).
+export const listPendingRecordsRequest = () =>
+  api.get("/records/pending").then((res) => res.data.data.records);
+
+// Buscador de Registros (codigo/cliente/chofer/destino) - filtra en el backend, no
+// trae el historico completo para buscar en el navegador.
+export const searchRecordsRequest = (q) =>
+  api.get("/records/search", { params: { q } }).then((res) => res.data.data.records);
+
 // Resumen liviano (id/fechaServicio/estado) de un mes, para armar el acordeon de
 // dias sin traer stops/ruta/economico de cada registro.
 export const listRecordsSummaryByMonthRequest = (year, month) =>
@@ -11,6 +22,11 @@ export const listRecordsSummaryByMonthRequest = (year, month) =>
 // Registros completos de un dia especifico (se piden recien al desplegar ese dia).
 export const listRecordsByDayRequest = (year, month, day) =>
   api.get(`/records/${year}/${month}/${day}`).then((res) => res.data.data.records);
+
+// Registros completos de un mes especifico (ej. ranking de KM de flota del mes en
+// Vehiculos) - acotado a ese mes, no el historico completo.
+export const listRecordsByMonthRequest = (year, month) =>
+  api.get(`/records/${year}/${month}`).then((res) => res.data.data.records);
 
 export const createRecordRequest = (payload) =>
   api.post("/records", payload).then((res) => res.data.data.record);

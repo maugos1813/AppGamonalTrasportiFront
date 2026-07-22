@@ -1,13 +1,15 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { StatCard } from "../../components/ui/StatCard";
 import { Switch } from "../../components/ui/Switch";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, CARGO_LABELS } from "../../lib/constants";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatDateTime } from "../../lib/format";
+import { getAppsheetSyncStatusRequest, runAppsheetSyncRequest } from "../../lib/sync.api";
 import { updateUserRequest } from "../../lib/users.api";
 
 const BackgroundGeolocation = registerPlugin("BackgroundGeolocation");
@@ -56,10 +58,41 @@ const requestLocationPermission = () =>
     }
   });
 
+const SYNC_ERROR_PREVIEW = 5;
+
 export const ProfilePage = () => {
   const { user, setUser } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const [savingLocation, setSavingLocation] = useState(false);
   const [locationError, setLocationError] = useState("");
+
+  const [syncState, setSyncState] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState("");
+
+  useEffect(() => {
+    if (!isPrivileged) return;
+    getAppsheetSyncStatusRequest()
+      .then(setSyncState)
+      .catch(() => {});
+  }, [isPrivileged]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncError("");
+    setSyncResult(null);
+    try {
+      const result = await runAppsheetSyncRequest();
+      setSyncResult(result);
+      const state = await getAppsheetSyncStatusRequest();
+      setSyncState(state);
+    } catch (err) {
+      setSyncError(parseApiError(err).message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const handleToggleLocationSharing = async (checked) => {
     setSavingLocation(true);
@@ -141,6 +174,57 @@ export const ProfilePage = () => {
               disabled={savingLocation}
               onChange={handleToggleLocationSharing}
             />
+          </div>
+        )}
+
+        {isPrivileged && (
+          <div className="mt-6 border-t border-line/10 pt-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="text-[15px] font-medium text-ink-50">Sincronizar con AppSheet</h3>
+                <p className="mt-1 text-[13px] text-ink-300">
+                  Trae los servicios nuevos cargados en la planilla de AppSheet (desde marzo 2026 en
+                  adelante). Los que ya se sincronizaron antes no se vuelven a traer.
+                </p>
+              </div>
+              <Button className="sm:w-auto" loading={syncing} onClick={handleSync}>
+                Sincronizar ahora
+              </Button>
+            </div>
+
+            <p className="mt-3 text-[13px] text-ink-400">
+              {syncState?.lastSyncedAt
+                ? `Ultima sincronizacion: ${formatDateTime(syncState.lastSyncedAt)}`
+                : "Todavia no se sincronizo nunca."}
+            </p>
+
+            <Alert>{syncError}</Alert>
+
+            {syncResult && (
+              <div className="mt-3 rounded-xl glass-surface-sm px-4 py-3 text-[13px] text-ink-200">
+                <p>
+                  <span className="text-success-500">{syncResult.created} creados</span>
+                  {" · "}
+                  <span className="text-ink-400">{syncResult.skipped} ya sincronizados</span>
+                  {" · "}
+                  <span className={syncResult.errors.length ? "text-danger-500" : "text-ink-400"}>
+                    {syncResult.errors.length} con error
+                  </span>
+                </p>
+                {syncResult.errors.length > 0 && (
+                  <ul className="mt-2 flex flex-col gap-1 text-ink-300">
+                    {syncResult.errors.slice(0, SYNC_ERROR_PREVIEW).map((e) => (
+                      <li key={`${e.row}-${e.id}`}>
+                        Fila {e.row} ({e.id}): {e.reason}
+                      </li>
+                    ))}
+                    {syncResult.errors.length > SYNC_ERROR_PREVIEW && (
+                      <li>...y {syncResult.errors.length - SYNC_ERROR_PREVIEW} mas.</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
       </GlassCard>

@@ -18,7 +18,6 @@ import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const INITIAL_FORM = {
-  codigo: "",
   clientId: "",
   driverId: "",
   vehicleId: "",
@@ -83,9 +82,12 @@ export const NewDhlAbServiceRecordPage = () => {
 
     const { calle, cap, ciudad, ...rest } = form;
     const direccion = buildAddress({ calle, cap, ciudad });
+    // DHL/AB Service no maneja codigos propios: se genera uno interno solo para
+    // cumplir la columna unica de la base, no se le muestra al usuario.
+    const codigo = `${form.spedizzione}-${Date.now()}`;
 
     const payload = Object.fromEntries(
-      Object.entries({ ...rest, ciudad, stops: [direccion] }).filter(
+      Object.entries({ ...rest, codigo, ciudad, stops: [direccion] }).filter(
         ([key, value]) => key === "stops" || value !== ""
       )
     );
@@ -154,16 +156,6 @@ export const NewDhlAbServiceRecordPage = () => {
           <Alert>{formError}</Alert>
 
           <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <TextField
-              id="codigo"
-              label="Codigo"
-              placeholder="Ej: DHL-0001"
-              value={form.codigo}
-              onChange={handleChange("codigo")}
-              error={fieldErrors.codigo?.[0]}
-              required
-            />
-
             <SearchableSelect
               id="estado"
               label="Estado"

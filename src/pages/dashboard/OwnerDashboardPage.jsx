@@ -1,29 +1,25 @@
+import clsx from "clsx";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { ClientDistributionChart } from "../../components/charts/ClientDistributionChart";
 import { EconomicsChart } from "../../components/charts/EconomicsChart";
-import { ServicesStatusChart } from "../../components/charts/ServicesStatusChart";
+import { RevenueTrendChart } from "../../components/charts/RevenueTrendChart";
 import { Alert } from "../../components/ui/Alert";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Spinner } from "../../components/ui/Spinner";
-import { StatCard } from "../../components/ui/StatCard";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { RECORD_STATUS_LABELS } from "../../lib/constants";
+import { CHART_COLORS } from "../../lib/constants";
 import {
   computeClientDistribution,
-  computeDriverKmRanking,
-  computeDriverStats,
   computeEconomicStats,
-  computeFleetKmUsage,
-  computeServiceStats,
-  computeVehicleStats,
+  computeMonthlyRevenueTrend,
+  isDhlAbRecord,
 } from "../../lib/dashboardStats";
-import { formatCurrency } from "../../lib/format";
+import { formatCurrency, formatCurrencyCompact } from "../../lib/format";
 import { listRecordsRequest } from "../../lib/records.api";
-import { listUsersRequest } from "../../lib/users.api";
-import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const PERIOD_OPTIONS = [
   { value: "hoy", label: "Hoy" },
@@ -37,29 +33,30 @@ const PERIOD_DELTA_LABEL = {
   mes: "vs mes pasado",
 };
 
-const PERIOD_LABEL = {
-  hoy: "hoy",
-  semana: "esta semana",
-  mes: "este mes",
+const SECTION_OPTIONS = [
+  { value: "extras_piazza", label: "Extras Piazza" },
+  { value: "dhl_ab", label: "DHL - AB Service" },
+];
+
+const SECTION_LABEL = {
+  extras_piazza: "Extras Piazza",
+  dhl_ab: "DHL - AB Service",
 };
 
 export const OwnerDashboardPage = () => {
   const { user } = useAuth();
   const [records, setRecords] = useState(null);
-  const [vehicles, setVehicles] = useState(null);
-  const [users, setUsers] = useState(null);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
+  const [section, setSection] = useState("extras_piazza");
 
   useEffect(() => {
     let cancelled = false;
 
-    Promise.all([listRecordsRequest(), listVehiclesRequest(), listUsersRequest()])
-      .then(([recordsData, vehiclesData, usersData]) => {
+    listRecordsRequest()
+      .then((recordsData) => {
         if (cancelled) return;
         setRecords(recordsData);
-        setVehicles(vehiclesData);
-        setUsers(usersData);
       })
       .catch((err) => {
         if (!cancelled) setError(parseApiError(err).message);
@@ -70,32 +67,28 @@ export const OwnerDashboardPage = () => {
     };
   }, []);
 
-  const loaded = records && vehicles && users;
+  const loaded = Boolean(records);
 
-  const serviceStats = useMemo(() => (loaded ? computeServiceStats(records) : null), [loaded, records]);
-  const vehicleStats = useMemo(
-    () => (loaded ? computeVehicleStats(vehicles, records) : null),
-    [loaded, vehicles, records]
+  // Todo el bloque de Control economico mira solo la seccion elegida (Extras
+  // Piazza o DHL - AB Service): son negocios con estructuras de costos distintas
+  // (ver isDhlAbRecord/recordCost en dashboardStats.js), asi que no tiene sentido
+  // mezclarlos en el mismo numero.
+  const scopedRecords = useMemo(
+    () => (loaded ? records.filter((r) => (section === "dhl_ab" ? isDhlAbRecord(r) : !isDhlAbRecord(r))) : null),
+    [loaded, records, section]
   );
-  const driverStats = useMemo(
-    () => (loaded ? computeDriverStats(users, records) : null),
-    [loaded, users, records]
-  );
+
   const economicStats = useMemo(
-    () => (loaded ? computeEconomicStats(records, period) : null),
-    [loaded, records, period]
+    () => (loaded ? computeEconomicStats(scopedRecords, period) : null),
+    [loaded, scopedRecords, period]
   );
   const clientDistribution = useMemo(
-    () => (loaded ? computeClientDistribution(records, period) : null),
-    [loaded, records, period]
+    () => (loaded ? computeClientDistribution(scopedRecords, period) : null),
+    [loaded, scopedRecords, period]
   );
-  const driverKmRanking = useMemo(
-    () => (loaded ? computeDriverKmRanking(records, period) : null),
-    [loaded, records, period]
-  );
-  const fleetKmUsage = useMemo(
-    () => (loaded ? computeFleetKmUsage(records, period) : null),
-    [loaded, records, period]
+  const monthlyTrend = useMemo(
+    () => (loaded ? computeMonthlyRevenueTrend(scopedRecords) : null),
+    [loaded, scopedRecords]
   );
 
   if (error) return <Alert>{error}</Alert>;
@@ -110,59 +103,111 @@ export const OwnerDashboardPage = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-[24px] font-semibold text-ink-50">Hola, {user?.nombre}</h1>
-        <p className="mt-1 text-[14px] text-ink-300">Vision general del negocio.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="text-[24px] font-semibold text-ink-50">Hola, {user?.nombre}</h1>
+          <p className="mt-1 text-[14px] text-ink-300">Vision general del negocio.</p>
+        </div>
+        {/* Extras Piazza y DHL/AB Service tienen estructuras de costos distintas (ver
+            recordCost en dashboardStats.js), asi que todo Control economico de abajo
+            mira solo la seccion elegida aca. */}
+        <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={setSection} />
       </div>
 
-      {/* Orden fijo en todas las pantallas: Control economico, Servicios, Control de
-          choferes, Control operativo. En mobile se apilan en ese orden; desde lg+ el
-          grid de 2 columnas los acomoda 2x2 (economico/servicios arriba). */}
-      <div className="flex flex-col gap-6 lg:grid lg:grid-cols-2 lg:gap-6">
-        <GlassCard className="flex flex-col lg:h-full">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-[17px] font-medium text-ink-50">Control economico</h2>
-            <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
-          </div>
+      {/* Control economico: bloques de alto natural, en orden de prioridad (resumen ->
+          tendencia -> comparativas -> detalle) - se ve todo desplegado en la pagina,
+          sin pelear con una caja chica. */}
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-[20px] font-semibold text-ink-50">
+            Control economico <span className="text-ink-400">- {SECTION_LABEL[section]}</span>
+          </h2>
+          <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
+        </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <StatCard
-              label="Facturacion"
-              value={formatCurrency(economicStats.facturacion)}
-              tone="blue"
-              deltaPct={economicStats.facturacionDeltaPct}
-              deltaLabel={PERIOD_DELTA_LABEL[period]}
-            />
-            <StatCard label="Costos operativos" value={formatCurrency(economicStats.costos)} />
-            <StatCard
-              label="Ganancia estimada"
-              value={formatCurrency(economicStats.ganancia)}
-              tone={economicStats.ganancia >= 0 ? "green" : "red"}
-              deltaPct={economicStats.gananciaDeltaPct}
-              deltaLabel={PERIOD_DELTA_LABEL[period]}
-            />
-          </div>
+        {/* Anillos de progreso: cada uno cuenta algo distinto (no son 3 veces la
+            misma metrica) - facturacion vs el periodo anterior, costos como % de lo
+            facturado, y margen de ganancia sobre lo facturado. */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <ProgressRing
+            label="Facturacion"
+            value={formatCurrencyCompact(economicStats.facturacion)}
+            percent={
+              economicStats.facturacionDeltaPct != null
+                ? Math.min(100, 100 + economicStats.facturacionDeltaPct)
+                : economicStats.facturacion > 0
+                  ? 100
+                  : 0
+            }
+            sublabel={
+              economicStats.facturacionDeltaPct != null
+                ? `${economicStats.facturacionDeltaPct >= 0 ? "+" : ""}${economicStats.facturacionDeltaPct.toFixed(1)}% ${PERIOD_DELTA_LABEL[period]}`
+                : PERIOD_DELTA_LABEL[period]
+            }
+            color={CHART_COLORS.facturacion}
+          />
+          <ProgressRing
+            label="Costos operativos"
+            value={formatCurrencyCompact(economicStats.costos)}
+            percent={economicStats.facturacion > 0 ? (economicStats.costos / economicStats.facturacion) * 100 : 0}
+            sublabel={
+              economicStats.facturacion > 0
+                ? `${Math.round((economicStats.costos / economicStats.facturacion) * 100)}% de la facturacion`
+                : "Sin facturacion"
+            }
+            color={CHART_COLORS.costos}
+          />
+          <ProgressRing
+            label="Ganancia estimada"
+            value={formatCurrencyCompact(economicStats.ganancia)}
+            percent={economicStats.facturacion > 0 ? (economicStats.ganancia / economicStats.facturacion) * 100 : 0}
+            sublabel={
+              economicStats.facturacion > 0
+                ? `${Math.round((economicStats.ganancia / economicStats.facturacion) * 100)}% de margen`
+                : "Sin facturacion"
+            }
+            color={economicStats.ganancia >= 0 ? CHART_COLORS.gananciaPositiva : CHART_COLORS.gananciaNegativa}
+          />
+        </div>
 
-          <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Tendencia mes a mes del anio en curso (facturacion + ganancia). Siempre
+            anual, no depende del selector Hoy/Semana/Mes de arriba. */}
+        <GlassCard>
+          <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">
+            Tendencia {new Date().getFullYear()}
+          </h3>
+          <div className="mt-3 h-[240px]">
+            <RevenueTrendChart data={monthlyTrend} />
+          </div>
+        </GlassCard>
+
+        <GlassCard>
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             <div>
               <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
                 Facturacion vs costos
               </h3>
-              <EconomicsChart
-                facturacion={economicStats.facturacion}
-                costos={economicStats.costos}
-                ganancia={economicStats.ganancia}
-              />
+              <div className="h-[220px]">
+                <EconomicsChart
+                  facturacion={economicStats.facturacion}
+                  costos={economicStats.costos}
+                  ganancia={economicStats.ganancia}
+                />
+              </div>
             </div>
             <div>
               <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
                 Distribucion por cliente
               </h3>
-              <ClientDistributionChart data={clientDistribution} />
+              <div className="h-[220px]">
+                <ClientDistributionChart data={clientDistribution} />
+              </div>
             </div>
           </div>
+        </GlassCard>
 
-          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <GlassCard>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <RankedList
               title="Servicios mas rentables"
               items={economicStats.masRentables}
@@ -171,96 +216,8 @@ export const OwnerDashboardPage = () => {
             <RankedList title="Servicios con perdidas" items={economicStats.conPerdidas} tone="red" />
           </div>
         </GlassCard>
-
-        <GlassCard className="flex flex-col lg:h-full">
-          <h2 className="text-[17px] font-medium text-ink-50">Servicios</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label="Creados hoy" value={serviceStats.creadosHoy} tone="blue" />
-            <StatCard label="Programados hoy" value={serviceStats.programadosHoy} tone="blue" />
-            {Object.entries(serviceStats.byEstado).map(([estado, count]) => (
-              <StatCard key={estado} label={RECORD_STATUS_LABELS[estado]} value={count} />
-            ))}
-          </div>
-          {/* flex-1 + min-h-0: si esta tarjeta queda mas baja que "Control economico"
-              (mismo alto de fila en el grid), el grafico crece para ocupar el espacio
-              libre en vez de dejarlo vacio. */}
-          <div className="mt-6 min-h-[220px] flex-1">
-            <ServicesStatusChart byEstado={serviceStats.byEstado} />
-          </div>
-        </GlassCard>
-
-        <GlassCard>
-          <h2 className="text-[17px] font-medium text-ink-50">Control de choferes</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <StatCard label="Total choferes" value={driverStats.total} />
-            <StatCard label="Activos" value={driverStats.activos} tone="green" />
-            <StatCard label="Con servicio hoy" value={driverStats.conServicioHoy} tone="blue" />
-            <StatCard label="Disponibles ahora" value={driverStats.disponiblesAhora} tone="green" />
-          </div>
-        </GlassCard>
-
-        <GlassCard>
-          <h2 className="text-[17px] font-medium text-ink-50">Ranking de choferes (KM)</h2>
-          <p className="mt-1 text-[13px] text-ink-300">
-            Extras Piazza cuenta 1x, DHL y AB Service cuentan 2x. Periodo: {PERIOD_LABEL[period]}.
-          </p>
-          <div className="mt-4">
-            <KmRankingList items={driverKmRanking.slice(0, 8)} />
-          </div>
-        </GlassCard>
-
-        <GlassCard>
-          <h2 className="text-[17px] font-medium text-ink-50">Control operativo</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
-            <StatCard label="Total vehiculos" value={vehicleStats.total} />
-            <StatCard label="Disponibles" value={vehicleStats.disponibles} tone="green" />
-            <StatCard label="En servicio" value={vehicleStats.enServicioAhora} tone="blue" />
-            <StatCard label="En mantenimiento" value={vehicleStats.enMantenimiento} tone="amber" />
-            <StatCard label="Fuera de servicio" value={vehicleStats.fueraDeServicio} tone="red" />
-          </div>
-        </GlassCard>
-
-        <GlassCard>
-          <h2 className="text-[17px] font-medium text-ink-50">Uso de flota (KM)</h2>
-          <p className="mt-1 text-[13px] text-ink-300">
-            Extras Piazza cuenta 1x, DHL y AB Service cuentan 2x. Periodo: {PERIOD_LABEL[period]}.
-          </p>
-          <div className="mt-4">
-            <KmRankingList items={fleetKmUsage.slice(0, 8)} />
-          </div>
-        </GlassCard>
       </div>
     </div>
-  );
-};
-
-const KmRankingList = ({ items }) => {
-  const max = items[0]?.km ?? 0;
-
-  if (items.length === 0) {
-    return <p className="text-[13px] text-ink-400">Sin datos en este periodo.</p>;
-  }
-
-  return (
-    <ul className="flex flex-col gap-3">
-      {items.map((item, index) => (
-        <li key={item.id}>
-          <div className="flex items-center justify-between gap-2 text-[13px]">
-            <span className="truncate text-ink-50">
-              <span className="mr-2 text-ink-400">#{index + 1}</span>
-              {item.nombre}
-            </span>
-            <span className="shrink-0 font-medium text-ink-50">{Math.round(item.km)} km</span>
-          </div>
-          <div className="mt-1.5 h-2 w-full overflow-hidden rounded-full bg-line/10">
-            <div
-              className="h-full rounded-full bg-accent-500"
-              style={{ width: `${max > 0 ? (item.km / max) * 100 : 0}%` }}
-            />
-          </div>
-        </li>
-      ))}
-    </ul>
   );
 };
 
@@ -275,12 +232,12 @@ const RankedList = ({ title, items, tone }) => (
           <li key={record.id}>
             <Link
               to={`/records/${record.id}`}
-              className="flex items-center justify-between rounded-xl glass-surface-sm px-4 py-2.5 text-[13px] hover:bg-line/10"
+              className="flex items-center justify-between gap-3 rounded-xl glass-surface-sm px-4 py-2.5 text-[13px] hover:bg-line/10"
             >
-              <span className="text-ink-50">
+              <span className="min-w-0 truncate text-ink-50">
                 {record.codigo} - {record.destinazione}
               </span>
-              <span className={tone === "green" ? "text-success-500" : "text-danger-500"}>
+              <span className={clsx("shrink-0", tone === "green" ? "text-success-500" : "text-danger-500")}>
                 {formatCurrency(profit)}
               </span>
             </Link>
