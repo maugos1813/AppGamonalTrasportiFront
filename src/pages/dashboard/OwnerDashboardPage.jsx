@@ -1,10 +1,12 @@
 import clsx from "clsx";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { ClientDistributionChart } from "../../components/charts/ClientDistributionChart";
 import { EconomicsChart } from "../../components/charts/EconomicsChart";
 import { RevenueTrendChart } from "../../components/charts/RevenueTrendChart";
 import { Alert } from "../../components/ui/Alert";
+import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
@@ -43,12 +45,64 @@ const SECTION_LABEL = {
   dhl_ab: "DHL - AB Service",
 };
 
+// Detalle de que compone un anillo de Control economico (facturacion/costos/
+// ganancia), agrupado por categoria - ver facturacionBreakdown/costosBreakdown
+// en computeEconomicStats. Reutilizado para los 3 anillos, cada uno pasa sus
+// propias filas.
+const EconomicBreakdownModal = ({ title, sublabel, rows, total, onClose }) => {
+  useEffect(() => {
+    const onKeyDown = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onClose}
+        className="absolute inset-0 bg-backdrop backdrop-blur-sm"
+      />
+      <div className="glass-surface relative z-10 w-full max-w-sm rounded-3xl bg-background p-6">
+        <h2 className="text-[17px] font-semibold text-ink-50">{title}</h2>
+        <p className="mt-1 text-[13px] text-ink-400">{sublabel}</p>
+
+        <div className="mt-4 flex flex-col gap-2">
+          {rows.map(({ label, monto, count }) => (
+            <div
+              key={label}
+              className="flex items-center justify-between gap-3 rounded-xl glass-surface-sm px-3 py-2 text-[13px]"
+            >
+              <span className="text-ink-50">
+                {label}
+                {count != null && <span className="text-ink-400"> ({count})</span>}
+              </span>
+              <span className="shrink-0 text-ink-300">{formatCurrency(monto)}</span>
+            </div>
+          ))}
+          <div className="mt-1 flex items-center justify-between rounded-xl bg-accent-500/10 px-3 py-2 text-[13px] font-medium">
+            <span className="text-ink-50">Total</span>
+            <span className="text-ink-50">{formatCurrency(total)}</span>
+          </div>
+        </div>
+
+        <Button variant="ghost" className="mt-6" onClick={onClose}>
+          Cerrar
+        </Button>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 export const OwnerDashboardPage = () => {
   const { user } = useAuth();
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
   const [section, setSection] = useState("extras_piazza");
+  const [openBreakdown, setOpenBreakdown] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -145,6 +199,7 @@ export const OwnerDashboardPage = () => {
                 : PERIOD_DELTA_LABEL[period]
             }
             color={CHART_COLORS.facturacion}
+            onClick={() => setOpenBreakdown("facturacion")}
           />
           <ProgressRing
             label="Costos operativos"
@@ -156,6 +211,7 @@ export const OwnerDashboardPage = () => {
                 : "Sin facturacion"
             }
             color={CHART_COLORS.costos}
+            onClick={() => setOpenBreakdown("costos")}
           />
           <ProgressRing
             label="Ganancia estimada"
@@ -166,9 +222,41 @@ export const OwnerDashboardPage = () => {
                 ? `${Math.round((economicStats.ganancia / economicStats.facturacion) * 100)}% de margen`
                 : "Sin facturacion"
             }
+            onClick={() => setOpenBreakdown("ganancia")}
             color={economicStats.ganancia >= 0 ? CHART_COLORS.gananciaPositiva : CHART_COLORS.gananciaNegativa}
           />
         </div>
+
+        {openBreakdown === "facturacion" && (
+          <EconomicBreakdownModal
+            title="Facturacion"
+            sublabel={`${SECTION_LABEL[section]} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            rows={economicStats.facturacionBreakdown}
+            total={economicStats.facturacion}
+            onClose={() => setOpenBreakdown(null)}
+          />
+        )}
+        {openBreakdown === "costos" && (
+          <EconomicBreakdownModal
+            title="Costos operativos"
+            sublabel={`${SECTION_LABEL[section]} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            rows={economicStats.costosBreakdown}
+            total={economicStats.costos}
+            onClose={() => setOpenBreakdown(null)}
+          />
+        )}
+        {openBreakdown === "ganancia" && (
+          <EconomicBreakdownModal
+            title="Ganancia estimada"
+            sublabel={`${SECTION_LABEL[section]} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            rows={[
+              { label: "Facturacion", monto: economicStats.facturacion },
+              { label: "Costos operativos", monto: -economicStats.costos },
+            ]}
+            total={economicStats.ganancia}
+            onClose={() => setOpenBreakdown(null)}
+          />
+        )}
 
         {/* Tendencia mes a mes del anio en curso (facturacion + ganancia). Siempre
             anual, no depende del selector Hoy/Semana/Mes de arriba. */}

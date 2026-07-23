@@ -174,6 +174,25 @@ export const ProfilePage = () => {
               disabled={savingLocation}
               onChange={handleToggleLocationSharing}
             />
+
+            {Capacitor.isNativePlatform() && (
+              <div className="mt-4 flex flex-col gap-2 rounded-xl glass-surface-sm px-4 py-3 text-[13px] text-ink-300 sm:flex-row sm:items-center sm:justify-between">
+                <span>
+                  Algunos celulares (Xiaomi, Huawei, Samsung, Oppo/Vivo, entre otros) apagan solos el
+                  GPS en segundo plano para ahorrar bateria, aunque sigas trabajando. Para evitarlo,
+                  entra a la configuracion de la app y elegi "Sin restricciones" en Bateria. Cerrar la
+                  app a proposito (deslizandola de recientes) sigue apagando el GPS al instante, como
+                  corresponde cuando termines tu jornada.
+                </span>
+                <button
+                  type="button"
+                  onClick={() => BackgroundGeolocation.openSettings()}
+                  className="shrink-0 rounded-lg border border-line/20 px-3 py-1.5 text-[13px] font-medium hover:bg-ink-500/10"
+                >
+                  Abrir configuracion
+                </button>
+              </div>
+            )}
           </div>
         )}
 

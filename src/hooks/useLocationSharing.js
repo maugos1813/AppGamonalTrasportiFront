@@ -39,6 +39,13 @@ export const useLocationSharing = () => {
     // una sesion anterior) y solo reporta al backend/UI cuando el estado realmente
     // cambia, para no mandar el mismo valor en cada tick de 20s.
     let lastReportedDenied = Boolean(user?.ubicacionPermisoDenegado);
+    // Ultima posicion nativa conocida (aunque sea vieja): el watcher de mas abajo usa
+    // distanceFilter, asi que no dispara si el chofer esta parado repartiendo. El tick
+    // de 20s la reenvia igual como heartbeat para que el mapa no lo de por "no
+    // disponible" a los 5 min solo por no haberse movido (ver LOCATION_FRESH_MINUTES
+    // en el backend). El backend descarta el punto de historial si es el mismo lugar,
+    // asi que este heartbeat no ensucia la ruta del dia.
+    let lastNativeLocation = null;
 
     const reportPermission = (denegado) => {
       if (denegado === lastReportedDenied) return;
@@ -68,6 +75,7 @@ export const useLocationSharing = () => {
           }
           if (!location) return;
           reportPermission(false);
+          lastNativeLocation = { lat: location.latitude, lng: location.longitude };
           updateMyLocationRequest(location.latitude, location.longitude).catch(() => {});
         }
       );
@@ -98,8 +106,19 @@ export const useLocationSharing = () => {
         if (cancelled) return;
 
         if (Capacitor.isNativePlatform()) {
-          if (canShare) await startNativeTracking();
-          else stopNativeTracking();
+          if (canShare) {
+            await startNativeTracking();
+            // Heartbeat: el watcher de arriba solo dispara si el chofer se movio
+            // distanceFilter metros, asi que si esta quieto reenviamos la ultima
+            // posicion conocida para que el mapa lo siga viendo "fresco".
+            if (lastNativeLocation) {
+              updateMyLocationRequest(lastNativeLocation.lat, lastNativeLocation.lng).catch(
+                () => {}
+              );
+            }
+          } else {
+            stopNativeTracking();
+          }
         } else if (canShare) {
           sendLocationOnceWeb();
         }

@@ -6,15 +6,19 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
-import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { EN_PROCESO_STATUSES, TERMINADOS_STATUSES } from "../../lib/constants";
+import { EN_PROCESO_STATUSES } from "../../lib/constants";
 import { addMinutes, formatDateTime } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { getRecordLiveEtaRequest, getRecordRequest, listRecordsRequest } from "../../lib/records.api";
-import { getDriverReturnEtaRequest, listDriverLocationsRequest } from "../../lib/users.api";
+import {
+  getDriverRouteHistoryRequest,
+  getDriverReturnEtaRequest,
+  listDriverLocationsRequest,
+  listUsersRequest,
+} from "../../lib/users.api";
 
 // Modulo estable fuera del componente: si se recrea en cada render, useJsApiLoader
 // recarga el script de Google Maps una y otra vez.
@@ -24,7 +28,10 @@ const MILAN_CENTER = { lat: 45.4642, lng: 9.19 };
 const REFRESH_INTERVAL_MS = 20000;
 const STATIC_ROUTE_COLOR = "#3987e5";
 const LIVE_ROUTE_COLOR = "#22c55e";
+const HISTORY_ROUTE_COLOR = "#a855f7";
 const DESTINATION_COLOR = "#f59e0b";
+const ROUTE_START_COLOR = "#22c55e";
+const ROUTE_END_COLOR = "#ef4444";
 // Chofer con ubicacion fresca pero sin servicio "en camino" ahora mismo (volviendo de
 // una entrega o esperando el proximo): mismo gris que el estado "En suspenso" en el
 // resto de la app, para diferenciarlo del pin rojo por defecto de los que si reparten.
@@ -42,16 +49,8 @@ const AREA_B_PATHS = MILANO_ZONES.areaB;
 
 const SECTION_OPTIONS = [
   { value: "pendientes", label: "Pendientes" },
-  { value: "terminados", label: "Terminados" },
   { value: "choferes", label: "Choferes" },
-];
-
-// Filtro de categoria para "Terminados": agrupa DHL y AB Service juntos (misma
-// distincion que ya se usa en toda la app para separar de Extras Piazza).
-const CATEGORY_FILTER_OPTIONS = [
-  { value: "todos", label: "Todos" },
-  { value: "EXTRAS_PIAZZA", label: "Extras Piazza" },
-  { value: "DHL_AB", label: "DHL / AB Service" },
+  { value: "ruta-chofer", label: "Ruta chofer" },
 ];
 
 const minutesAgo = (dateString) => {
@@ -65,14 +64,6 @@ const minutesAgo = (dateString) => {
 const toLocalDateInputValue = (date) => {
   const pad = (n) => String(n).padStart(2, "0");
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-};
-
-const isSameLocalDate = (dateValue, yyyyMmDd) => toLocalDateInputValue(new Date(dateValue)) === yyyyMmDd;
-
-const matchesCategoryFilter = (record, categoryFilter) => {
-  if (categoryFilter === "todos") return true;
-  const isDhlAb = record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
-  return categoryFilter === "DHL_AB" ? isDhlAb : !isDhlAb;
 };
 
 const PencilIcon = (props) => (
@@ -110,9 +101,14 @@ export const MapPage = () => {
   const [locations, setLocations] = useState(null);
   const [records, setRecords] = useState(null);
   const [selectedRecordId, setSelectedRecordId] = useState(null);
-  // Filtro de "Terminados": por defecto el dia de hoy y todas las categorias.
-  const [terminadosDate, setTerminadosDate] = useState(() => toLocalDateInputValue(new Date()));
-  const [terminadosCategory, setTerminadosCategory] = useState("todos");
+  // "Ruta chofer": elige un chofer (todos, no solo los que estan compartiendo
+  // ubicacion ahora) y un dia puntual, y dibuja los puntos GPS guardados ese dia
+  // (ver LocationPing en el backend) como una linea - no depende de que el chofer
+  // este activo ahora mismo, es historial.
+  const [allDrivers, setAllDrivers] = useState(null);
+  const [rutaChoferId, setRutaChoferId] = useState("");
+  const [rutaChoferDate, setRutaChoferDate] = useState(() => toLocalDateInputValue(new Date()));
+  const [rutaChoferPoints, setRutaChoferPoints] = useState(null);
   // ETA en vivo del servicio seleccionado en la lista (ruta + linea en el mapa) y del
   // marcador que tiene el InfoWindow abierto (puede ser el mismo servicio u otro, o el
   // regreso de un chofer libre). Se piden a demanda -ver los 2 useEffect mas abajo-, no
@@ -163,20 +159,52 @@ export const MapPage = () => {
     };
   }, [isPrivileged]);
 
+  // Lista completa de choferes para el selector de "Ruta chofer" (a diferencia de
+  // "locations", que solo trae a los que estan compartiendo ubicacion ahora mismo) -
+  // se pide una sola vez, no hace falta refrescarla cada 20s.
+  useEffect(() => {
+    if (!isPrivileged) return;
+    let cancelled = false;
+    listUsersRequest()
+      .then((data) => {
+        if (!cancelled) setAllDrivers(data.filter((u) => u.cargo === "CHOFER"));
+      })
+      .catch((err) => {
+        if (!cancelled) setError(parseApiError(err).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPrivileged]);
+
+  // Historial de puntos GPS del chofer/dia elegidos - se pide de nuevo cada vez que
+  // cambia cualquiera de los dos, y solo mientras la seccion "Ruta chofer" esta activa.
+  useEffect(() => {
+    if (section !== "ruta-chofer" || !rutaChoferId || !rutaChoferDate) {
+      setRutaChoferPoints(null);
+      return;
+    }
+    let cancelled = false;
+    setRutaChoferPoints(null);
+    const [year, month, day] = rutaChoferDate.split("-").map(Number);
+    getDriverRouteHistoryRequest(rutaChoferId, year, month, day)
+      .then((data) => {
+        if (!cancelled) setRutaChoferPoints(data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(parseApiError(err).message);
+          setRutaChoferPoints([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section, rutaChoferId, rutaChoferDate]);
+
   const pendingRecords = (records ?? [])
     .filter((r) => EN_PROCESO_STATUSES.includes(r.estado))
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
-
-  // Terminados: por defecto solo el dia de hoy (se puede cambiar con el filtro de
-  // fecha) y todas las categorias, mas reciente primero (es historial, al reves que
-  // pendientes).
-  const finishedRecords = (records ?? [])
-    .filter((r) => TERMINADOS_STATUSES.includes(r.estado))
-    .filter((r) => isSameLocalDate(r.fechaServicio, terminadosDate))
-    .filter((r) => matchesCategoryFilter(r, terminadosCategory))
-    .sort((a, b) => new Date(b.fechaServicio) - new Date(a.fechaServicio));
-
-  const listRecords = section === "pendientes" ? pendingRecords : finishedRecords;
 
   // Vista "Choferes": una fila por chofer (no por servicio - un chofer con varias
   // entregas compactadas aparece varias veces en "locations", todas con la misma
@@ -205,8 +233,7 @@ export const MapPage = () => {
 
   // ETA en vivo del servicio elegido en la lista: se pide solo mientras ese servicio
   // sigue seleccionado, y se repite cada 20s para mantenerlo al dia - apenas se cambia
-  // de seleccion o de seccion, se corta (no sigue pidiendo de fondo). En "Terminados"
-  // nunca se pide (no tiene sentido, ya no hay ubicacion en vivo que mostrar).
+  // de seleccion o de seccion, se corta (no sigue pidiendo de fondo).
   useEffect(() => {
     if (section !== "pendientes" || !selectedRecordId) {
       setSelectedLiveEta(null);
@@ -289,8 +316,8 @@ export const MapPage = () => {
     };
   }, [selectedRecordId]);
 
-  // selectedLiveEta ya queda en null en "Terminados" (el effect de arriba lo corta),
-  // asi que ahi esto cae directo al recorrido planificado del formulario.
+  // Solo "Pendientes" selecciona un registro (ver mas abajo): ETA en vivo si el chofer
+  // ya esta en camino, si no el planificado como fallback mientras todavia no sale.
   const selectedRouteGeometry = selectedLiveEta?.geometria ?? selectedRecordDetail?.ruta?.geometria;
   const selectedRoutePositions = useMemo(
     () => selectedRouteGeometry?.coordinates?.map(([lng, lat]) => ({ lat, lng })),
@@ -298,12 +325,24 @@ export const MapPage = () => {
   );
   const selectedDestination = selectedRecordDetail?.stops?.[selectedRecordDetail.stops.length - 1];
 
-  // Dibuja la ruta seleccionada a mano (sin el componente <Polyline>): asi se
-  // controla directo la instancia nativa de Google Maps y se garantiza que nunca haya
-  // 2 lineas superpuestas. Antes de dibujar la nueva (o si no queda nada
-  // seleccionado), siempre se borra la anterior primero - asi cumple la regla de "solo
-  // la linea del servicio actual, nunca la del anterior" al cambiar de seleccion, de
-  // seccion (Pendientes/Terminados), o al pasar de ruta estatica a ETA en vivo.
+  // "Ruta chofer": los puntos GPS guardados ese dia, tal cual (no es una ruta
+  // calculada/ruteada como la de un servicio, es el historial real punto a punto).
+  const rutaChoferPositions = useMemo(
+    () => rutaChoferPoints?.map((p) => ({ lat: p.lat, lng: p.lng })),
+    [rutaChoferPoints]
+  );
+
+  // La linea que se dibuja depende de la seccion activa: el recorrido de un servicio
+  // pendiente (Pendientes) o el historial de un chofer en un dia puntual (Ruta chofer).
+  const activeRoutePositions = section === "ruta-chofer" ? rutaChoferPositions : selectedRoutePositions;
+  const activeRouteColor =
+    section === "ruta-chofer" ? HISTORY_ROUTE_COLOR : selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR;
+
+  // Dibuja la ruta activa a mano (sin el componente <Polyline>): asi se controla
+  // directo la instancia nativa de Google Maps y se garantiza que nunca haya 2 lineas
+  // superpuestas. Antes de dibujar la nueva (o si no queda nada seleccionado), siempre
+  // se borra la anterior primero - asi cumple la regla de "solo la linea actual, nunca
+  // la anterior" al cambiar de seleccion, de seccion, o de ruta estatica a ETA en vivo.
   // @react-google-maps/api (el componente <Polyline> declarativo) no garantiza esto de
   // forma confiable al cambiar de instancia, sobre todo con StrictMode en desarrollo.
   useEffect(() => {
@@ -314,11 +353,11 @@ export const MapPage = () => {
       polylineRef.current = null;
     }
 
-    if (!selectedRoutePositions?.length) return;
+    if (!activeRoutePositions?.length) return;
 
     polylineRef.current = new window.google.maps.Polyline({
-      path: selectedRoutePositions,
-      strokeColor: selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR,
+      path: activeRoutePositions,
+      strokeColor: activeRouteColor,
       strokeWeight: 4,
       map,
     });
@@ -327,28 +366,30 @@ export const MapPage = () => {
       polylineRef.current?.setMap(null);
       polylineRef.current = null;
     };
-  }, [map, selectedRoutePositions, selectedLiveEta]);
+  }, [map, activeRoutePositions, activeRouteColor]);
 
-  // Centra y ajusta el zoom del mapa para que la ruta seleccionada (que ya incluye la
-  // posicion del chofer como primer punto) quede completamente visible. Solo se
-  // reajusta cuando cambia la seleccion, no en cada refresco de datos, para no
-  // pelearse con el pan/zoom manual del usuario mientras mira el mapa.
+  // Centra y ajusta el zoom del mapa para que la ruta activa quede completamente
+  // visible. Solo se reajusta cuando cambia la seleccion (o el chofer/dia elegido en
+  // "Ruta chofer"), no en cada refresco de datos, para no pelearse con el pan/zoom
+  // manual del usuario mientras mira el mapa.
   useEffect(() => {
-    if (!map || !selectedRoutePositions?.length) return;
+    if (!map || !activeRoutePositions?.length) return;
     const bounds = new window.google.maps.LatLngBounds();
-    selectedRoutePositions.forEach((point) => bounds.extend(point));
+    activeRoutePositions.forEach((point) => bounds.extend(point));
     map.fitBounds(bounds, 40);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, selectedRecordId]);
+  }, [map, selectedRecordId, rutaChoferId, rutaChoferDate]);
 
   if (!isPrivileged) return <Navigate to="/" replace />;
 
   const showsDriverLocations = section === "pendientes" || section === "choferes";
 
   const center =
-    showsDriverLocations && locations && locations.length > 0
-      ? { lat: locations[0].lat, lng: locations[0].lng }
-      : MILAN_CENTER;
+    section === "ruta-chofer" && rutaChoferPositions?.length
+      ? rutaChoferPositions[0]
+      : showsDriverLocations && locations && locations.length > 0
+        ? { lat: locations[0].lat, lng: locations[0].lng }
+        : MILAN_CENTER;
 
   return (
     <div className="flex flex-col gap-4">
@@ -358,8 +399,8 @@ export const MapPage = () => {
           <p className="mt-1 text-[14px] text-ink-300">
             {section === "pendientes"
               ? "Choferes compartiendo ubicacion ahora mismo: repartiendo o disponibles."
-              : section === "terminados"
-                ? "Recorrido planificado de servicios ya finalizados."
+              : section === "ruta-chofer"
+                ? "Recorrido real (GPS) de un chofer en un dia puntual."
                 : "Ubicacion actual de todos los choferes, sin rutas ni ETA."}
           </p>
         </div>
@@ -415,50 +456,77 @@ export const MapPage = () => {
                 ))}
               </ul>
             </>
-          ) : (
+          ) : section === "ruta-chofer" ? (
             <>
-              <h2 className="text-[17px] font-medium text-ink-50">
-                {section === "pendientes" ? "Pronostico de llegada" : "Servicios finalizados"}
-              </h2>
+              <h2 className="text-[17px] font-medium text-ink-50">Ruta chofer</h2>
               <p className="mt-1 text-[13px] text-ink-300">
-                {section === "pendientes"
-                  ? "Servicios pendientes. Si el chofer ya esta en camino, se muestra el tiempo en vivo desde su ubicacion actual; si todavia no salio, se muestra el estimado planificado. Toca uno para ver la ruta en el mapa."
-                  : "Servicios entregados, retirados, anulados o reprogramados. Toca uno para ver en el mapa el recorrido planificado a partir de las direcciones cargadas (no la ubicacion en vivo del chofer)."}
+                Elegi un chofer y un dia para ver su recorrido real (GPS), no el planificado.
               </p>
 
-          {section === "terminados" && (
-            <div className="mt-4 grid grid-cols-1 gap-3 border-t border-line/10 pt-4 sm:grid-cols-2">
-              <TextField
-                id="terminados-fecha"
-                label="Fecha"
-                type="date"
-                value={terminadosDate}
-                onChange={(e) => setTerminadosDate(e.target.value)}
-              />
-              <Select
-                id="terminados-categoria"
-                label="Categoria"
-                options={CATEGORY_FILTER_OPTIONS}
-                value={terminadosCategory}
-                onChange={(e) => setTerminadosCategory(e.target.value)}
-              />
-            </div>
-          )}
+              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-line/10 pt-4">
+                <Select
+                  id="ruta-chofer-select"
+                  label="Chofer"
+                  options={[
+                    { value: "", label: "Elegi un chofer..." },
+                    ...(allDrivers ?? []).map((d) => ({ value: d.id, label: `${d.nombre} ${d.apellido}` })),
+                  ]}
+                  value={rutaChoferId}
+                  onChange={(e) => setRutaChoferId(e.target.value)}
+                />
+                <TextField
+                  id="ruta-chofer-fecha"
+                  label="Fecha"
+                  type="date"
+                  value={rutaChoferDate}
+                  onChange={(e) => setRutaChoferDate(e.target.value)}
+                />
+              </div>
 
-          {listRecords.length === 0 && (
-            <p className="mt-4 text-[14px] text-ink-300">
-              {section === "pendientes"
-                ? "No hay servicios pendientes."
-                : "No hay servicios finalizados para ese dia y esa categoria."}
-            </p>
+              {!rutaChoferId && (
+                <p className="mt-4 text-[14px] text-ink-300">Elegi un chofer para ver su recorrido.</p>
+              )}
+              {rutaChoferId && rutaChoferPoints === null && (
+                <div className="mt-4 flex justify-center py-6">
+                  <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+                </div>
+              )}
+              {rutaChoferId && rutaChoferPoints?.length === 0 && (
+                <p className="mt-4 text-[14px] text-ink-300">
+                  No hay puntos GPS guardados para ese chofer ese dia.
+                </p>
+              )}
+              {rutaChoferPoints?.length > 0 && (
+                <div className="mt-4 rounded-xl glass-surface-sm px-4 py-3 text-[13px] text-ink-200">
+                  <p>
+                    <strong>{rutaChoferPoints.length}</strong> puntos registrados
+                  </p>
+                  <p className="mt-1 text-ink-300">Primero: {formatDateTime(rutaChoferPoints[0].recordedAt)}</p>
+                  <p className="text-ink-300">
+                    Ultimo: {formatDateTime(rutaChoferPoints[rutaChoferPoints.length - 1].recordedAt)}
+                  </p>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <h2 className="text-[17px] font-medium text-ink-50">Pronostico de llegada</h2>
+              <p className="mt-1 text-[13px] text-ink-300">
+                Servicios pendientes. Si el chofer ya esta en camino, se muestra el tiempo en vivo desde su
+                ubicacion actual; si todavia no salio, se muestra el estimado planificado. Toca uno para ver
+                la ruta en el mapa.
+              </p>
+
+          {pendingRecords.length === 0 && (
+            <p className="mt-4 text-[14px] text-ink-300">No hay servicios pendientes.</p>
           )}
 
           <ul className="mt-4 flex flex-col gap-2">
-            {listRecords.map((record) => {
+            {pendingRecords.map((record) => {
               const isSelected = record.id === selectedRecordId;
               // El ETA en vivo solo se pidio para el servicio seleccionado (ver el
               // useEffect de mas arriba) - los demas siempre muestran el planificado.
-              const liveEta = section === "pendientes" && isSelected ? selectedLiveEta : undefined;
+              const liveEta = isSelected ? selectedLiveEta : undefined;
               return (
                 <li key={record.id} className="relative">
                   <button
@@ -474,31 +542,19 @@ export const MapPage = () => {
                       <span>
                         <strong>{record.codigo}</strong> - {record.destinazione}
                       </span>
-                      {section === "terminados" && <StatusBadge status={record.estado} />}
                     </span>
-                    {section === "pendientes" ? (
-                      liveEta ? (
-                        <span className="text-[13px] text-emerald-400">
-                          En vivo: {liveEta.distanciaKm.toFixed(1)} km - {Math.round(liveEta.duracionMin)} min -
-                          llega ~{addMinutes(new Date(), liveEta.duracionMin)}
-                        </span>
-                      ) : record.ruta?.duracionMin != null ? (
-                        <span className="text-[13px] text-ink-300">
-                          {record.ruta.distanciaKm.toFixed(1)} km - {Math.round(record.ruta.duracionMin)} min -
-                          llega ~{addMinutes(record.fechaServicio, record.ruta.duracionMin)}
-                        </span>
-                      ) : (
-                        <span className="text-[13px] text-ink-400">ETA no disponible</span>
-                      )
+                    {liveEta ? (
+                      <span className="text-[13px] text-emerald-400">
+                        En vivo: {liveEta.distanciaKm.toFixed(1)} km - {Math.round(liveEta.duracionMin)} min -
+                        llega ~{addMinutes(new Date(), liveEta.duracionMin)}
+                      </span>
                     ) : record.ruta?.duracionMin != null ? (
                       <span className="text-[13px] text-ink-300">
-                        {record.ruta.distanciaKm.toFixed(1)} km - {Math.round(record.ruta.duracionMin)} min -{" "}
-                        {formatDateTime(record.fechaServicio)}
+                        {record.ruta.distanciaKm.toFixed(1)} km - {Math.round(record.ruta.duracionMin)} min -
+                        llega ~{addMinutes(record.fechaServicio, record.ruta.duracionMin)}
                       </span>
                     ) : (
-                      <span className="text-[13px] text-ink-400">
-                        Ruta no disponible - {formatDateTime(record.fechaServicio)}
-                      </span>
+                      <span className="text-[13px] text-ink-400">ETA no disponible</span>
                     )}
                   </button>
 
@@ -692,6 +748,51 @@ export const MapPage = () => {
                       </InfoWindow>
                     )}
                   </Marker>
+                )}
+
+                {rutaChoferPositions?.length > 0 && (
+                  <>
+                    <Marker
+                      position={rutaChoferPositions[0]}
+                      onClick={() => setOpenInfoId("ruta-inicio")}
+                      icon={{
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: ROUTE_START_COLOR,
+                        fillOpacity: 0.9,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 2,
+                      }}
+                    >
+                      {openInfoId === "ruta-inicio" && (
+                        <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
+                          <div className="text-[13px]">
+                            Inicio: {formatDateTime(rutaChoferPoints[0].recordedAt)}
+                          </div>
+                        </InfoWindow>
+                      )}
+                    </Marker>
+                    <Marker
+                      position={rutaChoferPositions[rutaChoferPositions.length - 1]}
+                      onClick={() => setOpenInfoId("ruta-fin")}
+                      icon={{
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        scale: 8,
+                        fillColor: ROUTE_END_COLOR,
+                        fillOpacity: 0.9,
+                        strokeColor: "#ffffff",
+                        strokeWeight: 2,
+                      }}
+                    >
+                      {openInfoId === "ruta-fin" && (
+                        <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
+                          <div className="text-[13px]">
+                            Ultimo punto: {formatDateTime(rutaChoferPoints[rutaChoferPoints.length - 1].recordedAt)}
+                          </div>
+                        </InfoWindow>
+                      )}
+                    </Marker>
+                  </>
                 )}
               </GoogleMap>
             )}

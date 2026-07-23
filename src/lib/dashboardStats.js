@@ -124,9 +124,16 @@ const ECONOMIC_COST_FIELDS = [
   "costoEspera",
 ];
 
-// DHL/AB Service no carga costos manuales: se paga un monto fijo por KM (ida y
-// vuelta, de ahi el x2) en vez de sumar combustible/peajes/etc. Area C y espera
-// siguen siendo manuales para DHL tambien (no entran en la tarifa por KM).
+const ECONOMIC_COST_FIELD_LABELS = {
+  costoCombustible: "Combustible",
+  peajes: "Peajes",
+  vignetta: "Vignetta",
+  costoHotel: "Hotel",
+  costoTraforoFrejusBrennero: "Traforo/Frejus/Brennero",
+  areaC: "Area C",
+  costoEspera: "Espera",
+};
+
 export const isDhlAbRecord = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
 
 // Tarifa de referencia para estimar lo facturado (rimborso km estandar).
@@ -156,15 +163,12 @@ const recordDriverHours = (record) => {
 
 const recordDriverPay = (record) => recordDriverHours(record) * DRIVER_HOURLY_RATE;
 
-// "Costos operativos": combustible/peajes/etc (Extras Piazza) o el monto fijo por
-// KM (DHL/AB Service, que no carga esos gastos manualmente), mas en ambos casos el
-// pago al chofer - antes solo se contaban los gastos del vehiculo, sin el costo real
-// de la mano de obra.
+// "Costos operativos": combustible/peajes/vignetta/hotel/traforo/area C/espera,
+// mas el pago al chofer - DHL/AB Service ahora carga estos mismos gastos a mano
+// igual que Extras Piazza (antes se le estimaba un monto fijo por KM porque no
+// se cargaban).
 const recordCost = (record) =>
-  recordDriverPay(record) +
-  (isDhlAbRecord(record)
-    ? dhlExtras(record)
-    : ECONOMIC_COST_FIELDS.reduce((sum, field) => sum + (record[field] ?? 0), 0));
+  recordDriverPay(record) + ECONOMIC_COST_FIELDS.reduce((sum, field) => sum + (record[field] ?? 0), 0);
 
 // DHL/AB Service tampoco carga facturacion manualmente todavia: mientras no se
 // cargue un pagoRecibido real, se estima con la tarifa de referencia por KM. El dia
@@ -199,10 +203,60 @@ export const computeEconomicStats = (records, period, now = new Date()) => {
     .sort((a, b) => a.profit - b.profit)
     .slice(0, 5);
 
+  // Desglose por categoria de lo que compone facturacion y costos - para el modal
+  // de detalle de los anillos de Control economico (mismos campos que recordRevenue
+  // y recordCost, solo que agrupados en vez de sumados directo a un total).
+  const conPago = scoped.filter((r) => r.pagoRecibido != null);
+  const sinPagoDhlAb = scoped.filter((r) => r.pagoRecibido == null && isDhlAbRecord(r));
+  const OTHER_COST_FIELDS = ECONOMIC_COST_FIELDS.filter((f) => f !== "areaC" && f !== "costoEspera");
+
+  const facturacionBreakdown = [
+    {
+      label: "Pagos reales cargados",
+      monto: conPago.reduce((sum, r) => sum + r.pagoRecibido, 0),
+      count: conPago.length,
+    },
+    {
+      label: "Estimado por tarifa km (DHL/AB Service)",
+      monto: sinPagoDhlAb.reduce((sum, r) => sum + dhlKmCharge(r, DHL_KM_RATE), 0),
+      count: sinPagoDhlAb.length,
+    },
+    {
+      label: "Area C + espera (de los estimados)",
+      monto: sinPagoDhlAb.reduce((sum, r) => sum + dhlExtras(r), 0),
+      count: sinPagoDhlAb.length,
+    },
+  ];
+
+  const costosBreakdown = [
+    {
+      label: "Pago a choferes",
+      monto: scoped.reduce((sum, r) => sum + recordDriverPay(r), 0),
+      count: scoped.length,
+    },
+    {
+      label: "Area C",
+      monto: scoped.reduce((sum, r) => sum + (r.areaC ?? 0), 0),
+      count: scoped.filter((r) => r.areaC).length,
+    },
+    {
+      label: "Espera",
+      monto: scoped.reduce((sum, r) => sum + (r.costoEspera ?? 0), 0),
+      count: scoped.filter((r) => r.costoEspera).length,
+    },
+    ...OTHER_COST_FIELDS.map((field) => ({
+      label: ECONOMIC_COST_FIELD_LABELS[field],
+      monto: scoped.reduce((sum, r) => sum + (r[field] ?? 0), 0),
+      count: scoped.filter((r) => r[field]).length,
+    })),
+  ];
+
   return {
     facturacion,
     costos,
     ganancia,
+    facturacionBreakdown,
+    costosBreakdown,
     masRentables,
     conPerdidas,
     facturacionDeltaPct: percentChange(facturacion, facturacionAnterior),
@@ -354,9 +408,11 @@ export const computeFleetKmUsage = (records, period, now = new Date()) => {
       nombre: `${r.vehicle.targa}${r.vehicle.modelo ? ` - ${r.vehicle.modelo}` : ""}`,
       km: 0,
       servicios: 0,
+      breakdown: { EXTRA_PIAZZA: 0, DHL: 0, AB_SERVICE: 0 },
     };
     entry.km += recordKm(r);
     entry.servicios += 1;
+    entry.breakdown[kmCategory(r)] += r.kilometrosReales ?? r.kilometros ?? 0;
     totals.set(r.vehicle.id, entry);
   });
 

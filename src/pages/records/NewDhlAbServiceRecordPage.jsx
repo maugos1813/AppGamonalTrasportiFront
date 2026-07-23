@@ -34,6 +34,11 @@ const INITIAL_FORM = {
   kilometros: "",
   areaC: "",
   costoEspera: "",
+  costoCombustible: "",
+  peajes: "",
+  vignetta: "",
+  costoHotel: "",
+  costoTraforoFrejusBrennero: "",
 };
 
 // Arma la direccion de la parada final a partir de calle/CAP/ciudad, en el mismo
@@ -332,6 +337,51 @@ export const NewDhlAbServiceRecordPage = () => {
               min="0"
               value={form.costoEspera}
               onChange={handleChange("costoEspera")}
+            />
+            <TextField
+              id="costoCombustible"
+              label="Costo combustible"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.costoCombustible}
+              onChange={handleChange("costoCombustible")}
+            />
+            <TextField
+              id="peajes"
+              label="Peajes exterior"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.peajes}
+              onChange={handleChange("peajes")}
+            />
+            <TextField
+              id="vignetta"
+              label="Vignetta"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.vignetta}
+              onChange={handleChange("vignetta")}
+            />
+            <TextField
+              id="costoHotel"
+              label="Costo de hotel"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.costoHotel}
+              onChange={handleChange("costoHotel")}
+            />
+            <TextField
+              id="costoTraforoFrejusBrennero"
+              label="Traforo Frejus/Brennero"
+              type="number"
+              step="0.01"
+              min="0"
+              value={form.costoTraforoFrejusBrennero}
+              onChange={handleChange("costoTraforoFrejusBrennero")}
             />
           </div>
         </GlassCard>

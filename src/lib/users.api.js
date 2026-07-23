@@ -33,3 +33,7 @@ export const listDriverLocationsRequest = () =>
 // para todos los choferes libres en cada refresco de posiciones.
 export const getDriverReturnEtaRequest = (id) =>
   api.get(`/users/${id}/eta-regreso`).then((res) => res.data.data.eta);
+
+// Ruta real (historial de pings GPS) de un chofer en un dia puntual.
+export const getDriverRouteHistoryRequest = (id, year, month, day) =>
+  api.get(`/users/${id}/ruta/${year}/${month}/${day}`).then((res) => res.data.data.puntos);

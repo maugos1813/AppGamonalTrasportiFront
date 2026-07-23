@@ -2,14 +2,19 @@
 // de la referencia de dashboard que paso el usuario. "percent" solo controla cuanto
 // se llena el anillo (0-100, se recorta afuera de ese rango); "value"/"label"/
 // "sublabel" son el texto libre que se muestra, no tienen que coincidir con percent.
-export const ProgressRing = ({ value, label, sublabel, percent, color, size = 96, strokeWidth = 9 }) => {
+export const ProgressRing = ({ value, label, sublabel, percent, color, size = 96, strokeWidth = 9, onClick }) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, percent ?? 0));
   const offset = circumference * (1 - clamped / 100);
+  const Wrapper = onClick ? "button" : "div";
 
   return (
-    <div className="flex flex-col items-center gap-3 rounded-2xl glass-surface-sm px-4 py-5 text-center">
+    <Wrapper
+      type={onClick ? "button" : undefined}
+      onClick={onClick}
+      className={`flex flex-col items-center gap-3 rounded-2xl glass-surface-sm px-4 py-5 text-center${onClick ? " transition-colors hover:bg-line/[0.08]" : ""}`}
+    >
       <div className="relative shrink-0" style={{ width: size, height: size }}>
         <svg width={size} height={size} className="-rotate-90">
           <circle
@@ -42,6 +47,6 @@ export const ProgressRing = ({ value, label, sublabel, percent, color, size = 96
         <span className="block text-[12px] uppercase tracking-wide text-ink-400">{label}</span>
         {sublabel && <span className="mt-0.5 block text-[11px] text-ink-300">{sublabel}</span>}
       </div>
-    </div>
+    </Wrapper>
   );
 };

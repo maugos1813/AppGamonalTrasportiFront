@@ -82,6 +82,8 @@ const driverName = (record) =>
 
 const isDhlAb = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
 
+const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
+
 // Urgencia por tiempo restante a la ETA: >1h verde, 31-59min naranja, <=30min (o ya
 // vencido) rojo - para que el panel de Pendientes se pueda escanear de un vistazo.
 const URGENCY_STYLES = {
@@ -490,12 +492,22 @@ export const RecordsListPage = ({ section }) => {
     (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
   );
   const summaryDays = summary
-    ? groupSummaryByDay(
-        summary.filter(
-          (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
-        )
-      )
+    ? groupSummaryByDay(summary.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione)))
     : null;
+
+  // Total de KM del mes, Extras Piazza vs DHL/AB Service - de todo el mes (no solo
+  // la seccion que se esta mirando), para tener una idea general del volumen sin
+  // tener que cambiar de pestana. DHL/AB pesa x2 en los rankings (ver kmMultiplier
+  // en dashboardStats.js), asi que se muestra el crudo y el ponderado por separado.
+  const monthKmTotals = summary?.reduce(
+    (acc, r) => {
+      const km = r.kilometrosReales ?? r.kilometros ?? 0;
+      if (isDhlAb(r)) acc.dhlAb += km;
+      else acc.extrasPiazza += km;
+      return acc;
+    },
+    { extrasPiazza: 0, dhlAb: 0 }
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -510,7 +522,11 @@ export const RecordsListPage = ({ section }) => {
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <SectionTabs />
-          <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />
+          {/* En proceso/Terminados solo tiene sentido para el chofer: no tiene el panel
+              de Pendientes ni navegacion mes a mes, asi que es su unica forma de acotar
+              la lista. El OWNER/ADMIN ya tiene Pendientes a la derecha, asi que ve todo
+              el mes junto (el StatusBadge de cada fila alcanza para diferenciar). */}
+          {!isPrivileged && <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />}
           {isPrivileged && sectionConfig.allowCreate && (
             <Link to={sectionConfig.newPath}>
               <Button className="w-auto px-5">Nuevo servicio</Button>
@@ -570,9 +586,17 @@ export const RecordsListPage = ({ section }) => {
                 >
                   &larr; Mes anterior
                 </button>
-                <h2 className="text-[15px] font-semibold uppercase text-ink-100">
-                  {monthLabel(viewDate.year, viewDate.month)}
-                </h2>
+                <div className="flex flex-col items-center gap-0.5">
+                  <h2 className="text-[15px] font-semibold uppercase text-ink-100">
+                    {monthLabel(viewDate.year, viewDate.month)}
+                  </h2>
+                  {monthKmTotals && (
+                    <p className="text-[11px] normal-case text-ink-400">
+                      Extras Piazza: {fmtKm(monthKmTotals.extrasPiazza)} km · DHL - AB Service:{" "}
+                      {fmtKm(monthKmTotals.dhlAb)} km x2 = {fmtKm(monthKmTotals.dhlAb * 2)} km
+                    </p>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setViewDate((v) => shiftMonth(v, 1))}
@@ -611,19 +635,14 @@ export const RecordsListPage = ({ section }) => {
               )}
 
               {summaryDays?.length === 0 && (
-                <p className="py-4 text-center text-[14px] text-ink-300">
-                  No hay servicios {tab === "en_proceso" ? "en proceso" : "terminados"} este mes.
-                </p>
+                <p className="py-4 text-center text-[14px] text-ink-300">No hay servicios este mes.</p>
               )}
 
               {summaryDays?.map((day) => {
                 const dayOpen = openDays.has(day.key);
                 const loaded = dayRecords.get(day.key);
                 const dayVisibleRecords = loaded
-                  ?.filter(
-                    (r) =>
-                      TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
-                  )
+                  ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione))
                   .sort((a, b) => driverName(a).localeCompare(driverName(b)));
 
                 return (
