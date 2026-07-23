@@ -1,5 +1,6 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, Navigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
@@ -91,10 +92,68 @@ const GroupSection = ({ title, members }) => (
   </div>
 );
 
+const KM_BREAKDOWN_ROWS = [
+  { key: "EXTRA_PIAZZA", label: "Extras Piazza", multiplier: 1 },
+  { key: "DHL", label: "DHL", multiplier: 2 },
+  { key: "AB_SERVICE", label: "AB Service", multiplier: 2 },
+];
+
+const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
+
+// Desglose de KM del mes por tipo de servicio, con el x2 de DHL/AB Service
+// visible por separado (ver kmMultiplier en dashboardStats.js) en vez de solo
+// el total ya ponderado.
+const DriverKmModal = ({ entry, onClose }) => {
+  useEffect(() => {
+    const onKeyDown = (e) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div className="fixed inset-0 z-40 flex items-center justify-center p-4">
+      <button
+        type="button"
+        aria-label="Cerrar"
+        onClick={onClose}
+        className="absolute inset-0 bg-backdrop backdrop-blur-sm"
+      />
+      <div className="glass-surface relative z-10 w-full max-w-sm rounded-3xl bg-background p-6">
+        <h2 className="text-[17px] font-semibold text-ink-50">{entry.nombre}</h2>
+        <p className="mt-1 text-[13px] text-ink-400">KM recorridos este mes, por tipo de servicio.</p>
+
+        <div className="mt-4 flex flex-col gap-2">
+          {KM_BREAKDOWN_ROWS.map(({ key, label, multiplier }) => (
+            <div
+              key={key}
+              className="flex items-center justify-between rounded-xl glass-surface-sm px-3 py-2 text-[13px]"
+            >
+              <span className="text-ink-50">{label}</span>
+              <span className="text-ink-300">
+                {fmtKm(entry.breakdown[key])} km{multiplier > 1 ? ` x2 = ${fmtKm(entry.breakdown[key] * multiplier)} km` : ""}
+              </span>
+            </div>
+          ))}
+          <div className="mt-1 flex items-center justify-between rounded-xl bg-accent-500/10 px-3 py-2 text-[13px] font-medium">
+            <span className="text-ink-50">Total</span>
+            <span className="text-ink-50">{fmtKm(entry.km)} km</span>
+          </div>
+        </div>
+
+        <Button variant="ghost" className="mt-6" onClick={onClose}>
+          Cerrar
+        </Button>
+      </div>
+    </div>,
+    document.body
+  );
+};
+
 // Top de choferes por KM recorrido este mes (planificado o real, ver
 // computeDriverKmRanking) - misma logica que se usaba antes en el dashboard.
 const DriverRankingPanel = ({ records }) => {
   const ranking = records ? computeDriverKmRanking(records, "mes").slice(0, 10) : undefined;
+  const [selectedEntry, setSelectedEntry] = useState(null);
 
   return (
     <GlassCard className="flex flex-col !p-4 lg:max-h-[45vh]">
@@ -111,19 +170,22 @@ const DriverRankingPanel = ({ records }) => {
           <p className="py-3 text-center text-[13px] text-ink-300">Sin servicios este mes todavia.</p>
         )}
         {ranking?.map((entry, idx) => (
-          <Link
+          <button
             key={entry.id}
-            to={`/choferes/${entry.id}`}
-            className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2 text-[13px] transition-colors hover:bg-line/[0.08]"
+            type="button"
+            onClick={() => setSelectedEntry(entry)}
+            className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2 text-left text-[13px] transition-colors hover:bg-line/[0.08]"
           >
             <span className="w-4 shrink-0 text-center text-[12px] font-medium text-ink-400">{idx + 1}</span>
             <span className="min-w-0 flex-1 truncate text-ink-50">{entry.nombre}</span>
             <span className="shrink-0 text-[12px] text-ink-300">
               {Math.round(entry.km).toLocaleString("es-AR")} km
             </span>
-          </Link>
+          </button>
         ))}
       </div>
+
+      {selectedEntry && <DriverKmModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} />}
     </GlassCard>
   );
 };

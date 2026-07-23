@@ -315,6 +315,12 @@ const kmMultiplier = (record) =>
 // recien creado no queda en cero solo porque todavia no se cerro.
 const recordKm = (record) => (record.kilometrosReales ?? record.kilometros ?? 0) * kmMultiplier(record);
 
+// Categoria "cruda" (sin el peso x2) por spedizzione, para poder mostrar el
+// desglose en el modal de detalle - un registro sin spedizzione reconocido se
+// trata como Extras Piazza (mismo criterio que kmMultiplier).
+const kmCategory = (record) =>
+  record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE" ? record.spedizzione : "EXTRA_PIAZZA";
+
 export const computeDriverKmRanking = (records, period, now = new Date()) => {
   const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
   const totals = new Map();
@@ -326,9 +332,11 @@ export const computeDriverKmRanking = (records, period, now = new Date()) => {
       nombre: `${r.driver.nombre} ${r.driver.apellido}`,
       km: 0,
       servicios: 0,
+      breakdown: { EXTRA_PIAZZA: 0, DHL: 0, AB_SERVICE: 0 },
     };
     entry.km += recordKm(r);
     entry.servicios += 1;
+    entry.breakdown[kmCategory(r)] += r.kilometrosReales ?? r.kilometros ?? 0;
     totals.set(r.driver.id, entry);
   });
 
