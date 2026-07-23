@@ -265,7 +265,7 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => (
           {isDhlAb(record) ? "DHL/AB" : "Extras Piazza"}
         </span>
       </div>
-      <span className="truncate text-ink-300">{record.destinazione}</span>
+      <span className="min-w-0 truncate text-ink-300">{record.destinazione}</span>
       <div className="flex items-center justify-between gap-2 text-[12px] text-ink-400">
         <span className="min-w-0 truncate">{driverName(record)}</span>
         <span className="shrink-0">{formatTimeRemaining(record.eta)}</span>
@@ -287,7 +287,7 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => (
 // El backend ya filtra (en curso, +/-3 dias) y ordena por ETA - solo se renderiza tal cual.
 const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId }) => {
   return (
-    <GlassCard className="flex flex-col !p-4 lg:h-[calc(100dvh-220px)]">
+    <GlassCard className="flex min-w-0 flex-col !p-4 lg:h-[calc(100dvh-220px)]">
       <h2 className="px-1 text-[15px] font-semibold text-ink-50">Pendientes</h2>
       <p className="mb-3 px-1 text-[12px] text-ink-400">
         Extras Piazza y DHL - AB Service juntos, ordenado por lo mas urgente.
@@ -563,7 +563,7 @@ export const RecordsListPage = ({ section }) => {
 
       {isPrivileged ? (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-start">
-          <GlassCard className="!p-0">
+          <GlassCard className="min-w-0 !p-0">
             {searchResults !== null ? (
               <div className="flex items-center justify-between gap-2 px-5 py-4">
                 <h2 className="text-[15px] font-semibold text-ink-100">
