@@ -75,8 +75,8 @@ export const useLocationSharing = () => {
           }
           if (!location) return;
           reportPermission(false);
-          lastNativeLocation = { lat: location.latitude, lng: location.longitude };
-          updateMyLocationRequest(location.latitude, location.longitude).catch(() => {});
+          lastNativeLocation = { lat: location.latitude, lng: location.longitude, accuracy: location.accuracy };
+          updateMyLocationRequest(location.latitude, location.longitude, location.accuracy).catch(() => {});
         }
       );
     };
@@ -91,9 +91,11 @@ export const useLocationSharing = () => {
       if (!navigator.geolocation) return;
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          updateMyLocationRequest(position.coords.latitude, position.coords.longitude).catch(
-            () => {}
-          );
+          updateMyLocationRequest(
+            position.coords.latitude,
+            position.coords.longitude,
+            position.coords.accuracy
+          ).catch(() => {});
         },
         () => {},
         { enableHighAccuracy: true, timeout: 10000 }
@@ -112,9 +114,11 @@ export const useLocationSharing = () => {
             // distanceFilter metros, asi que si esta quieto reenviamos la ultima
             // posicion conocida para que el mapa lo siga viendo "fresco".
             if (lastNativeLocation) {
-              updateMyLocationRequest(lastNativeLocation.lat, lastNativeLocation.lng).catch(
-                () => {}
-              );
+              updateMyLocationRequest(
+                lastNativeLocation.lat,
+                lastNativeLocation.lng,
+                lastNativeLocation.accuracy
+              ).catch(() => {});
             }
           } else {
             stopNativeTracking();

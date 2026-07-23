@@ -20,8 +20,10 @@ export const uploadUserAvatarRequest = (id, file) => {
   return api.post(`/users/${id}/avatar`, formData).then((res) => res.data.data.user);
 };
 
-export const updateMyLocationRequest = (lat, lng) =>
-  api.patch("/users/me/ubicacion", { lat, lng });
+// accuracy (radio de incertidumbre en metros que reporta el propio GPS) es opcional -
+// el backend la usa para descartar fixes de mala calidad antes de guardarlos.
+export const updateMyLocationRequest = (lat, lng, accuracy) =>
+  api.patch("/users/me/ubicacion", { lat, lng, ...(accuracy != null ? { accuracy } : {}) });
 
 export const reportLocationPermissionRequest = (denegado) =>
   api.patch("/users/me/ubicacion-permiso", { denegado });
