@@ -284,13 +284,13 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => (
   </div>
 );
 
-// El backend ya filtra (en curso, +/-3 dias) y ordena por ETA - solo se renderiza tal cual.
+// El backend ya filtra (en curso, servicios de hoy) y ordena por ETA - solo se renderiza tal cual.
 const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId }) => {
   return (
     <GlassCard className="flex min-w-0 flex-col !p-4 lg:h-[calc(100dvh-220px)]">
       <h2 className="px-1 text-[15px] font-semibold text-ink-50">Pendientes</h2>
       <p className="mb-3 px-1 text-[12px] text-ink-400">
-        Extras Piazza y DHL - AB Service juntos, ordenado por lo mas urgente.
+        Servicios de hoy: Extras Piazza y DHL - AB Service juntos, ordenado por lo mas urgente.
       </p>
 
       <div className="flex flex-col gap-2 overflow-y-auto">

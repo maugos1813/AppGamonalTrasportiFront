@@ -87,7 +87,7 @@ const buildChoferAlerts = async () => {
 // Pendientes de Registros los cubre mejor (con colores de urgencia), y traer el
 // historico completo de registros solo para esa alerta hacia que las notificaciones
 // tardaran en cargar. computeLocationPermissionAlerts solo necesita saber que chofer
-// esta "en camino" ahora mismo, asi que le alcanza con los pendientes (+/-3 dias).
+// esta "en camino" ahora mismo, asi que le alcanza con los pendientes de hoy.
 const buildOwnerAlerts = async () => {
   const [pendingRecords, users, vehicles, documents] = await Promise.all([
     listPendingRecordsRequest(),

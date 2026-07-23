@@ -3,9 +3,9 @@ import { api } from "./api";
 export const listRecordsRequest = () =>
   api.get("/records").then((res) => res.data.data.records);
 
-// Panel de "Pendientes" de Registros: acotado a +/-3 dias en el backend, no el
-// historico completo (no tiene sentido traer miles de registros para filtrar los
-// pocos que estan en curso ahora mismo).
+// Panel de "Pendientes" de Registros: acotado a los servicios de HOY en el backend,
+// no el historico completo (no tiene sentido traer miles de registros para filtrar
+// los pocos que estan en curso ahora mismo).
 export const listPendingRecordsRequest = () =>
   api.get("/records/pending").then((res) => res.data.data.records);
 
