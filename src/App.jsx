@@ -12,6 +12,7 @@ import { DriversPage } from "./pages/drivers/DriversPage";
 import { NewDriverPage } from "./pages/drivers/NewDriverPage";
 import { MapPage } from "./pages/map/MapPage";
 import { MecanicaPage } from "./pages/mecanica/MecanicaPage";
+import { DailySummaryPage } from "./pages/notifications/DailySummaryPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
 import { NewDhlAbServiceRecordPage } from "./pages/records/NewDhlAbServiceRecordPage";
 import { NewRecordPage } from "./pages/records/NewRecordPage";
@@ -34,6 +35,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
           <Route path="/" element={<DashboardPage />} />
+          <Route path="/resumen" element={<DailySummaryPage />} />
           <Route path="/profile" element={<ProfilePage />} />
           <Route path="/records" element={<Navigate to="/records/extras-piazza" replace />} />
           <Route path="/records/extras-piazza" element={<RecordsListPage section="extras-piazza" />} />

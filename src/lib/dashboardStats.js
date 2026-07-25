@@ -181,6 +181,34 @@ const recordRevenue = (record) => {
 
 const recordProfit = (record) => recordRevenue(record) - recordCost(record);
 
+// Conteo de servicios del periodo elegido, a nivel compania (sin separar por
+// spedizzione) - para las mini-cards KPI de la pestana "General" de Resumen.
+export const computeServicePeriodStats = (records, period, now = new Date()) => {
+  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
+  return {
+    total: scoped.length,
+    enCurso: scoped.filter((r) => EN_PROCESO_STATUSES.includes(r.estado)).length,
+    completados: scoped.filter((r) => r.estado === "CONSEGNATO").length,
+  };
+};
+
+// Servicios por dia de los ultimos 7 dias (terminando hoy), para los graficos de
+// tendencia semanal de la pestana "General" - isToday marca el ultimo punto (hoy),
+// para que el chart lo pueda resaltar.
+const WEEKDAY_LABELS = ["Do", "Lu", "Ma", "Mi", "Ju", "Vi", "Sa"];
+export const computeWeeklyServiceTrend = (records, now = new Date()) => {
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date(now);
+    date.setDate(date.getDate() - (6 - i));
+    return date;
+  });
+  return days.map((date, idx) => ({
+    label: WEEKDAY_LABELS[date.getDay()],
+    count: records.filter((r) => isSameDay(r.fechaServicio, date)).length,
+    isToday: idx === days.length - 1,
+  }));
+};
+
 export const computeEconomicStats = (records, period, now = new Date()) => {
   const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
   const previousScoped = records.filter((r) => isWithinPreviousPeriod(r.fechaServicio, period, now));
@@ -414,6 +442,34 @@ export const computeFleetKmUsage = (records, period, now = new Date()) => {
     entry.servicios += 1;
     entry.breakdown[kmCategory(r)] += r.kilometrosReales ?? r.kilometros ?? 0;
     totals.set(r.vehicle.id, entry);
+  });
+
+  return Array.from(totals.values()).sort((a, b) => b.km - a.km);
+};
+
+const EXTRAS_PIAZZA_ZONA_LABELS = { MILANO: "Milano", ROMA: "Roma" };
+const SIN_ZONA_KEY = "SIN_ZONA";
+
+// Extras Piazza por zona (Milano/Roma) - mismo shape que computeDriverKmRanking
+// (id/nombre/km/servicios) para reusar RankingCard tal cual. Hoy casi ningun
+// registro tiene extrasPiazzaZona cargada (el campo existe en el formulario pero
+// no se completa en la practica), asi que "Sin zona" va a dominar hasta que se
+// empiece a usar - queda listo para cuando eso pase.
+export const computeExtrasPiazzaZonaBreakdown = (records, period, now = new Date()) => {
+  const scoped = records.filter((r) => !isDhlAbRecord(r) && isWithinPeriod(r.fechaServicio, period, now));
+  const totals = new Map();
+
+  scoped.forEach((r) => {
+    const key = r.extrasPiazzaZona ?? SIN_ZONA_KEY;
+    const entry = totals.get(key) ?? {
+      id: key,
+      nombre: EXTRAS_PIAZZA_ZONA_LABELS[key] ?? "Sin zona",
+      km: 0,
+      servicios: 0,
+    };
+    entry.km += r.kilometrosReales ?? r.kilometros ?? 0;
+    entry.servicios += 1;
+    totals.set(key, entry);
   });
 
   return Array.from(totals.values()).sort((a, b) => b.km - a.km);

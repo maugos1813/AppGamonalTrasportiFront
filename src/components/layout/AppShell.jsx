@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { NotificationsProvider } from "../../context/NotificationsContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { MobileNavDrawer } from "./MobileNavDrawer";
@@ -50,6 +51,22 @@ const HomeIcon = (props) => (
   >
     <path d="M3 11.5 12 4l9 7.5" />
     <path d="M5.5 10v9a1 1 0 0 0 1 1h4v-6h3v6h4a1 1 0 0 0 1-1v-9" />
+  </svg>
+);
+
+const ChecklistIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <rect x="4" y="4" width="16" height="16" rx="2.5" />
+    <path d="M8 10.5l1.8 1.8L13.5 8.5" />
+    <path d="M8 16h8" />
   </svg>
 );
 
@@ -231,6 +248,7 @@ export const AppShell = () => {
   useLocationSharing();
 
   return (
+    <NotificationsProvider>
     <div className="relative min-h-dvh w-full bg-background">
       <div className="pointer-events-none fixed inset-0">
         <div className="hidden dark:block absolute -top-1/3 left-1/2 h-[70vh] w-[70vh] -translate-x-1/2 rounded-full bg-accent-500/20 blur-[140px]" />
@@ -262,6 +280,7 @@ export const AppShell = () => {
 
             <nav className="mt-8 flex flex-col gap-1">
               <SidebarNavTab to="/" label="Inicio" icon={HomeIcon} />
+              <SidebarNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
               <SidebarNavTab to="/records" label="Registros" icon={ListIcon} />
               {isPrivileged && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
               {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
@@ -357,6 +376,7 @@ export const AppShell = () => {
 
       <nav className="fixed inset-x-0 bottom-0 z-20 flex w-full items-stretch border-t border-sidebar-border bg-sidebar/95 backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] sm:hidden">
         <BottomNavTab to="/" label="Inicio" icon={HomeIcon} />
+        <BottomNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
         <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
         {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
         {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
@@ -371,5 +391,6 @@ export const AppShell = () => {
         onLogout={logout}
       />
     </div>
+    </NotificationsProvider>
   );
 };

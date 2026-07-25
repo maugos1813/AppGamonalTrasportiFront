@@ -2,7 +2,19 @@
 // de la referencia de dashboard que paso el usuario. "percent" solo controla cuanto
 // se llena el anillo (0-100, se recorta afuera de ese rango); "value"/"label"/
 // "sublabel" son el texto libre que se muestra, no tienen que coincidir con percent.
-export const ProgressRing = ({ value, label, sublabel, percent, color, size = 96, strokeWidth = 9, onClick }) => {
+// "legend" (opcional): [{ label, value, color }] mostrado debajo, como en la
+// referencia de "anillos con leyenda" (ej. Completados vs Resto).
+export const ProgressRing = ({
+  value,
+  label,
+  sublabel,
+  percent,
+  color,
+  size = 96,
+  strokeWidth = 9,
+  onClick,
+  legend,
+}) => {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const clamped = Math.max(0, Math.min(100, percent ?? 0));
@@ -46,6 +58,16 @@ export const ProgressRing = ({ value, label, sublabel, percent, color, size = 96
       <div>
         <span className="block text-[12px] uppercase tracking-wide text-ink-400">{label}</span>
         {sublabel && <span className="mt-0.5 block text-[11px] text-ink-300">{sublabel}</span>}
+        {legend && (
+          <div className="mt-2.5 flex items-center justify-center gap-3">
+            {legend.map((item) => (
+              <span key={item.label} className="flex items-center gap-1.5 text-[11px] text-ink-200">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
+                {item.value}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
     </Wrapper>
   );

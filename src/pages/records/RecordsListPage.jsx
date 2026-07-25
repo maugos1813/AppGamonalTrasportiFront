@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, NavLink } from "react-router-dom";
+import { Link, NavLink, Navigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
@@ -17,6 +17,7 @@ import {
   TERMINADOS_STATUSES,
 } from "../../lib/constants";
 import { formatDate, formatTimeRemaining } from "../../lib/format";
+import { scopedRecordsSection } from "../../lib/permissions";
 import {
   listPendingRecordsRequest,
   listRecordsByDayRequest,
@@ -285,12 +286,16 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => (
 );
 
 // El backend ya filtra (en curso, servicios de hoy) y ordena por ETA - solo se renderiza tal cual.
-const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId }) => {
+// scopedLabel: si es un ADMIN de area, el backend ya solo le manda su seccion, asi que
+// el subtitulo no debe prometer "Extras Piazza y DHL - AB Service juntos".
+const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId, scopedLabel }) => {
   return (
     <GlassCard className="flex min-w-0 flex-col !p-4 lg:h-[calc(100dvh-220px)]">
       <h2 className="px-1 text-[15px] font-semibold text-ink-50">Pendientes</h2>
       <p className="mb-3 px-1 text-[12px] text-ink-400">
-        Servicios de hoy: Extras Piazza y DHL - AB Service juntos, ordenado por lo mas urgente.
+        {scopedLabel
+          ? `Servicios de hoy de ${scopedLabel}, ordenado por lo mas urgente.`
+          : "Servicios de hoy: Extras Piazza y DHL - AB Service juntos, ordenado por lo mas urgente."}
       </p>
 
       <div className="flex flex-col gap-2 overflow-y-auto">
@@ -319,6 +324,9 @@ const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId })
 export const RecordsListPage = ({ section }) => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  // ADMIN "de area" (ver lib/permissions.js): solo puede estar en su propia seccion,
+  // la otra ni siquiera se le ofrece (el backend tampoco le manda esos registros).
+  const scopedSection = scopedRecordsSection(user);
   const sectionConfig = SECTIONS[section];
   const [error, setError] = useState("");
   const [tab, setTab] = useState("en_proceso");
@@ -509,6 +517,12 @@ export const RecordsListPage = ({ section }) => {
     { extrasPiazza: 0, dhlAb: 0 }
   );
 
+  // Un ADMIN de area no tiene ni siquiera la otra seccion como opcion (backend
+  // tampoco le manda esos registros) - se lo redirige de vuelta a la suya.
+  if (scopedSection && scopedSection !== section) {
+    return <Navigate to={`/records/${scopedSection}`} replace />;
+  }
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -521,7 +535,9 @@ export const RecordsListPage = ({ section }) => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <SectionTabs />
+          {/* Un ADMIN de area no tiene otra seccion a la que ir, asi que no se le
+              muestra el selector (llevaria a una seccion vacia). */}
+          {!scopedSection && <SectionTabs />}
           {/* En proceso/Terminados solo tiene sentido para el chofer: no tiene el panel
               de Pendientes ni navegacion mes a mes, asi que es su unica forma de acotar
               la lista. El OWNER/ADMIN ya tiene Pendientes a la derecha, asi que ve todo
@@ -692,6 +708,7 @@ export const RecordsListPage = ({ section }) => {
           <PendingPanel
             records={pendingRecords}
             closeTo={`/records/${section}`}
+            scopedLabel={scopedSection ? sectionConfig.label : null}
             onChangeEstado={handleChangeEstado}
             updatingId={updatingId}
           />

@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
-import { useAuth } from "../context/AuthContext";
+import { useAuth } from "./AuthContext";
 import {
   computeBirthdayAlerts,
   computeCurrentService,
@@ -105,7 +105,14 @@ const buildOwnerAlerts = async () => {
   ]);
 };
 
-export const useNotifications = () => {
+const NotificationsContext = createContext(null);
+
+// Una sola fuente para toda la app: NotificationsBell (header, en cada pantalla) y
+// Resumen (pestania Diario) antes llamaban cada uno a su propia copia de este fetch -
+// mismos pedidos (users/vehiculos/pendientes/documentos) disparados varias veces en
+// simultaneo en cada carga de pagina. Montado una vez en AppShell, todos comparten
+// el mismo resultado.
+export const NotificationsProvider = ({ children }) => {
   const { user } = useAuth();
   const { pathname } = useLocation();
   const [alerts, setAlerts] = useState([]);
@@ -147,5 +154,13 @@ export const useNotifications = () => {
     };
   }, [isChofer, isPrivileged, pathname]);
 
-  return { alerts, loading };
+  return (
+    <NotificationsContext.Provider value={{ alerts, loading }}>{children}</NotificationsContext.Provider>
+  );
+};
+
+export const useNotifications = () => {
+  const ctx = useContext(NotificationsContext);
+  if (!ctx) throw new Error("useNotifications debe usarse dentro de un NotificationsProvider");
+  return ctx;
 };

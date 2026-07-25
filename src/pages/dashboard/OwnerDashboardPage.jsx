@@ -21,6 +21,7 @@ import {
   isDhlAbRecord,
 } from "../../lib/dashboardStats";
 import { formatCurrency, formatCurrencyCompact } from "../../lib/format";
+import { scopedDashboardSection } from "../../lib/permissions";
 import { listRecordsRequest } from "../../lib/records.api";
 
 const PERIOD_OPTIONS = [
@@ -44,6 +45,18 @@ const SECTION_LABEL = {
   extras_piazza: "Extras Piazza",
   dhl_ab: "DHL - AB Service",
 };
+
+// Sub-division de Extras Piazza (Record.extrasPiazzaZona). Hoy toda la operacion de
+// Extras Piazza es Milano (Roma todavia no arranco) y casi ningun registro tiene la
+// zona cargada, asi que un registro sin zona cuenta como Milano (mismo criterio que
+// ya se usa con spedizzione null = Extras Piazza) en vez de un balde "sin zona"
+// aparte. DHL/AB Service no tiene este concepto, este selector solo aparece dentro
+// de Extras Piazza.
+const ZONA_OPTIONS = [
+  { value: "MILANO", label: "Milano" },
+  { value: "ROMA", label: "Roma" },
+];
+const ZONA_LABELS = { MILANO: "Piazza Milano", ROMA: "Piazza Roma" };
 
 // Detalle de que compone un anillo de Control economico (facturacion/costos/
 // ganancia), agrupado por categoria - ver facturacionBreakdown/costosBreakdown
@@ -98,10 +111,14 @@ const EconomicBreakdownModal = ({ title, sublabel, rows, total, onClose }) => {
 
 export const OwnerDashboardPage = () => {
   const { user } = useAuth();
+  // ADMIN "de area" (ver lib/permissions.js): arranca ya en su unica seccion, el
+  // backend tampoco le manda registros de la otra.
+  const scopedSection = scopedDashboardSection(user);
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
-  const [section, setSection] = useState("extras_piazza");
+  const [section, setSection] = useState(scopedSection ?? "extras_piazza");
+  const [zona, setZona] = useState("MILANO");
   const [openBreakdown, setOpenBreakdown] = useState(null);
 
   useEffect(() => {
@@ -126,11 +143,17 @@ export const OwnerDashboardPage = () => {
   // Todo el bloque de Control economico mira solo la seccion elegida (Extras
   // Piazza o DHL - AB Service): son negocios con estructuras de costos distintas
   // (ver isDhlAbRecord/recordCost en dashboardStats.js), asi que no tiene sentido
-  // mezclarlos en el mismo numero.
-  const scopedRecords = useMemo(
-    () => (loaded ? records.filter((r) => (section === "dhl_ab" ? isDhlAbRecord(r) : !isDhlAbRecord(r))) : null),
-    [loaded, records, section]
-  );
+  // mezclarlos en el mismo numero. Dentro de Extras Piazza, ademas se acota por
+  // zona (Milano/Roma/Sin zona) - DHL/AB Service no tiene este concepto.
+  const scopedRecords = useMemo(() => {
+    if (!loaded) return null;
+    const bySection = records.filter((r) => (section === "dhl_ab" ? isDhlAbRecord(r) : !isDhlAbRecord(r)));
+    if (section !== "extras_piazza") return bySection;
+    // Sin zona cargada cuenta como Milano (ver comentario de ZONA_OPTIONS).
+    return bySection.filter((r) =>
+      zona === "MILANO" ? r.extrasPiazzaZona !== "ROMA" : r.extrasPiazzaZona === "ROMA"
+    );
+  }, [loaded, records, section, zona]);
 
   const economicStats = useMemo(
     () => (loaded ? computeEconomicStats(scopedRecords, period) : null),
@@ -144,6 +167,9 @@ export const OwnerDashboardPage = () => {
     () => (loaded ? computeMonthlyRevenueTrend(scopedRecords) : null),
     [loaded, scopedRecords]
   );
+
+  const sectionHeading =
+    section === "extras_piazza" ? `${SECTION_LABEL[section]} - ${ZONA_LABELS[zona]}` : SECTION_LABEL[section];
 
   if (error) return <Alert>{error}</Alert>;
 
@@ -164,8 +190,11 @@ export const OwnerDashboardPage = () => {
         </div>
         {/* Extras Piazza y DHL/AB Service tienen estructuras de costos distintas (ver
             recordCost en dashboardStats.js), asi que todo Control economico de abajo
-            mira solo la seccion elegida aca. */}
-        <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={setSection} />
+            mira solo la seccion elegida aca. Un ADMIN de area no tiene otra seccion
+            a la que cambiar (el backend tampoco le manda esos registros). */}
+        {!scopedSection && (
+          <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={setSection} />
+        )}
       </div>
 
       {/* Control economico: bloques de alto natural, en orden de prioridad (resumen ->
@@ -174,10 +203,16 @@ export const OwnerDashboardPage = () => {
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-[20px] font-semibold text-ink-50">
-            Control economico <span className="text-ink-400">- {SECTION_LABEL[section]}</span>
+            Control economico <span className="text-ink-400">- {sectionHeading}</span>
           </h2>
           <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
         </div>
+
+        {/* Solo dentro de Extras Piazza: Milano/Roma/Sin zona (ver extrasPiazzaZona
+            en el schema). DHL/AB Service no se subdivide asi. */}
+        {section === "extras_piazza" && (
+          <SegmentedControl options={ZONA_OPTIONS} value={zona} onChange={setZona} />
+        )}
 
         {/* Anillos de progreso: cada uno cuenta algo distinto (no son 3 veces la
             misma metrica) - facturacion vs el periodo anterior, costos como % de lo
@@ -230,7 +265,7 @@ export const OwnerDashboardPage = () => {
         {openBreakdown === "facturacion" && (
           <EconomicBreakdownModal
             title="Facturacion"
-            sublabel={`${SECTION_LABEL[section]} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            sublabel={`${sectionHeading} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
             rows={economicStats.facturacionBreakdown}
             total={economicStats.facturacion}
             onClose={() => setOpenBreakdown(null)}
@@ -239,7 +274,7 @@ export const OwnerDashboardPage = () => {
         {openBreakdown === "costos" && (
           <EconomicBreakdownModal
             title="Costos operativos"
-            sublabel={`${SECTION_LABEL[section]} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            sublabel={`${sectionHeading} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
             rows={economicStats.costosBreakdown}
             total={economicStats.costos}
             onClose={() => setOpenBreakdown(null)}
@@ -248,7 +283,7 @@ export const OwnerDashboardPage = () => {
         {openBreakdown === "ganancia" && (
           <EconomicBreakdownModal
             title="Ganancia estimada"
-            sublabel={`${SECTION_LABEL[section]} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            sublabel={`${sectionHeading} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
             rows={[
               { label: "Facturacion", monto: economicStats.facturacion },
               { label: "Costos operativos", monto: -economicStats.costos },

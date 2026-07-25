@@ -1,19 +1,20 @@
 import clsx from "clsx";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { useNotifications } from "../../hooks/useNotifications";
+import { useNotifications } from "../../context/NotificationsContext";
 import { Spinner } from "../ui/Spinner";
 
 // Colores segun severidad: rojo = urgente (ETA por vencer), naranja = por vencer
 // (documentos), amarillo = recordatorio (cumpleanios). "warning" queda como
 // default para las alertas del chofer, que no traen severity propia.
-const SEVERITY_ITEM_CLASSES = {
+// Exportados para que DailySummaryPage use la misma paleta que este dropdown.
+export const SEVERITY_ITEM_CLASSES = {
   urgent: "border-danger-500/25 bg-danger-500/10 text-danger-500",
   warning: "border-status-rischedulato/25 bg-status-rischedulato/10 text-status-rischedulato",
   reminder: "border-yellow-500/25 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400",
 };
 
-const SEVERITY_DOT_CLASSES = {
+export const SEVERITY_DOT_CLASSES = {
   urgent: "bg-danger-500",
   warning: "bg-status-rischedulato",
   reminder: "bg-yellow-500",
@@ -128,6 +129,14 @@ export const NotificationsBell = ({ variant = "default" }) => {
               })}
             </ul>
           )}
+
+          <Link
+            to="/resumen"
+            onClick={() => setOpen(false)}
+            className="mt-3 block rounded-xl px-1 py-1 text-center text-[12px] font-medium text-accent-400 hover:text-accent-300"
+          >
+            Ver resumen diario completo &rarr;
+          </Link>
         </div>
       )}
     </div>

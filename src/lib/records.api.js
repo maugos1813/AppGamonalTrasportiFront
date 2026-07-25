@@ -1,7 +1,9 @@
 import { api } from "./api";
 
-export const listRecordsRequest = () =>
-  api.get("/records").then((res) => res.data.data.records);
+// params: { days?: number } - sin days, trae todo el historico (comportamiento de
+// siempre); con days, acota a los ultimos N dias (ver ?days en record.controller.js).
+export const listRecordsRequest = (params) =>
+  api.get("/records", { params }).then((res) => res.data.data.records);
 
 // Panel de "Pendientes" de Registros: acotado a los servicios de HOY en el backend,
 // no el historico completo (no tiene sentido traer miles de registros para filtrar

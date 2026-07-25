@@ -10,6 +10,7 @@ import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { EN_PROCESO_STATUSES } from "../../lib/constants";
+import { computeLocationPermissionAlerts } from "../../lib/dashboardStats";
 import { addMinutes, formatDateTime } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { getRecordLiveEtaRequest, getRecordRequest, listRecordsRequest } from "../../lib/records.api";
@@ -224,6 +225,16 @@ export const MapPage = () => {
     );
   }, [locations]);
 
+  // Auditoria del mapa: choferes que no van a aparecer arriba (o que se van a "caer" del
+  // mapa apenas salgan a repartir) porque el celular reporto el permiso de ubicacion en
+  // segundo plano desactivado - la misma alerta que ya existe para la campanita/Resumen
+  // diario, mostrada aca porque es exactamente donde importa notarla: junto a quienes SI
+  // se estan viendo ahora mismo.
+  const locationPermissionAlerts = useMemo(
+    () => computeLocationPermissionAlerts(allDrivers ?? [], records ?? []),
+    [allDrivers, records]
+  );
+
   const focusDriver = (loc) => {
     const markerId = loc.servicio?.id ?? `idle-${loc.id}`;
     setOpenInfoId(markerId);
@@ -408,6 +419,37 @@ export const MapPage = () => {
       </div>
 
       <Alert>{error || (loadError ? "No se pudo cargar Google Maps." : "")}</Alert>
+
+      {/* Auditoria de GPS: estos choferes no van a aparecer en el mapa de arriba (o se
+          van a "caer" apenas salgan a repartir) aunque tengan un servicio activo -
+          visible aca sea cual sea la seccion elegida, no solo en "Pendientes"/"Choferes". */}
+      {locationPermissionAlerts.length > 0 && (
+        <GlassCard className="border border-status-rischedulato/25 bg-status-rischedulato/5 !p-4">
+          <h2 className="text-[14px] font-semibold text-ink-50">
+            GPS apagado ({locationPermissionAlerts.length})
+          </h2>
+          <p className="mt-1 text-[12px] text-ink-300">
+            No van a aparecer arriba (o se van a caer apenas salgan a repartir) hasta que activen
+            "Permitir todo el tiempo" en el celular.
+          </p>
+          <ul className="mt-3 flex flex-col gap-1.5">
+            {locationPermissionAlerts.map((alert) => (
+              <li key={alert.id}>
+                <Link
+                  to={alert.link}
+                  className={`block rounded-lg px-3 py-2 text-[12.5px] transition-colors hover:brightness-110 ${
+                    alert.severity === "urgent"
+                      ? "bg-danger-500/10 text-danger-500"
+                      : "bg-status-rischedulato/10 text-status-rischedulato"
+                  }`}
+                >
+                  {alert.message}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </GlassCard>
+      )}
 
       {showsDriverLocations && locations?.length === 0 && (
         <GlassCard className="text-center text-[14px] text-ink-300">
