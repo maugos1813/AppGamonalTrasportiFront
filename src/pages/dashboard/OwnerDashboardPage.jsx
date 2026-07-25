@@ -4,19 +4,21 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { ClientDistributionChart } from "../../components/charts/ClientDistributionChart";
 import { EconomicsChart } from "../../components/charts/EconomicsChart";
+import { KmTrendChart } from "../../components/charts/KmTrendChart";
 import { RevenueTrendChart } from "../../components/charts/RevenueTrendChart";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
-import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { CHART_COLORS } from "../../lib/constants";
 import {
   computeClientDistribution,
   computeEconomicStats,
+  computeMonthlyKmTrend,
   computeMonthlyRevenueTrend,
   isDhlAbRecord,
 } from "../../lib/dashboardStats";
@@ -50,13 +52,14 @@ const SECTION_LABEL = {
 // Extras Piazza es Milano (Roma todavia no arranco) y casi ningun registro tiene la
 // zona cargada, asi que un registro sin zona cuenta como Milano (mismo criterio que
 // ya se usa con spedizzione null = Extras Piazza) en vez de un balde "sin zona"
-// aparte. DHL/AB Service no tiene este concepto, este selector solo aparece dentro
-// de Extras Piazza.
+// aparte. "General" no filtra nada, para ver ambas zonas juntas. DHL/AB Service no
+// tiene este concepto, este selector solo aparece dentro de Extras Piazza.
 const ZONA_OPTIONS = [
+  { value: "TODAS", label: "General" },
   { value: "MILANO", label: "Milano" },
   { value: "ROMA", label: "Roma" },
 ];
-const ZONA_LABELS = { MILANO: "Piazza Milano", ROMA: "Piazza Roma" };
+const ZONA_LABELS = { TODAS: "Vista general", MILANO: "Piazza Milano", ROMA: "Piazza Roma" };
 
 // Detalle de que compone un anillo de Control economico (facturacion/costos/
 // ganancia), agrupado por categoria - ver facturacionBreakdown/costosBreakdown
@@ -118,7 +121,7 @@ export const OwnerDashboardPage = () => {
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
   const [section, setSection] = useState(scopedSection ?? "extras_piazza");
-  const [zona, setZona] = useState("MILANO");
+  const [zona, setZona] = useState("TODAS");
   const [openBreakdown, setOpenBreakdown] = useState(null);
 
   useEffect(() => {
@@ -148,7 +151,7 @@ export const OwnerDashboardPage = () => {
   const scopedRecords = useMemo(() => {
     if (!loaded) return null;
     const bySection = records.filter((r) => (section === "dhl_ab" ? isDhlAbRecord(r) : !isDhlAbRecord(r)));
-    if (section !== "extras_piazza") return bySection;
+    if (section !== "extras_piazza" || zona === "TODAS") return bySection;
     // Sin zona cargada cuenta como Milano (ver comentario de ZONA_OPTIONS).
     return bySection.filter((r) =>
       zona === "MILANO" ? r.extrasPiazzaZona !== "ROMA" : r.extrasPiazzaZona === "ROMA"
@@ -167,19 +170,17 @@ export const OwnerDashboardPage = () => {
     () => (loaded ? computeMonthlyRevenueTrend(scopedRecords) : null),
     [loaded, scopedRecords]
   );
+  const monthlyKmTrend = useMemo(
+    () => (loaded ? computeMonthlyKmTrend(scopedRecords) : null),
+    [loaded, scopedRecords]
+  );
 
   const sectionHeading =
     section === "extras_piazza" ? `${SECTION_LABEL[section]} - ${ZONA_LABELS[zona]}` : SECTION_LABEL[section];
 
   if (error) return <Alert>{error}</Alert>;
 
-  if (!loaded) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-      </div>
-    );
-  }
+  if (!loaded) return <PageLoader />;
 
   return (
     <div className="flex flex-col gap-6">
@@ -301,6 +302,18 @@ export const OwnerDashboardPage = () => {
           </h3>
           <div className="mt-3 h-[240px]">
             <RevenueTrendChart data={monthlyTrend} />
+          </div>
+        </GlassCard>
+
+        {/* Mismo formato que el grafico de arriba, pero de km recorridos (no de
+            dinero) - color propio (CHART_COLORS.km) para diferenciarlo de un
+            vistazo. */}
+        <GlassCard>
+          <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">
+            Kilometros {new Date().getFullYear()}
+          </h3>
+          <div className="mt-3 h-[240px]">
+            <KmTrendChart data={monthlyKmTrend} />
           </div>
         </GlassCard>
 

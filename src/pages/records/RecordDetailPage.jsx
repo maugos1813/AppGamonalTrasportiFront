@@ -6,6 +6,7 @@ import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
@@ -125,6 +126,21 @@ const TrashIcon = (props) => (
   </svg>
 );
 
+const PencilIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </svg>
+);
+
 export const RecordDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -146,6 +162,7 @@ export const RecordDetailPage = () => {
   const [vehicles, setVehicles] = useState(null);
   const [clients, setClients] = useState(null);
 
+  const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -155,6 +172,7 @@ export const RecordDetailPage = () => {
 
   const load = useCallback(() => {
     setLoadError("");
+    setIsEditing(false);
     Promise.all([getRecordRequest(id), listRecordFilesRequest(id)])
       .then(([recordData, filesData]) => {
         setRecord(recordData);
@@ -234,6 +252,13 @@ export const RecordDetailPage = () => {
     }
   };
 
+  const handleCancelEdit = () => {
+    setForm(toFormState(record));
+    setSaveError("");
+    setSaveSuccess(false);
+    setIsEditing(false);
+  };
+
   const handleDelete = async () => {
     setDeleting(true);
     setDeleteError("");
@@ -261,9 +286,7 @@ export const RecordDetailPage = () => {
   if (!record || !form || !dropdownsLoaded) {
     return (
       <SlideOverPanel closeTo={fallbackCloseTo}>
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
+        <PageLoader />
       </SlideOverPanel>
     );
   }
@@ -276,7 +299,6 @@ export const RecordDetailPage = () => {
     : [];
 
   const backTo = location.state?.from ?? backToSection(record);
-  const isExtrasPiazza = record.spedizzione !== "DHL" && record.spedizzione !== "AB_SERVICE";
 
   return (
     <SlideOverPanel closeTo={backTo}>
@@ -287,412 +309,40 @@ export const RecordDetailPage = () => {
         </Link>
       </div>
 
-      <GlassCard>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <span className="text-[13px] font-medium text-ink-400">{record.codigo}</span>
-            <h1 className="mt-0.5 text-[22px] font-semibold text-ink-50">{record.destinazione}</h1>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <StatusBadge status={record.estado} />
-            {isPrivileged && (
-              <button
-                type="button"
-                aria-label="Eliminar servicio"
-                title="Eliminar servicio"
-                onClick={() => {
-                  setDeleteError("");
-                  setShowDeleteConfirm(true);
-                }}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-danger-500/15 hover:text-danger-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-danger-500/20"
-              >
-                <TrashIcon className="h-[17px] w-[17px]" />
-              </button>
-            )}
-          </div>
-        </div>
-
-        <p className="mt-3 text-[15px] text-ink-200">{record.descripcion}</p>
-
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <InfoRow label="Fecha de servicio" value={formatDateTime(record.fechaServicio)} />
-          <InfoRow label="ETA" value={formatDateTime(record.eta)} />
-          <InfoRow
-            label="Vehiculo"
-            value={`${record.vehicle?.targa ?? "-"} - ${record.vehicle?.modelo ?? ""}`}
-          />
-          <InfoRow label="Cliente" value={record.client?.nombre} />
-          {record.ciudad && <InfoRow label="Ciudad" value={record.ciudad} />}
-          {record.extrasPiazzaZona && (
-            <InfoRow label="Zona" value={EXTRAS_PIAZZA_ZONA_LABELS[record.extrasPiazzaZona]} />
-          )}
-          <InfoRow
-            label="Chofer"
-            value={`${record.driver?.nombre ?? ""} ${record.driver?.apellido ?? ""}`}
-          />
-          {record.ruta?.duracionMin != null && (
-            <InfoRow
-              label="Ruta estimada"
-              value={`${record.ruta.distanciaKm.toFixed(1)} km - ${Math.round(record.ruta.duracionMin)} min`}
-            />
-          )}
-        </div>
-
-        <div className="mt-6 border-t border-line/10 pt-6">
-          <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-            Kilometraje
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <InfoRow label="Km planificados" value={record.kilometros ?? "-"} />
-            <InfoRow label="Km reales" value={record.kilometrosReales ?? "-"} />
-            {!isChofer && (
-              <InfoRow
-                label="Diferencia"
-                value={
-                  record.diferenciaKm != null
-                    ? `${record.diferenciaKm > 0 ? "+" : ""}${record.diferenciaKm} km`
-                    : "-"
-                }
-                tone={
-                  record.diferenciaKm > 0 ? "amber" : record.diferenciaKm < 0 ? "blue" : undefined
-                }
-              />
-            )}
-          </div>
-        </div>
-
-        {!isChofer && (
-          <div className="mt-6 border-t border-line/10 pt-6">
-            <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-              Detalle economico
-            </h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <InfoRow label="Precio/km" value={record.precioKm ?? "-"} />
-              <InfoRow label="Total" value={record.total ?? "-"} />
-            </div>
-          </div>
-        )}
-      </GlassCard>
-
-      <GlassCard>
-        <h2 className="text-[17px] font-medium text-ink-50">Archivos</h2>
-        <p className="mt-1 text-[13px] text-ink-300">
-          {isChofer
-            ? "Sube tu foto de entrega para confirmar el servicio."
-            : "Documentos y comprobantes cargados para este registro."}
-        </p>
-
-        <Alert>{uploadError}</Alert>
-
-        {isChofer && (
-          <label className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl glass-input px-4 py-3 text-[14px] font-medium text-ink-50 hover:bg-line/10">
-            {uploading ? <Spinner /> : "Subir foto de entrega"}
-            <input
-              type="file"
-              accept="image/*,application/pdf"
-              className="hidden"
-              onChange={handleUpload}
-              disabled={uploading}
-            />
-          </label>
-        )}
-
-        <ul className="mt-4 flex flex-col gap-2">
-          {files.length === 0 && (
-            <li className="text-[14px] text-ink-400">Todavia no hay archivos cargados.</li>
-          )}
-          {files.map((file) => (
-            <li key={file.id}>
-              <a
-                href={file.archivoUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="flex items-center justify-between rounded-xl glass-surface-sm px-4 py-3 text-[14px] text-ink-50 hover:bg-line/10"
-              >
-                <span>{TIPO_ARCHIVO_LABELS[file.tipoArchivo] ?? file.tipoArchivo}</span>
-                <span className="text-[12px] text-ink-400">{formatDateTime(file.createdAt)}</span>
-              </a>
-            </li>
-          ))}
-        </ul>
-      </GlassCard>
-
-      <GlassCard>
-        <h2 className="text-[17px] font-medium text-ink-50">
-          {isChofer ? "Cargar datos de mi viaje" : "Editar servicio"}
-        </h2>
-        <p className="mt-1 text-[13px] text-ink-300">
-          {isChofer
-            ? "Kilometros reales, horas trabajadas, tiempo de espera y comentarios del servicio."
-            : "Modifica cualquier dato del servicio, incluidos los planificados y economicos."}
-        </p>
-
-        <form className="mt-6 flex flex-col gap-5" onSubmit={handleSave}>
-          {saveSuccess && <Alert variant="success">Cambios guardados correctamente.</Alert>}
-          <Alert>{saveError}</Alert>
-
-          {!isChofer && (
-            <>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <TextField
-                  id="codigo"
-                  label="Codigo"
-                  value={form.codigo}
-                  onChange={handleChange("codigo")}
-                />
-                <ClientAutocomplete
-                  id="clientId"
-                  label="Cliente"
-                  clients={clients}
-                  value={form.clientId}
-                  onChange={(clientId) => setField("clientId", clientId)}
-                  onClientCreated={(client) => setClients((prev) => [...prev, client])}
-                />
-                <SearchableSelect
-                  id="driverId"
-                  label="Chofer"
-                  placeholder="Escribe para buscar un chofer"
-                  options={driverOptions}
-                  value={form.driverId}
-                  onChange={(v) => setField("driverId", v)}
-                />
-                <SearchableSelect
-                  id="vehicleId"
-                  label="Vehiculo"
-                  placeholder="Escribe para buscar un vehiculo"
-                  options={vehicleOptions}
-                  value={form.vehicleId}
-                  onChange={(v) => setField("vehicleId", v)}
-                />
-                <SearchableSelect
-                  id="aplicativo"
-                  label="Numero de aplicativo"
-                  placeholder="Escribe para buscar un aplicativo"
-                  options={APLICATIVO_OPTIONS}
-                  value={form.aplicativo}
-                  onChange={(v) => setField("aplicativo", v)}
-                />
-                {isExtrasPiazza && (
-                  <SearchableSelect
-                    id="extrasPiazzaZona"
-                    label="Zona"
-                    placeholder="Escribe para buscar una zona"
-                    options={EXTRAS_PIAZZA_ZONA_OPTIONS}
-                    value={form.extrasPiazzaZona}
-                    onChange={(v) => setField("extrasPiazzaZona", v)}
-                  />
-                )}
-                <TextField
-                  id="ciudad"
-                  label="Ciudad"
-                  value={form.ciudad}
-                  onChange={handleChange("ciudad")}
-                />
-                <TextField
-                  id="fechaServicio"
-                  label="Fecha de servicio"
-                  type="datetime-local"
-                  value={form.fechaServicio}
-                  onChange={handleChange("fechaServicio")}
-                />
-                <TextField
-                  id="eta"
-                  label="ETA"
-                  type="datetime-local"
-                  value={form.eta}
-                  onChange={handleChange("eta")}
-                />
-              </div>
-
-              <StopListEditor
-                stops={form.stops}
-                onChange={(stops) => setField("stops", stops)}
-                disabled={saving}
-              />
-
-              <Textarea
-                id="descripcion"
-                label="Descripcion"
-                value={form.descripcion}
-                onChange={handleChange("descripcion")}
-              />
-            </>
-          )}
-
-          <SearchableSelect
-            id="estado"
-            label="Estado"
-            placeholder="Escribe para buscar un estado"
-            options={RECORD_STATUS_OPTIONS}
-            value={form.estado}
-            onChange={(v) => setField("estado", v)}
-          />
-
-          <TextField
-            id="kilometrosReales"
-            label={`Kilometros reales${record.kilometros != null ? ` (planificado: ${record.kilometros} km)` : ""}`}
-            type="number"
-            step="0.1"
-            min="0"
-            placeholder="Kilometros recorridos"
-            value={form.kilometrosReales}
-            onChange={handleChange("kilometrosReales")}
-          />
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-            <TextField
-              id="horasDia"
-              label="Horas dia"
-              type="number"
-              step="0.5"
-              min="0"
-              value={form.horasDia}
-              onChange={handleChange("horasDia")}
-            />
-            <TextField
-              id="horasNoche"
-              label="Horas noche"
-              type="number"
-              step="0.5"
-              min="0"
-              value={form.horasNoche}
-              onChange={handleChange("horasNoche")}
-            />
-            <TextField
-              id="tiempoEspera"
-              label="Tiempo de espera (h)"
-              type="number"
-              step="0.5"
-              min="0"
-              value={form.tiempoEspera}
-              onChange={handleChange("tiempoEspera")}
-            />
-          </div>
-
-          <Textarea
-            id="comentarios"
-            label="Comentarios"
-            placeholder="Notas sobre el servicio..."
-            value={form.comentarios}
-            onChange={handleChange("comentarios")}
-          />
-
-          {!isChofer && (
-            <div className="border-t border-line/10 pt-5">
-              <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-                Datos economicos (planificados)
-              </h3>
-
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                <TextField
-                  id="kilometros"
-                  label="Kilometros planificados"
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={form.kilometros}
-                  onChange={handleChange("kilometros")}
-                />
-                <TextField
-                  id="precioKm"
-                  label="Precio por km"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.precioKm}
-                  onChange={handleChange("precioKm")}
-                />
-                <TextField
-                  id="pagoRecibido"
-                  label="Pago previsto"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.pagoRecibido}
-                  onChange={handleChange("pagoRecibido")}
-                />
-                <TextField
-                  id="costoCombustible"
-                  label="Costo combustible"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.costoCombustible}
-                  onChange={handleChange("costoCombustible")}
-                />
-                <TextField
-                  id="peajes"
-                  label="Peajes"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.peajes}
-                  onChange={handleChange("peajes")}
-                />
-                <TextField
-                  id="vignetta"
-                  label="Vignetta"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.vignetta}
-                  onChange={handleChange("vignetta")}
-                />
-                <TextField
-                  id="costoHotel"
-                  label="Costo de hotel"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.costoHotel}
-                  onChange={handleChange("costoHotel")}
-                />
-                <TextField
-                  id="costoTraforoFrejusBrennero"
-                  label="Traforo Frejus/Brennero"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.costoTraforoFrejusBrennero}
-                  onChange={handleChange("costoTraforoFrejusBrennero")}
-                />
-                <TextField
-                  id="areaC"
-                  label="Area C"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.areaC}
-                  onChange={handleChange("areaC")}
-                />
-                <TextField
-                  id="costoEspera"
-                  label="Costo de espera"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={form.costoEspera}
-                  onChange={handleChange("costoEspera")}
-                />
-              </div>
-
-              <label className="mt-5 flex w-fit items-center gap-2 text-[14px] text-ink-200">
-                <input
-                  type="checkbox"
-                  checked={form.clienteConfirmado}
-                  onChange={handleCheckboxChange("clienteConfirmado")}
-                  className="h-4 w-4 rounded border-line/20 bg-transparent accent-accent-500"
-                />
-                Cliente confirmado
-              </label>
-            </div>
-          )}
-
-          <Button type="submit" loading={saving} className="sm:w-auto sm:px-8">
-            Guardar cambios
-          </Button>
-        </form>
-      </GlassCard>
+      {isEditing ? (
+        <RecordEditForm
+          record={record}
+          form={form}
+          isChofer={isChofer}
+          driverOptions={driverOptions}
+          vehicleOptions={vehicleOptions}
+          clients={clients}
+          setClients={setClients}
+          saving={saving}
+          saveError={saveError}
+          saveSuccess={saveSuccess}
+          handleChange={handleChange}
+          setField={setField}
+          handleCheckboxChange={handleCheckboxChange}
+          onSubmit={handleSave}
+          onCancel={handleCancelEdit}
+        />
+      ) : (
+        <RecordSummaryView
+          record={record}
+          files={files}
+          isChofer={isChofer}
+          isPrivileged={isPrivileged}
+          onEdit={() => setIsEditing(true)}
+          onDeleteClick={() => {
+            setDeleteError("");
+            setShowDeleteConfirm(true);
+          }}
+          uploading={uploading}
+          uploadError={uploadError}
+          onUpload={handleUpload}
+        />
+      )}
     </div>
 
     <ConfirmModal
@@ -706,6 +356,473 @@ export const RecordDetailPage = () => {
       onCancel={() => setShowDeleteConfirm(false)}
     />
     </SlideOverPanel>
+  );
+};
+
+// Vista de solo lectura: resumen del servicio + archivos. Es la vista por defecto al
+// abrir un registro - el formulario de edicion (RecordEditForm) es una vista aparte,
+// no un bloque que se despliega debajo de esta (ver isEditing en RecordDetailPage).
+const RecordSummaryView = ({
+  record,
+  files,
+  isChofer,
+  isPrivileged,
+  onEdit,
+  onDeleteClick,
+  uploading,
+  uploadError,
+  onUpload,
+}) => (
+  <>
+    <GlassCard>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <span className="text-[13px] font-medium text-ink-400">{record.codigo}</span>
+          <h1 className="mt-0.5 text-[22px] font-semibold text-ink-50">{record.destinazione}</h1>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <StatusBadge status={record.estado} />
+          <button
+            type="button"
+            aria-label="Editar servicio"
+            title="Editar servicio"
+            onClick={onEdit}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/15 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20"
+          >
+            <PencilIcon className="h-[16px] w-[16px]" />
+          </button>
+          {isPrivileged && (
+            <button
+              type="button"
+              aria-label="Eliminar servicio"
+              title="Eliminar servicio"
+              onClick={onDeleteClick}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-danger-500/15 hover:text-danger-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-danger-500/20"
+            >
+              <TrashIcon className="h-[17px] w-[17px]" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <p className="mt-3 text-[15px] text-ink-200">{record.descripcion}</p>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <InfoRow label="Fecha de servicio" value={formatDateTime(record.fechaServicio)} />
+        <InfoRow label="ETA" value={formatDateTime(record.eta)} />
+        <InfoRow
+          label="Vehiculo"
+          value={`${record.vehicle?.targa ?? "-"} - ${record.vehicle?.modelo ?? ""}`}
+        />
+        <InfoRow label="Cliente" value={record.client?.nombre} />
+        {record.ciudad && <InfoRow label="Ciudad" value={record.ciudad} />}
+        {record.extrasPiazzaZona && (
+          <InfoRow label="Zona" value={EXTRAS_PIAZZA_ZONA_LABELS[record.extrasPiazzaZona]} />
+        )}
+        <InfoRow
+          label="Chofer"
+          value={`${record.driver?.nombre ?? ""} ${record.driver?.apellido ?? ""}`}
+        />
+        {record.ruta?.duracionMin != null && (
+          <InfoRow
+            label="Ruta estimada"
+            value={`${record.ruta.distanciaKm.toFixed(1)} km - ${Math.round(record.ruta.duracionMin)} min`}
+          />
+        )}
+      </div>
+
+      <div className="mt-6 border-t border-line/10 pt-6">
+        <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+          Kilometraje
+        </h3>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <InfoRow label="Km planificados" value={record.kilometros ?? "-"} />
+          <InfoRow label="Km reales" value={record.kilometrosReales ?? "-"} />
+          {!isChofer && (
+            <InfoRow
+              label="Diferencia"
+              value={
+                record.diferenciaKm != null
+                  ? `${record.diferenciaKm > 0 ? "+" : ""}${record.diferenciaKm} km`
+                  : "-"
+              }
+              tone={
+                record.diferenciaKm > 0 ? "amber" : record.diferenciaKm < 0 ? "blue" : undefined
+              }
+            />
+          )}
+        </div>
+      </div>
+
+      {!isChofer && (
+        <div className="mt-6 border-t border-line/10 pt-6">
+          <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+            Detalle economico
+          </h3>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <InfoRow label="Precio/km" value={record.precioKm ?? "-"} />
+            <InfoRow label="Total" value={record.total ?? "-"} />
+          </div>
+        </div>
+      )}
+    </GlassCard>
+
+    <GlassCard>
+      <h2 className="text-[17px] font-medium text-ink-50">Archivos</h2>
+      <p className="mt-1 text-[13px] text-ink-300">
+        {isChofer
+          ? "Sube tu foto de entrega para confirmar el servicio."
+          : "Documentos y comprobantes cargados para este registro."}
+      </p>
+
+      <Alert>{uploadError}</Alert>
+
+      {isChofer && (
+        <label className="mt-4 flex w-full cursor-pointer items-center justify-center gap-2 rounded-xl glass-input px-4 py-3 text-[14px] font-medium text-ink-50 hover:bg-line/10">
+          {uploading ? <Spinner /> : "Subir foto de entrega"}
+          <input
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={onUpload}
+            disabled={uploading}
+          />
+        </label>
+      )}
+
+      <ul className="mt-4 flex flex-col gap-2">
+        {files.length === 0 && (
+          <li className="text-[14px] text-ink-400">Todavia no hay archivos cargados.</li>
+        )}
+        {files.map((file) => (
+          <li key={file.id}>
+            <a
+              href={file.archivoUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center justify-between rounded-xl glass-surface-sm px-4 py-3 text-[14px] text-ink-50 hover:bg-line/10"
+            >
+              <span>{TIPO_ARCHIVO_LABELS[file.tipoArchivo] ?? file.tipoArchivo}</span>
+              <span className="text-[12px] text-ink-400">{formatDateTime(file.createdAt)}</span>
+            </a>
+          </li>
+        ))}
+      </ul>
+    </GlassCard>
+  </>
+);
+
+// Vista de edicion, aparte de RecordSummaryView (ver comentario ahi) - se muestra en
+// vez del resumen mientras isEditing es true, nunca junto a el.
+const RecordEditForm = ({
+  record,
+  form,
+  isChofer,
+  driverOptions,
+  vehicleOptions,
+  clients,
+  setClients,
+  saving,
+  saveError,
+  saveSuccess,
+  handleChange,
+  setField,
+  handleCheckboxChange,
+  onSubmit,
+  onCancel,
+}) => {
+  const isExtrasPiazza = record.spedizzione !== "DHL" && record.spedizzione !== "AB_SERVICE";
+
+  return (
+    <GlassCard>
+      <h2 className="text-[17px] font-medium text-ink-50">
+        {isChofer ? "Cargar datos de mi viaje" : "Editar servicio"}
+      </h2>
+      <p className="mt-1 text-[13px] text-ink-300">
+        {isChofer
+          ? "Kilometros reales, horas trabajadas, tiempo de espera y comentarios del servicio."
+          : "Modifica cualquier dato del servicio, incluidos los planificados y economicos."}
+      </p>
+
+      <form className="mt-6 flex flex-col gap-5" onSubmit={onSubmit}>
+        {saveSuccess && <Alert variant="success">Cambios guardados correctamente.</Alert>}
+        <Alert>{saveError}</Alert>
+
+        {!isChofer && (
+          <>
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <TextField
+                id="codigo"
+                label="Codigo"
+                value={form.codigo}
+                onChange={handleChange("codigo")}
+              />
+              <ClientAutocomplete
+                id="clientId"
+                label="Cliente"
+                clients={clients}
+                value={form.clientId}
+                onChange={(clientId) => setField("clientId", clientId)}
+                onClientCreated={(client) => setClients((prev) => [...prev, client])}
+              />
+              <SearchableSelect
+                id="driverId"
+                label="Chofer"
+                placeholder="Escribe para buscar un chofer"
+                options={driverOptions}
+                value={form.driverId}
+                onChange={(v) => setField("driverId", v)}
+              />
+              <SearchableSelect
+                id="vehicleId"
+                label="Vehiculo"
+                placeholder="Escribe para buscar un vehiculo"
+                options={vehicleOptions}
+                value={form.vehicleId}
+                onChange={(v) => setField("vehicleId", v)}
+              />
+              {!isExtrasPiazza && (
+                <SearchableSelect
+                  id="aplicativo"
+                  label="Numero de aplicativo"
+                  placeholder="Escribe para buscar un aplicativo"
+                  options={APLICATIVO_OPTIONS}
+                  value={form.aplicativo}
+                  onChange={(v) => setField("aplicativo", v)}
+                />
+              )}
+              {isExtrasPiazza && (
+                <SearchableSelect
+                  id="extrasPiazzaZona"
+                  label="Zona"
+                  placeholder="Escribe para buscar una zona"
+                  options={EXTRAS_PIAZZA_ZONA_OPTIONS}
+                  value={form.extrasPiazzaZona}
+                  onChange={(v) => setField("extrasPiazzaZona", v)}
+                />
+              )}
+              <TextField
+                id="ciudad"
+                label="Ciudad"
+                value={form.ciudad}
+                onChange={handleChange("ciudad")}
+              />
+              <TextField
+                id="fechaServicio"
+                label="Fecha de servicio"
+                type="datetime-local"
+                value={form.fechaServicio}
+                onChange={handleChange("fechaServicio")}
+              />
+              <TextField
+                id="eta"
+                label="ETA"
+                type="datetime-local"
+                value={form.eta}
+                onChange={handleChange("eta")}
+              />
+            </div>
+
+            <StopListEditor
+              stops={form.stops}
+              onChange={(stops) => setField("stops", stops)}
+              disabled={saving}
+            />
+
+            <Textarea
+              id="descripcion"
+              label="Descripcion"
+              value={form.descripcion}
+              onChange={handleChange("descripcion")}
+            />
+          </>
+        )}
+
+        <SearchableSelect
+          id="estado"
+          label="Estado"
+          placeholder="Escribe para buscar un estado"
+          options={RECORD_STATUS_OPTIONS}
+          value={form.estado}
+          onChange={(v) => setField("estado", v)}
+        />
+
+        <TextField
+          id="kilometrosReales"
+          label={`Kilometros reales${record.kilometros != null ? ` (planificado: ${record.kilometros} km)` : ""}`}
+          type="number"
+          step="0.1"
+          min="0"
+          placeholder="Kilometros recorridos"
+          value={form.kilometrosReales}
+          onChange={handleChange("kilometrosReales")}
+        />
+
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <TextField
+            id="horasDia"
+            label="Horas dia"
+            type="number"
+            step="0.5"
+            min="0"
+            value={form.horasDia}
+            onChange={handleChange("horasDia")}
+          />
+          <TextField
+            id="horasNoche"
+            label="Horas noche"
+            type="number"
+            step="0.5"
+            min="0"
+            value={form.horasNoche}
+            onChange={handleChange("horasNoche")}
+          />
+          <TextField
+            id="tiempoEspera"
+            label="Tiempo de espera (h)"
+            type="number"
+            step="0.5"
+            min="0"
+            value={form.tiempoEspera}
+            onChange={handleChange("tiempoEspera")}
+          />
+        </div>
+
+        <Textarea
+          id="comentarios"
+          label="Comentarios"
+          placeholder="Notas sobre el servicio..."
+          value={form.comentarios}
+          onChange={handleChange("comentarios")}
+        />
+
+        {!isChofer && (
+          <div className="border-t border-line/10 pt-5">
+            <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+              Datos economicos (planificados)
+            </h3>
+
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+              <TextField
+                id="kilometros"
+                label="Kilometros planificados"
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.kilometros}
+                onChange={handleChange("kilometros")}
+              />
+              <TextField
+                id="precioKm"
+                label="Precio por km"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.precioKm}
+                onChange={handleChange("precioKm")}
+              />
+              <TextField
+                id="pagoRecibido"
+                label="Pago previsto"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.pagoRecibido}
+                onChange={handleChange("pagoRecibido")}
+              />
+              <TextField
+                id="costoCombustible"
+                label="Costo combustible"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.costoCombustible}
+                onChange={handleChange("costoCombustible")}
+              />
+              <TextField
+                id="peajes"
+                label="Peajes"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.peajes}
+                onChange={handleChange("peajes")}
+              />
+              <TextField
+                id="vignetta"
+                label="Vignetta"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.vignetta}
+                onChange={handleChange("vignetta")}
+              />
+              <TextField
+                id="costoHotel"
+                label="Costo de hotel"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.costoHotel}
+                onChange={handleChange("costoHotel")}
+              />
+              <TextField
+                id="costoTraforoFrejusBrennero"
+                label="Traforo Frejus/Brennero"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.costoTraforoFrejusBrennero}
+                onChange={handleChange("costoTraforoFrejusBrennero")}
+              />
+              <TextField
+                id="areaC"
+                label="Area C"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.areaC}
+                onChange={handleChange("areaC")}
+              />
+              <TextField
+                id="costoEspera"
+                label="Costo de espera"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.costoEspera}
+                onChange={handleChange("costoEspera")}
+              />
+            </div>
+
+            <label className="mt-5 flex w-fit items-center gap-2 text-[14px] text-ink-200">
+              <input
+                type="checkbox"
+                checked={form.clienteConfirmado}
+                onChange={handleCheckboxChange("clienteConfirmado")}
+                className="h-4 w-4 rounded border-line/20 bg-transparent accent-accent-500"
+              />
+              Cliente confirmado
+            </label>
+          </div>
+        )}
+
+        <div className="flex flex-wrap gap-3">
+          <Button type="submit" loading={saving} className="sm:w-auto sm:px-8">
+            Guardar cambios
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={saving}
+            className="sm:w-auto sm:px-8"
+          >
+            Cancelar
+          </Button>
+        </div>
+      </form>
+    </GlassCard>
   );
 };
 

@@ -4,8 +4,8 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
-import { Spinner } from "../../components/ui/Spinner";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
@@ -13,7 +13,7 @@ import { combineStopAddress, StopListEditor } from "../../components/records/Sto
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { APLICATIVO_OPTIONS, EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
+import { EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -23,7 +23,6 @@ const INITIAL_FORM = {
   clientId: "",
   driverId: "",
   vehicleId: "",
-  aplicativo: "",
   extrasPiazzaZona: "",
   stops: [{ direccion: "", cap: "" }],
   descripcion: "",
@@ -114,9 +113,7 @@ export const NewRecordPage = () => {
   if (!loaded) {
     return (
       <SlideOverPanel closeTo="/records/extras-piazza">
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
+        <PageLoader />
       </SlideOverPanel>
     );
   }
@@ -198,16 +195,6 @@ export const NewRecordPage = () => {
               options={RECORD_STATUS_OPTIONS}
               value={form.estado}
               onChange={(v) => setField("estado", v)}
-            />
-
-            <SearchableSelect
-              id="aplicativo"
-              label="Numero de aplicativo"
-              placeholder="Escribe para buscar un aplicativo"
-              options={APLICATIVO_OPTIONS}
-              value={form.aplicativo}
-              onChange={(v) => setField("aplicativo", v)}
-              error={fieldErrors.aplicativo?.[0]}
             />
 
             <SearchableSelect

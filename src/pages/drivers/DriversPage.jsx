@@ -6,6 +6,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
@@ -283,11 +284,7 @@ export const DriversPage = () => {
 
       <Alert>{error}</Alert>
 
-      {drivers === null && !error && (
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
-      )}
+      {drivers === null && !error && <PageLoader />}
 
       {drivers?.length === 0 && (
         <GlassCard className="text-center text-[14px] text-ink-300">

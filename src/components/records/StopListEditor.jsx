@@ -49,8 +49,13 @@ export const StopListEditor = ({ stops, onChange, error, disabled }) => {
       </div>
 
       {stops.map((stop, index) => (
-        <div key={index} className="flex items-start gap-2">
-          <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+        <div key={index} className="flex flex-wrap items-start gap-2">
+          {/* min-w-56: sin piso, el grupo direccion+CAP competia en la misma fila
+              contra los 3 botones (Subir/Bajar/Eliminar) dentro del panel angosto de
+              "Nuevo servicio" y quedaba comprimido a unos pocos px (bug reportado) -
+              con flex-wrap en la fila y este piso, los botones pasan a la siguiente
+              linea en vez de aplastar el campo. */}
+          <div className="flex min-w-56 flex-1 flex-col gap-2 sm:flex-row">
             <TextField
               className="flex-1"
               placeholder="Ej: Via delle Industrie, 2e, Romanengo CR"

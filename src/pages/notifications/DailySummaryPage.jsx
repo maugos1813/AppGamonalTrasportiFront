@@ -6,9 +6,9 @@ import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
-import { Spinner } from "../../components/ui/Spinner";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { ServicesTrendChart } from "../../components/charts/ServicesTrendChart";
@@ -327,9 +327,7 @@ export const DailySummaryPage = () => {
           <Alert>{weeklyError}</Alert>
 
           {!weeklyLoaded && (
-            <div className="flex justify-center py-16">
-              <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-            </div>
+            <PageLoader />
           )}
 
           {weeklyLoaded && (
@@ -432,9 +430,7 @@ export const DailySummaryPage = () => {
       {tab === "diario" && (
         <>
           {loading && (
-            <div className="flex justify-center py-16">
-              <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-            </div>
+            <PageLoader />
           )}
 
           {!loading && groups.length === 0 && (
@@ -484,9 +480,7 @@ export const DailySummaryPage = () => {
           <Alert>{weeklyError}</Alert>
 
           {!weeklyLoaded && (
-            <div className="flex justify-center py-16">
-              <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-            </div>
+            <PageLoader />
           )}
 
           {weeklyLoaded && (

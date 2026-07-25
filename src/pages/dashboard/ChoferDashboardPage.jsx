@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { Spinner } from "../../components/ui/Spinner";
 import { StatCard } from "../../components/ui/StatCard";
 import { parseApiError } from "../../lib/api";
@@ -47,13 +48,7 @@ export const ChoferDashboardPage = () => {
 
   if (error) return <Alert>{error}</Alert>;
 
-  if (!records) {
-    return (
-      <div className="flex justify-center py-16">
-        <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-      </div>
-    );
-  }
+  if (!records) return <PageLoader />;
 
   const currentServices = computeCurrentServices(records);
   const myServiceCounts = computeMyServiceCounts(records);

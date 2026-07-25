@@ -312,6 +312,22 @@ export const computeMonthlyRevenueTrend = (records, now = new Date()) => {
   return buckets;
 };
 
+// Kilometros mes a mes del anio en curso, mismo criterio que computeMonthlyRevenueTrend
+// (anio calendario completo, no el periodo del selector Hoy/Semana/Mes) - para el
+// grafico de tendencia de km del dashboard OWNER.
+export const computeMonthlyKmTrend = (records, now = new Date()) => {
+  const year = now.getFullYear();
+  const buckets = MONTH_LABELS.map((month) => ({ month, km: 0 }));
+
+  records.forEach((r) => {
+    const date = new Date(r.fechaServicio);
+    if (date.getFullYear() !== year) return;
+    buckets[date.getMonth()].km += r.kilometros ?? 0;
+  });
+
+  return buckets;
+};
+
 const OTROS_LABEL = "Otros";
 const MAX_CLIENT_SLICES = 4;
 

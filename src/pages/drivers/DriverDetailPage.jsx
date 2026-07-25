@@ -5,6 +5,7 @@ import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { Spinner } from "../../components/ui/Spinner";
@@ -332,9 +333,7 @@ export const DriverDetailPage = () => {
   if (!driver || !form || !documents) {
     return (
       <SlideOverPanel closeTo="/choferes">
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
+        <PageLoader />
       </SlideOverPanel>
     );
   }

@@ -5,6 +5,7 @@ import { Link, Navigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { Spinner } from "../../components/ui/Spinner";
 import { VehicleStatusBadge } from "../../components/ui/VehicleStatusBadge";
 import { useAuth } from "../../context/AuthContext";
@@ -337,11 +338,7 @@ export const VehiclesPage = () => {
 
       <Alert>{error}</Alert>
 
-      {vehicles === null && !error && (
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
-      )}
+      {vehicles === null && !error && <PageLoader />}
 
       {vehicles?.length === 0 && (
         <GlassCard className="text-center text-[14px] text-ink-300">

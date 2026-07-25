@@ -58,6 +58,8 @@ export const formatCurrency = (value) =>
     maximumFractionDigits: 2,
   }).format(value ?? 0);
 
+export const formatKm = (value) => `${Math.round(value ?? 0).toLocaleString("es-AR")} km`;
+
 // Sin decimales, para espacios chicos (ej. el centro de un anillo de progreso).
 export const formatCurrencyCompact = (value) =>
   new Intl.NumberFormat("es-AR", {

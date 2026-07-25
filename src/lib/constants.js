@@ -111,6 +111,7 @@ export const CHART_COLORS = {
   costos: "#7c3aed",
   gananciaPositiva: "#16a34a",
   gananciaNegativa: "#dc2626",
+  km: "#2563eb",
 };
 
 export const VEHICLE_STATUS_OPTIONS = [

@@ -5,8 +5,8 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
-import { Spinner } from "../../components/ui/Spinner";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { useAuth } from "../../context/AuthContext";
@@ -124,9 +124,7 @@ export const NewDhlAbServiceRecordPage = () => {
   if (!loaded) {
     return (
       <SlideOverPanel closeTo="/records/dhl-ab-service">
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
+        <PageLoader />
       </SlideOverPanel>
     );
   }

@@ -5,6 +5,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Spinner } from "../../components/ui/Spinner";
 import { TextField } from "../../components/ui/TextField";
@@ -214,11 +215,7 @@ export const MecanicaPage = () => {
 
       <Alert>{loadError}</Alert>
 
-      {vehicles === null && !loadError && (
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
-      )}
+      {vehicles === null && !loadError && <PageLoader />}
 
       {vehicles !== null && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,320px)_1fr]">

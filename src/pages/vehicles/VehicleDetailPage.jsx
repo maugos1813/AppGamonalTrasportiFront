@@ -4,9 +4,9 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { PageLoader } from "../../components/ui/PageLoader";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
-import { Spinner } from "../../components/ui/Spinner";
 import { StatCard } from "../../components/ui/StatCard";
 import { TextField } from "../../components/ui/TextField";
 import { VehicleStatusBadge } from "../../components/ui/VehicleStatusBadge";
@@ -253,9 +253,7 @@ export const VehicleDetailPage = () => {
   if (!vehicle || !form) {
     return (
       <SlideOverPanel closeTo="/vehiculos">
-        <div className="flex justify-center py-16">
-          <Spinner className="h-6 w-6 border-line/20 border-t-line" />
-        </div>
+        <PageLoader />
       </SlideOverPanel>
     );
   }
