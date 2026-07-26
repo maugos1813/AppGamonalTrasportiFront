@@ -168,7 +168,7 @@ export const MapPage = () => {
     let cancelled = false;
     listUsersRequest()
       .then((data) => {
-        if (!cancelled) setAllDrivers(data.filter((u) => u.cargo === "CHOFER"));
+        if (!cancelled) setAllDrivers(data);
       })
       .catch((err) => {
         if (!cancelled) setError(parseApiError(err).message);

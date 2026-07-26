@@ -95,8 +95,11 @@ export const computeVehicleStats = (vehicles, records) => {
   };
 };
 
+// Cualquier usuario puede manejar un servicio sin importar su cargo (OWNER/ADMIN
+// tambien pueden salir a repartir) - por eso "choferes" aca no filtra por cargo, solo
+// por estado de la cuenta (ver pedido explicito: "todos sean choferes sin excepcion").
 export const computeDriverStats = (users, records, now = new Date()) => {
-  const choferes = users.filter((u) => u.cargo === "CHOFER");
+  const choferes = users;
   const activos = choferes.filter((u) => u.estado === "ACTIVO");
 
   const conServicioHoyIds = new Set(
@@ -523,9 +526,10 @@ export const computeReperibilidadPiazza = (records, users, vehicles, now = new D
   // donde OWNER/ADMIN puede tocar el Si/No y el vehiculo asignado de cada uno.
   // choferesDisponibles/choferesNoDisponibles siguen aparte para el resumen de texto
   // (contadores y el aviso de "se marcaron no disponibles").
+  // Sin filtro de cargo: OWNER/ADMIN tambien pueden salir a manejar un servicio, asi
+  // que tienen que poder aparecer y asignarse como cualquier otro chofer.
   const choferesPiazza = users.filter(
-    (u) =>
-      u.cargo === "CHOFER" && u.estado === "ACTIVO" && u.area === "EXTRAS_PIAZZA" && !enServicioAhoraDriverIds.has(u.id)
+    (u) => u.estado === "ACTIVO" && u.area === "EXTRAS_PIAZZA" && !enServicioAhoraDriverIds.has(u.id)
   );
 
   const choferesDisponibles = choferesPiazza.filter((u) => !marcadoNoDisponibleHoy(u));
@@ -559,12 +563,13 @@ const BIRTHDAY_WARNING_DAYS = 7;
 
 const daysUntil = (dateValue, now) => (new Date(dateValue).getTime() - now.getTime()) / DAY_MS;
 
-// Documentos de choferes (no OWNER/ADMIN) que vencen dentro de 30 dias, o ya vencidos.
+// Documentos de cualquier usuario (sin filtrar por cargo - OWNER/ADMIN tambien pueden
+// manejar) que vencen dentro de 30 dias, o ya vencidos.
 export const computeDriverDocumentAlerts = (documents, users, now = new Date()) => {
-  const choferIds = new Set(users.filter((u) => u.cargo === "CHOFER").map((u) => u.id));
+  const userIds = new Set(users.map((u) => u.id));
 
   return documents
-    .filter((d) => d.fechaScadenza && choferIds.has(d.usuarioId))
+    .filter((d) => d.fechaScadenza && userIds.has(d.usuarioId))
     .filter((d) => daysUntil(d.fechaScadenza, now) <= DOCUMENT_WARNING_DAYS)
     .sort((a, b) => new Date(a.fechaScadenza) - new Date(b.fechaScadenza))
     .map((d) => {

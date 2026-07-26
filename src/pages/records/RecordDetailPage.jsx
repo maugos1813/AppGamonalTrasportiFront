@@ -192,7 +192,7 @@ export const RecordDetailPage = () => {
     if (isChofer) return;
     Promise.all([listUsersRequest(), listVehiclesRequest(), listClientsRequest()])
       .then(([users, vehiclesData, clientsData]) => {
-        setDrivers(users.filter((u) => u.cargo === "CHOFER" && u.estado === "ACTIVO"));
+        setDrivers(users.filter((u) => u.estado === "ACTIVO"));
         setVehicles(vehiclesData);
         setClients(clientsData);
       })

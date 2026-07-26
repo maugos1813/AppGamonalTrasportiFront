@@ -196,7 +196,7 @@ export const DailySummaryPage = () => {
       });
     listUsersRequest()
       .then((data) => {
-        if (!cancelled) setDrivers(data.filter((u) => u.cargo === "CHOFER"));
+        if (!cancelled) setDrivers(data);
       })
       .catch((err) => {
         if (!cancelled) setWeeklyError(parseApiError(err).message);
