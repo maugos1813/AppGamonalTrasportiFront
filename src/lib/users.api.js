@@ -28,6 +28,9 @@ export const updateMyLocationRequest = (lat, lng, accuracy) =>
 export const reportLocationPermissionRequest = (denegado) =>
   api.patch("/users/me/ubicacion-permiso", { denegado });
 
+export const updateMyReperibilidadRequest = (noDisponible) =>
+  api.patch("/users/me/reperibilidad", { noDisponible }).then((res) => res.data.data.user);
+
 export const listDriverLocationsRequest = () =>
   api.get("/users/ubicaciones").then((res) => res.data.data.ubicaciones);
 

@@ -9,6 +9,7 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { PageLoader } from "../../components/ui/PageLoader";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
+import { Select } from "../../components/ui/Select";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { ServicesTrendChart } from "../../components/charts/ServicesTrendChart";
@@ -22,14 +23,22 @@ import {
   computeEconomicStats,
   computeExtrasPiazzaZonaBreakdown,
   computeFleetKmUsage,
+  computeReperibilidadPiazza,
   computeServicePeriodStats,
   computeVehicleStats,
   computeWeeklyServiceTrend,
+  isReperibilidadNoDisponibleHoy,
 } from "../../lib/dashboardStats";
-import { formatCurrency, formatDate } from "../../lib/format";
+import { RECORD_STATUS_LABELS } from "../../lib/constants";
+import { formatCurrency, formatDate, formatDateTime } from "../../lib/format";
 import { listRecordsRequest, searchRecordsRequest } from "../../lib/records.api";
-import { listUsersRequest } from "../../lib/users.api";
+import { listUsersRequest, updateUserRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
+
+const DISPONIBLE_OPTIONS = [
+  { value: "SI", label: "Si" },
+  { value: "NO", label: "No" },
+];
 
 // Misma fuente que useNotifications (ver dashboardStats.js): cada alerta arma su id con
 // un prefijo por tipo de origen. Se usa solo para agrupar visualmente aca, no cambia la
@@ -71,7 +80,13 @@ const TAB_OPTIONS = [
   { value: "general", label: "General" },
   { value: "diario", label: "Diario" },
   { value: "semanal", label: "Semanal" },
+  { value: "reperibilidad", label: "Reperibilita" },
 ];
+
+// Mismo criterio que driverName en RecordsListPage.jsx (version local, esta pagina no
+// importa de ahi para no acoplar los dos archivos).
+const driverName = (record) =>
+  record.driver ? `${record.driver.nombre} ${record.driver.apellido}` : "Sin chofer";
 
 const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
 
@@ -161,12 +176,17 @@ export const DailySummaryPage = () => {
   const [weeklyError, setWeeklyError] = useState("");
 
   useEffect(() => {
-    if (!isPrivileged || (tab !== "general" && tab !== "semanal") || records !== null) return;
+    if (
+      !isPrivileged ||
+      (tab !== "general" && tab !== "semanal" && tab !== "reperibilidad") ||
+      records !== null
+    )
+      return;
     let cancelled = false;
 
-    // General/Semanal solo necesitan hoy/esta semana - pedir todo el historico (miles
-    // de registros, ~2.7MB) para despues filtrar en el navegador era el cuello de
-    // botella real de esta pagina.
+    // General/Semanal/Reperibilita solo necesitan hoy/esta semana - pedir todo el
+    // historico (miles de registros, ~2.7MB) para despues filtrar en el navegador era
+    // el cuello de botella real de esta pagina.
     listRecordsRequest({ days: 7 })
       .then((data) => {
         if (!cancelled) setRecords(data);
@@ -203,6 +223,91 @@ export const DailySummaryPage = () => {
     [records]
   );
   const economicStats = useMemo(() => (records ? computeEconomicStats(records, "semana") : null), [records]);
+  const reperibilidad = useMemo(
+    () => (records && drivers && vehicles ? computeReperibilidadPiazza(records, drivers, vehicles) : null),
+    [records, drivers, vehicles]
+  );
+  // Edicion en linea de la tabla de choferes (Si/No + vehiculo asignado): guarda por
+  // chofer, no bloquea el resto de la fila mientras una de las dos guarda. drivers
+  // se actualiza en el propio array cargado (no se vuelve a pedir la lista completa),
+  // asi el resto de la pagina (ranking, etc.) tambien ve el dato fresco al toque.
+  const [savingDriverField, setSavingDriverField] = useState({});
+  const [driverFieldErrors, setDriverFieldErrors] = useState({});
+
+  const applyDriverUpdate = (driverId, field) => async (value) => {
+    setSavingDriverField((prev) => ({ ...prev, [`${driverId}:${field}`]: true }));
+    setDriverFieldErrors((prev) => ({ ...prev, [driverId]: "" }));
+    try {
+      const updated = await updateUserRequest(driverId, { [field]: value });
+      setDrivers((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    } catch (err) {
+      setDriverFieldErrors((prev) => ({ ...prev, [driverId]: parseApiError(err).message }));
+    } finally {
+      setSavingDriverField((prev) => ({ ...prev, [`${driverId}:${field}`]: false }));
+    }
+  };
+
+  const handleChangeDisponible = (driverId) => (value) =>
+    applyDriverUpdate(driverId, "reperibilidadNoDisponible")(value === "NO");
+
+  const handleChangeVehiculo = (driverId) => (value) =>
+    applyDriverUpdate(driverId, "vehiculoAsignadoId")(value || null);
+
+  const vehicleOptions = useMemo(
+    () => [
+      { value: "", label: "Sin asignar" },
+      ...(vehicles ?? []).map((v) => ({
+        value: v.id,
+        label: `${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`,
+      })),
+    ],
+    [vehicles]
+  );
+
+  const [copyFeedback, setCopyFeedback] = useState("");
+  const handleCopyReperibilidad = () => {
+    if (!reperibilidad) return;
+    const lines = [`Reperibilita Extras Piazza - ${todayLabel()}`, ""];
+
+    lines.push(`Servicios pendientes (${reperibilidad.serviciosPendientes.length}):`);
+    if (reperibilidad.serviciosPendientes.length === 0) lines.push("- Ninguno");
+    reperibilidad.serviciosPendientes.forEach((r) => {
+      const partes = [
+        r.codigo,
+        driverName(r),
+        r.vehicle?.targa ?? "Sin vehiculo",
+        r.client?.nombre ?? "Sin cliente",
+        r.destinazione,
+        RECORD_STATUS_LABELS[r.estado] ?? r.estado,
+        `ETA ${formatDateTime(r.eta)}`,
+      ];
+      if (r.comentarios) partes.push(r.comentarios);
+      lines.push(`- ${partes.join(" | ")}`);
+    });
+
+    lines.push("", `Choferes disponibles esta noche (${reperibilidad.choferesDisponibles.length}):`);
+    if (reperibilidad.choferesDisponibles.length === 0) lines.push("- Ninguno");
+    reperibilidad.choferesDisponibles.forEach((u) => {
+      const vehiculo = u.vehiculoAsignado
+        ? `${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` - ${u.vehiculoAsignado.modelo}` : ""}`
+        : "sin vehiculo asignado";
+      lines.push(`- ${u.nombre} ${u.apellido} (${vehiculo})`);
+    });
+
+    lines.push("", `Vehiculos disponibles (${reperibilidad.vehiculosDisponibles.length}):`);
+    if (reperibilidad.vehiculosDisponibles.length === 0) lines.push("- Ninguno");
+    reperibilidad.vehiculosDisponibles.forEach((v) =>
+      lines.push(`- ${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`)
+    );
+
+    navigator.clipboard
+      .writeText(lines.join("\n"))
+      .then(() => {
+        setCopyFeedback("Copiado al portapapeles");
+        setTimeout(() => setCopyFeedback(""), 2500);
+      })
+      .catch(() => setCopyFeedback("No se pudo copiar"));
+  };
 
   const inactiveDriverNames = useMemo(() => {
     if (!drivers) return [];
@@ -274,14 +379,24 @@ export const DailySummaryPage = () => {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[24px] font-semibold capitalize text-ink-50">
-            {tab === "general" ? "Resumen general" : tab === "diario" ? "Resumen diario" : "Resumen semanal"}
+            {
+              {
+                general: "Resumen general",
+                diario: "Resumen diario",
+                semanal: "Resumen semanal",
+                reperibilidad: "Reperibilita",
+              }[tab]
+            }
           </h1>
           <p className="mt-1 text-[14px] text-ink-300">
-            {tab === "general"
-              ? "La operacion de hoy, de un vistazo."
-              : tab === "diario"
-                ? `${todayLabel()} · todo lo que necesita tu atencion, en un solo lugar.`
-                : "Patrones de la semana: quien rindio mas o menos, y que servicios dieron perdida."}
+            {
+              {
+                general: "La operacion de hoy, de un vistazo.",
+                diario: `${todayLabel()} · todo lo que necesita tu atencion, en un solo lugar.`,
+                semanal: "Patrones de la semana: quien rindio mas o menos, y que servicios dieron perdida.",
+                reperibilidad: `${todayLabel()} · lo que queda pendiente y quien esta disponible por si sale un pedido.`,
+              }[tab]
+            }
           </p>
         </div>
         {isPrivileged && <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />}
@@ -517,6 +632,147 @@ export const DailySummaryPage = () => {
                   <ProfitLossList title="Mas rentables" items={economicStats.masRentables} tone="green" />
                   <ProfitLossList title="Con perdidas" items={economicStats.conPerdidas} tone="red" />
                 </div>
+              </GlassCard>
+            </>
+          )}
+        </>
+      )}
+
+      {tab === "reperibilidad" && isPrivileged && (
+        <>
+          <Alert>{weeklyError}</Alert>
+
+          {!weeklyLoaded && (
+            <PageLoader />
+          )}
+
+          {weeklyLoaded && (
+            <>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-[13px] text-ink-400">
+                  Extras Piazza &middot; {reperibilidad.serviciosPendientes.length} servicio(s) pendiente(s)
+                </p>
+                <Button variant="ghost" className="w-auto px-4" onClick={handleCopyReperibilidad}>
+                  {copyFeedback || "Copiar como texto"}
+                </Button>
+              </div>
+
+              <GlassCard>
+                <h2 className="text-[15px] font-semibold text-ink-50">Servicios pendientes</h2>
+                <p className="mt-1 text-[12px] text-ink-400">
+                  Extras Piazza que todavia hay que completar hoy.
+                </p>
+
+                {reperibilidad.serviciosPendientes.length === 0 ? (
+                  <p className="mt-3 text-[13px] text-ink-300">
+                    No hay servicios pendientes de Extras Piazza.
+                  </p>
+                ) : (
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full min-w-[760px] border-collapse text-[13px]">
+                      <thead>
+                        <tr className="text-left text-[11px] uppercase tracking-wide text-ink-500">
+                          <th className="pb-2 pr-3 font-medium">Chofer</th>
+                          <th className="pb-2 pr-3 font-medium">Vehiculo</th>
+                          <th className="pb-2 pr-3 font-medium">Cliente</th>
+                          <th className="pb-2 pr-3 font-medium">Lugar</th>
+                          <th className="pb-2 pr-3 font-medium">Estado</th>
+                          <th className="pb-2 pr-3 font-medium">ETA</th>
+                          <th className="pb-2 font-medium">Comentarios</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {reperibilidad.serviciosPendientes.map((r) => (
+                          <tr key={r.id} className="border-t border-line/10">
+                            <td className="py-2 pr-3">
+                              <Link to={`/records/${r.id}`} className="text-ink-50 hover:underline">
+                                {driverName(r)}
+                              </Link>
+                            </td>
+                            <td className="py-2 pr-3 text-ink-300">{r.vehicle?.targa ?? "-"}</td>
+                            <td className="py-2 pr-3 text-ink-300">{r.client?.nombre ?? "-"}</td>
+                            <td className="py-2 pr-3 text-ink-300">{r.destinazione}</td>
+                            <td className="py-2 pr-3">
+                              <StatusBadge status={r.estado} className="px-2 py-0.5 text-[11px]" />
+                            </td>
+                            <td className="py-2 pr-3 text-ink-300">{formatDateTime(r.eta)}</td>
+                            <td className="py-2 text-ink-300">{r.comentarios || "-"}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </GlassCard>
+
+              <GlassCard>
+                <h2 className="text-[15px] font-semibold text-ink-50">Choferes disponibles esta noche</h2>
+                <p className="mt-1 text-[12px] text-ink-400">
+                  Extras Piazza, activos y sin servicio en curso ahora. Marca si esta disponible y con
+                  que vehiculo sale, para cualquier chofer de la lista.
+                </p>
+
+                {reperibilidad.choferesPiazza.length === 0 ? (
+                  <p className="mt-3 text-[13px] text-ink-300">Sin choferes de Extras Piazza activos.</p>
+                ) : (
+                  <div className="mt-3 flex flex-col gap-2">
+                    <div className="flex items-center gap-3 px-3 text-[11px] uppercase tracking-wide text-ink-500">
+                      <span className="min-w-0 flex-1">Chofer</span>
+                      <span className="w-20 shrink-0">Disponible</span>
+                      <span className="w-52 shrink-0">Vehiculo</span>
+                    </div>
+                    {reperibilidad.choferesPiazza.map((u) => {
+                      const disponible = !isReperibilidadNoDisponibleHoy(u);
+                      return (
+                        <div key={u.id} className="flex flex-col gap-1">
+                          <div className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2">
+                            <span className="min-w-0 flex-1 truncate text-[13px] text-ink-50">
+                              {u.nombre} {u.apellido}
+                            </span>
+                            <Select
+                              id={`disponible-${u.id}`}
+                              className="w-20 px-2.5 py-1.5 pr-7 text-[12px]"
+                              options={DISPONIBLE_OPTIONS}
+                              value={disponible ? "SI" : "NO"}
+                              disabled={Boolean(savingDriverField[`${u.id}:reperibilidadNoDisponible`])}
+                              onChange={(e) => handleChangeDisponible(u.id)(e.target.value)}
+                            />
+                            <Select
+                              id={`vehiculo-${u.id}`}
+                              className="w-52 px-2.5 py-1.5 pr-7 text-[12px]"
+                              options={vehicleOptions}
+                              value={u.vehiculoAsignadoId ?? ""}
+                              disabled={Boolean(savingDriverField[`${u.id}:vehiculoAsignadoId`])}
+                              onChange={(e) => handleChangeVehiculo(u.id)(e.target.value)}
+                            />
+                          </div>
+                          {driverFieldErrors[u.id] && (
+                            <span className="px-3 text-[12px] text-danger-500">{driverFieldErrors[u.id]}</span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </GlassCard>
+
+              <GlassCard>
+                <h2 className="text-[15px] font-semibold text-ink-50">Vehiculos disponibles</h2>
+                <p className="mt-1 text-[12px] text-ink-400">
+                  Extras Piazza, disponibles y sin servicio en curso ahora.
+                </p>
+                {reperibilidad.vehiculosDisponibles.length === 0 ? (
+                  <p className="mt-3 text-[13px] text-ink-300">Ninguno disponible ahora.</p>
+                ) : (
+                  <ul className="mt-3 flex flex-col gap-1.5">
+                    {reperibilidad.vehiculosDisponibles.map((v) => (
+                      <li key={v.id} className="rounded-xl glass-surface-sm px-3 py-2 text-[13px] text-ink-50">
+                        {v.targa}
+                        {v.modelo ? ` - ${v.modelo}` : ""}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </GlassCard>
             </>
           )}

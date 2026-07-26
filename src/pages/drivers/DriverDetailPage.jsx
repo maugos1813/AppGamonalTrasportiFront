@@ -34,6 +34,7 @@ import {
   updateUserRequest,
   uploadUserAvatarRequest,
 } from "../../lib/users.api";
+import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const TrashIcon = (props) => (
   <svg
@@ -70,7 +71,10 @@ const toFormState = (driver) => ({
   cargo: driver.cargo ?? "CHOFER",
   estado: driver.estado ?? "",
   fechaNacimiento: toDateInputValue(driver.fechaNacimiento),
+  vehiculoAsignadoId: driver.vehiculoAsignadoId ?? "",
 });
+
+const vehicleLabel = (v) => `${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`;
 
 // Muestra el valor si esta cargado, o un placeholder atenuado si falta completarlo.
 const DriverStat = ({ label, value, tone }) => {
@@ -172,6 +176,7 @@ export const DriverDetailPage = () => {
 
   const [driver, setDriver] = useState(null);
   const [form, setForm] = useState(null);
+  const [vehicles, setVehicles] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [editing, setEditing] = useState(false);
 
@@ -195,11 +200,12 @@ export const DriverDetailPage = () => {
   const load = useCallback(() => {
     if (!isPrivileged) return;
     setLoadError("");
-    Promise.all([getUserRequest(id), listDocumentsRequest(id)])
-      .then(([driverData, docs]) => {
+    Promise.all([getUserRequest(id), listDocumentsRequest(id), listVehiclesRequest()])
+      .then(([driverData, docs, vehiclesData]) => {
         setDriver(driverData);
         setForm(toFormState(driverData));
         setDocuments(docs);
+        setVehicles(vehiclesData);
       })
       .catch((err) => setLoadError(parseApiError(err).message));
   }, [id, isPrivileged]);
@@ -334,7 +340,7 @@ export const DriverDetailPage = () => {
     );
   }
 
-  if (!driver || !form || !documents) {
+  if (!driver || !form || !documents || !vehicles) {
     return (
       <SlideOverPanel closeTo="/choferes">
         <PageLoader />
@@ -346,6 +352,8 @@ export const DriverDetailPage = () => {
     if (!acc[document.tipoDocumento]) acc[document.tipoDocumento] = document;
     return acc;
   }, {});
+
+  const vehicleOptions = vehicles.map((v) => ({ value: v.id, label: vehicleLabel(v) }));
 
   return (
     <SlideOverPanel closeTo="/choferes">
@@ -427,6 +435,10 @@ export const DriverDetailPage = () => {
             <DriverStat label="Numero de celular" value={driver.numeroCelular} />
             <DriverStat label="Fecha de nacimiento" value={formatDate(driver.fechaNacimiento)} />
             <DriverStat label="Miembro desde" value={formatDate(driver.createdAt)} />
+            <DriverStat
+              label="Vehiculo asignado"
+              value={driver.vehiculoAsignado ? vehicleLabel(driver.vehiculoAsignado) : null}
+            />
           </div>
         ) : (
           <form className="mt-8 flex flex-col gap-5" onSubmit={handleSave}>
@@ -502,6 +514,15 @@ export const DriverDetailPage = () => {
                 onChange={handleChange("fechaNacimiento")}
                 error={fieldErrors.fechaNacimiento?.[0]}
                 required
+              />
+              <SearchableSelect
+                id="vehiculoAsignadoId"
+                label="Vehiculo asignado"
+                placeholder="Escribe para buscar un vehiculo"
+                options={vehicleOptions}
+                value={form.vehiculoAsignadoId}
+                onChange={(v) => setField("vehiculoAsignadoId", v)}
+                error={fieldErrors.vehiculoAsignadoId?.[0]}
               />
             </div>
 

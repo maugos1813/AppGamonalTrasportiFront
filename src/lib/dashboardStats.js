@@ -491,6 +491,56 @@ export const computeExtrasPiazzaZonaBreakdown = (records, period, now = new Date
   return Array.from(totals.values()).sort((a, b) => b.km - a.km);
 };
 
+// reperibilidadNoDisponible solo cuenta si se marco HOY - un chofer que se marco "no
+// disponible" ayer y se olvido de sacarlo no debe seguir apareciendo como no
+// disponible indefinidamente. Exportada aparte (ademas de usarse dentro de
+// computeReperibilidadPiazza) para que la UI pueda mostrar el mismo Si/No que
+// terminaria calculando este archivo, sin duplicar el criterio de "hoy".
+export const isReperibilidadNoDisponibleHoy = (user, now = new Date()) =>
+  Boolean(
+    user.reperibilidadNoDisponible && user.reperibilidadActualizada && isSameDay(user.reperibilidadActualizada, now)
+  );
+
+// Reperibilita de Extras Piazza (vista "Resumen > Reperibilita"): servicios que
+// todavia hay que completar hoy, mas quien esta disponible esta noche por si sale un
+// pedido (choferes) o listo para salir (vehiculos).
+export const computeReperibilidadPiazza = (records, users, vehicles, now = new Date()) => {
+  const enServicioAhoraDriverIds = new Set(
+    records.filter((r) => r.estado === "IN_CONSEGNA").map((r) => r.driver?.id)
+  );
+  const enServicioAhoraVehicleIds = new Set(
+    records.filter((r) => r.estado === "IN_CONSEGNA").map((r) => r.vehicle?.id)
+  );
+
+  const serviciosPendientes = records
+    .filter((r) => !isDhlAbRecord(r) && EN_PROCESO_STATUSES.includes(r.estado))
+    .sort((a, b) => new Date(a.eta) - new Date(b.eta));
+
+  const marcadoNoDisponibleHoy = (u) => isReperibilidadNoDisponibleHoy(u, now);
+
+  // choferesPiazza: version "editable" (todos los activos de Extras Piazza sin
+  // servicio en curso ahora, disponibles o no) para la tabla de Resumen > Reperibilita
+  // donde OWNER/ADMIN puede tocar el Si/No y el vehiculo asignado de cada uno.
+  // choferesDisponibles/choferesNoDisponibles siguen aparte para el resumen de texto
+  // (contadores y el aviso de "se marcaron no disponibles").
+  const choferesPiazza = users.filter(
+    (u) =>
+      u.cargo === "CHOFER" && u.estado === "ACTIVO" && u.area === "EXTRAS_PIAZZA" && !enServicioAhoraDriverIds.has(u.id)
+  );
+
+  const choferesDisponibles = choferesPiazza.filter((u) => !marcadoNoDisponibleHoy(u));
+  const choferesNoDisponibles = choferesPiazza.filter((u) => marcadoNoDisponibleHoy(u));
+
+  const vehiculosDisponibles = vehicles.filter(
+    (v) =>
+      v.area === "EXTRAS_PIAZZA" &&
+      v.estado === "DISPONIBLE" &&
+      !enServicioAhoraVehicleIds.has(v.id)
+  );
+
+  return { serviciosPendientes, choferesPiazza, choferesDisponibles, choferesNoDisponibles, vehiculosDisponibles };
+};
+
 // Servicios en curso o pendientes cuya fecha de servicio ya paso sin cerrarse.
 export const computeOverdueServices = (records, now = new Date()) =>
   records.filter(
