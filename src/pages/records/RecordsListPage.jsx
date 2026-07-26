@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { Link, NavLink, Navigate } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, NavLink, Navigate, useLocation } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
@@ -10,6 +10,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import {
   APLICATIVO_LABELS,
@@ -17,7 +18,7 @@ import {
   RECORD_STATUS_OPTIONS,
   TERMINADOS_STATUSES,
 } from "../../lib/constants";
-import { formatDate, formatTimeRemaining } from "../../lib/format";
+import { formatDate, formatDateTime, formatTimeRemaining } from "../../lib/format";
 import { scopedRecordsSection } from "../../lib/permissions";
 import {
   listPendingRecordsRequest,
@@ -27,6 +28,26 @@ import {
   searchRecordsRequest,
   updateRecordRequest,
 } from "../../lib/records.api";
+import { getAppsheetSyncStatusRequest, runAppsheetSyncRequest } from "../../lib/sync.api";
+
+const SyncIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+    <path d="M3 21v-5h5" />
+  </svg>
+);
+
+const SYNC_ERROR_PREVIEW = 5;
 
 const TAB_OPTIONS = [
   { value: "en_proceso", label: "En proceso" },
@@ -163,9 +184,14 @@ const DisclosureHeader = ({ open, onClick, children, className }) => (
   </button>
 );
 
-const RecordCard = ({ record }) => (
-  <Link to={`/records/${record.id}`}>
-    <GlassCard className="transition-colors hover:bg-line/[0.08]">
+// state: backgroundLocation - para que App.jsx renderice el detalle como overlay
+// sobre esta misma lista (que sigue montada) en vez de reemplazarla, evitando el
+// refetch innecesario de volver a esta pantalla (ver App.jsx).
+const RecordCard = ({ record }) => {
+  const location = useLocation();
+  return (
+    <Link to={`/records/${record.id}`} state={{ backgroundLocation: location }}>
+      <GlassCard className="transition-colors hover:bg-line/[0.08]">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <span className="text-[13px] font-medium text-ink-400">{record.codigo}</span>
@@ -184,9 +210,10 @@ const RecordCard = ({ record }) => (
         </span>
         <span>Cliente: {record.client?.nombre}</span>
       </div>
-    </GlassCard>
-  </Link>
-);
+      </GlassCard>
+    </Link>
+  );
+};
 
 const ROW_COLUMN_CLASSES = {
   chofer: "w-32 shrink-0 truncate",
@@ -211,9 +238,12 @@ const CompactRowHeader = () => (
 );
 
 // Fila compacta (50px) para escanear muchos servicios de un mismo dia de un vistazo.
-const RecordRow = ({ record }) => (
+const RecordRow = ({ record }) => {
+  const location = useLocation();
+  return (
   <Link
     to={`/records/${record.id}`}
+    state={{ backgroundLocation: location }}
     className="flex h-[50px] items-center gap-3 rounded-xl px-4 text-[12px] text-ink-200 transition-colors hover:bg-line/[0.08]"
   >
     <span className={ROW_COLUMN_CLASSES.chofer} title={driverName(record)}>
@@ -238,7 +268,8 @@ const RecordRow = ({ record }) => (
       {APLICATIVO_LABELS[record.aplicativo] ?? "-"}
     </span>
   </Link>
-);
+  );
+};
 
 const now = new Date();
 const CURRENT_VIEW_DATE = { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
@@ -250,11 +281,13 @@ const CURRENT_VIEW_DATE = { year: now.getUTCFullYear(), month: now.getUTCMonth()
 // (no un boton de "marcar entregado") a proposito: un clic de mas en un boton
 // cambiaria el estado sin querer, mientras que elegir de una lista requiere abrirla
 // primero.
-const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => (
+const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => {
+  const location = useLocation();
+  return (
   <div className={`rounded-xl border-l-4 ${URGENCY_STYLES[urgencyLevel(record.eta)]} glass-surface-sm text-[13px]`}>
     <Link
       to={`/records/${record.id}`}
-      state={{ from: closeTo }}
+      state={{ from: closeTo, backgroundLocation: location }}
       className="flex flex-col gap-1 px-3 pt-2.5 transition-colors hover:opacity-90"
     >
       <div className="flex items-center justify-between gap-2">
@@ -284,7 +317,8 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => (
       />
     </div>
   </div>
-);
+  );
+};
 
 // El backend ya filtra (en curso, servicios de hoy) y ordena por ETA - solo se renderiza tal cual.
 // scopedLabel: si es un ADMIN de area, el backend ya solo le manda su seccion, asi que
@@ -323,6 +357,8 @@ const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId, s
 };
 
 export const RecordsListPage = ({ section }) => {
+  const location = useLocation();
+  const { version, refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   // ADMIN "de area" (ver lib/permissions.js): solo puede estar en su propia seccion,
@@ -331,6 +367,38 @@ export const RecordsListPage = ({ section }) => {
   const sectionConfig = SECTIONS[section];
   const [error, setError] = useState("");
   const [tab, setTab] = useState("en_proceso");
+
+  // Sincronizacion manual con AppSheet (antes vivia en Mi perfil) - solo
+  // OWNER/ADMIN, un boton chico redondo arriba de la lista en vez de una seccion
+  // aparte.
+  const [syncState, setSyncState] = useState(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState(null);
+  const [syncError, setSyncError] = useState("");
+
+  useEffect(() => {
+    if (!isPrivileged) return;
+    getAppsheetSyncStatusRequest()
+      .then(setSyncState)
+      .catch(() => {});
+  }, [isPrivileged]);
+
+  const handleSync = async () => {
+    setSyncing(true);
+    setSyncError("");
+    setSyncResult(null);
+    try {
+      const result = await runAppsheetSyncRequest();
+      setSyncResult(result);
+      if (result.created > 0) refreshRecords();
+      const state = await getAppsheetSyncStatusRequest();
+      setSyncState(state);
+    } catch (err) {
+      setSyncError(parseApiError(err).message);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   // --- Vista OWNER/ADMIN: navega mes a mes, trae solo un resumen liviano del mes
   // y recien pide los registros completos del dia cuando se despliega ese dia. ---
@@ -379,7 +447,7 @@ export const RecordsListPage = ({ section }) => {
     return () => {
       cancelled = true;
     };
-  }, [isPrivileged]);
+  }, [isPrivileged, version]);
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -396,7 +464,7 @@ export const RecordsListPage = ({ section }) => {
     return () => {
       cancelled = true;
     };
-  }, [isPrivileged]);
+  }, [isPrivileged, version]);
 
   // Debounce: espera a que se deje de tipear antes de pegarle al backend. Menos de 2
   // caracteres limpia los resultados en vez de buscar (ver SEARCH_MIN_LENGTH del backend).
@@ -466,7 +534,7 @@ export const RecordsListPage = ({ section }) => {
     return () => {
       cancelled = true;
     };
-  }, [isPrivileged, viewDate.year, viewDate.month]);
+  }, [isPrivileged, viewDate.year, viewDate.month, version]);
 
   const fetchDay = (day) => {
     setLoadingDays((prev) => new Set(prev).add(day.key));
@@ -496,6 +564,25 @@ export const RecordsListPage = ({ section }) => {
     });
     if (!dayRecords.has(day.key) && !loadingDays.has(day.key)) fetchDay(day);
   };
+
+  // Se creo/edito/borro un registro en otra pantalla (ver DataRefreshContext) - los
+  // dias ya desplegados quedaron con el cache viejo (fetchDay solo pide un dia la
+  // primera vez que se abre, ver toggleDay), asi que se vuelven a pedir. Se ignora el
+  // primer render (version arranca en 0, no hay nada que refrescar todavia).
+  const isFirstVersionRender = useRef(true);
+  useEffect(() => {
+    if (isFirstVersionRender.current) {
+      isFirstVersionRender.current = false;
+      return;
+    }
+    setDayRecords(new Map());
+    setDayErrors(new Map());
+    openDays.forEach((key) => {
+      const [year, month, day] = key.split("-").map(Number);
+      fetchDay({ key, date: new Date(Date.UTC(year, month - 1, day)) });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version]);
 
   const visibleRecords = records?.filter(
     (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
@@ -544,13 +631,60 @@ export const RecordsListPage = ({ section }) => {
               la lista. El OWNER/ADMIN ya tiene Pendientes a la derecha, asi que ve todo
               el mes junto (el StatusBadge de cada fila alcanza para diferenciar). */}
           {!isPrivileged && <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />}
+          {isPrivileged && (
+            <button
+              type="button"
+              aria-label="Sincronizar con AppSheet"
+              title={
+                syncState?.lastSyncedAt
+                  ? `Ultima sincronizacion: ${formatDateTime(syncState.lastSyncedAt)}`
+                  : "Todavia no se sincronizo nunca"
+              }
+              onClick={handleSync}
+              disabled={syncing}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/15 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <SyncIcon className={`h-[16px] w-[16px] ${syncing ? "animate-spin" : ""}`} />
+            </button>
+          )}
           {isPrivileged && sectionConfig.allowCreate && (
-            <Link to={sectionConfig.newPath}>
+            <Link to={sectionConfig.newPath} state={{ backgroundLocation: location }}>
               <Button className="w-auto px-5">Nuevo servicio</Button>
             </Link>
           )}
         </div>
       </div>
+
+      {isPrivileged && (syncError || syncResult) && (
+        <div className="flex flex-col gap-2">
+          <Alert>{syncError}</Alert>
+          {syncResult && (
+            <div className="rounded-xl glass-surface-sm px-4 py-3 text-[13px] text-ink-200">
+              <p>
+                <span className="text-success-500">{syncResult.created} creados</span>
+                {" · "}
+                <span className="text-ink-400">{syncResult.skipped} ya sincronizados</span>
+                {" · "}
+                <span className={syncResult.errors.length ? "text-danger-500" : "text-ink-400"}>
+                  {syncResult.errors.length} con error
+                </span>
+              </p>
+              {syncResult.errors.length > 0 && (
+                <ul className="mt-2 flex flex-col gap-1 text-ink-300">
+                  {syncResult.errors.slice(0, SYNC_ERROR_PREVIEW).map((e) => (
+                    <li key={`${e.row}-${e.id}`}>
+                      Fila {e.row} ({e.id}): {e.reason}
+                    </li>
+                  ))}
+                  {syncResult.errors.length > SYNC_ERROR_PREVIEW && (
+                    <li>...y {syncResult.errors.length - SYNC_ERROR_PREVIEW} mas.</li>
+                  )}
+                </ul>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {isPrivileged && (
         <TextField

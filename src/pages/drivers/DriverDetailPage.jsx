@@ -13,6 +13,7 @@ import { StatCard } from "../../components/ui/StatCard";
 import { Switch } from "../../components/ui/Switch";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import {
   AREA_OPTIONS,
@@ -167,6 +168,7 @@ export const DriverDetailPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const { refresh: refreshDrivers } = useDataRefresh("drivers");
 
   const [driver, setDriver] = useState(null);
   const [form, setForm] = useState(null);
@@ -244,6 +246,7 @@ export const DriverDetailPage = () => {
       setForm(toFormState(updated));
       setEditing(false);
       setSaveSuccess(true);
+      refreshDrivers();
     } catch (err) {
       const parsed = parseApiError(err);
       setSaveError(parsed.message);
@@ -258,6 +261,7 @@ export const DriverDetailPage = () => {
     setDeleteError("");
     try {
       await deleteUserRequest(id);
+      refreshDrivers();
       navigate("/choferes", { replace: true });
     } catch (err) {
       setDeleteError(parseApiError(err).message);

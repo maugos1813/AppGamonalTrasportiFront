@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
@@ -11,6 +11,7 @@ import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import { EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
@@ -43,6 +44,8 @@ const INITIAL_FORM = {
 
 export const NewRecordPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const [form, setForm] = useState(INITIAL_FORM);
@@ -88,7 +91,15 @@ export const NewRecordPage = () => {
 
     try {
       const record = await createRecordRequest(payload);
-      navigate(`/records/${record.id}`, { replace: true });
+      refreshRecords();
+      // Se preserva backgroundLocation (si esta pantalla se abrio como overlay sobre
+      // una lista, ver App.jsx) para que el detalle del registro recien creado
+      // tambien se muestre como overlay, en vez de que la lista de fondo se
+      // desmonte en esta transicion.
+      navigate(`/records/${record.id}`, {
+        replace: true,
+        state: { backgroundLocation: location.state?.backgroundLocation },
+      });
     } catch (err) {
       const parsed = parseApiError(err);
       setFormError(parsed.message);
@@ -251,7 +262,7 @@ export const NewRecordPage = () => {
         </GlassCard>
 
         <GlassCard>
-          <h2 className="text-[17px] font-medium text-ink-50">Datos economicos (planificados)</h2>
+          <h2 className="text-[17px] font-medium text-ink-50">Datos economicos</h2>
           <p className="mt-1 text-[13px] text-ink-300">
             Opcional. El chofer despues carga los kilometros reales para comparar.
           </p>
@@ -277,10 +288,11 @@ export const NewRecordPage = () => {
             />
             <TextField
               id="pagoRecibido"
-              label="Pago previsto"
+              label="Monto recibido"
               type="number"
               step="0.01"
               min="0"
+              placeholder="Lo que efectivamente se cobro (columna MONTO en Sheets)"
               value={form.pagoRecibido}
               onChange={handleChange("pagoRecibido")}
             />

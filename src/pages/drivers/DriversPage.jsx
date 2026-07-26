@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
@@ -9,6 +9,7 @@ import { GlassCard } from "../../components/ui/GlassCard";
 import { PageLoader } from "../../components/ui/PageLoader";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, GRUPO_OPTIONS } from "../../lib/constants";
 import { computeDriverDocumentAlerts, computeDriverKmRanking } from "../../lib/dashboardStats";
@@ -27,8 +28,12 @@ const PhoneIcon = ({ className }) => (
 // Card compacta: pensada para verse bien en grillas de 2 (mobile) a 4 (desktop
 // grande) columnas, asi que prioriza nombre/estado y deja el resto en una sola
 // fila chica en vez del layout mas espacioso de antes (2 en fila, siempre).
-const DriverCard = ({ driver }) => (
-  <Link to={`/choferes/${driver.id}`} className="block">
+// state: backgroundLocation - para que App.jsx renderice el detalle como overlay
+// sobre esta lista (que sigue montada), en vez de reemplazarla (ver App.jsx).
+const DriverCard = ({ driver }) => {
+  const location = useLocation();
+  return (
+  <Link to={`/choferes/${driver.id}`} state={{ backgroundLocation: location }} className="block">
     <GlassCard className="!p-4 transition-colors hover:bg-line/[0.09]">
       <div className="flex items-center gap-3">
         <Avatar user={driver} className="h-10 w-10 shrink-0 text-[13px]" />
@@ -67,7 +72,8 @@ const DriverCard = ({ driver }) => (
       </div>
     </GlassCard>
   </Link>
-);
+  );
+};
 
 // @container (no breakpoints de viewport): la grilla vive en una columna de 2/3 de
 // pantalla, no en el ancho completo - ver el mismo ajuste en VehiclesPage.
@@ -234,8 +240,11 @@ const DriverDocumentAlertsPanel = ({ users, documents }) => {
 };
 
 export const DriversPage = () => {
+  const location = useLocation();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const { version: driversVersion } = useDataRefresh("drivers");
+  const { version: recordsVersion } = useDataRefresh("records");
 
   const [drivers, setDrivers] = useState(null);
   const [monthlyRecords, setMonthlyRecords] = useState(null);
@@ -247,15 +256,18 @@ export const DriversPage = () => {
     listUsersRequest()
       .then(setDrivers)
       .catch((err) => setError(parseApiError(err).message));
-  }, [isPrivileged]);
+  }, [isPrivileged, driversVersion]);
 
+  // Depende tambien de recordsVersion: el ranking de km sale de los registros del mes,
+  // no de los choferes - si se edita un km desde el detalle de un registro, esto tiene
+  // que reflejarse aca tambien.
   useEffect(() => {
     if (!isPrivileged) return;
     const now = new Date();
     listRecordsByMonthRequest(now.getFullYear(), now.getMonth() + 1)
       .then(setMonthlyRecords)
       .catch((err) => setError(parseApiError(err).message));
-  }, [isPrivileged]);
+  }, [isPrivileged, recordsVersion]);
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -277,7 +289,7 @@ export const DriversPage = () => {
           <h1 className="text-[24px] font-semibold text-ink-50">Choferes</h1>
           <p className="mt-1 text-[14px] text-ink-300">Equipo de choferes de Gamonal Trasporti.</p>
         </div>
-        <Link to="/choferes/new">
+        <Link to="/choferes/new" state={{ backgroundLocation: location }}>
           <Button className="w-auto px-5">Nuevo chofer</Button>
         </Link>
       </div>

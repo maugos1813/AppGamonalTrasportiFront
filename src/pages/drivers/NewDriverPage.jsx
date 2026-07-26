@@ -8,6 +8,7 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS } from "../../lib/constants";
 import { createUserRequest } from "../../lib/users.api";
@@ -26,6 +27,7 @@ export const NewDriverPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const { refresh: refreshDrivers } = useDataRefresh("drivers");
 
   const [form, setForm] = useState(INITIAL_FORM);
   const [submitting, setSubmitting] = useState(false);
@@ -45,6 +47,7 @@ export const NewDriverPage = () => {
 
     try {
       await createUserRequest({ ...form, cargo: "CHOFER" });
+      refreshDrivers();
       navigate("/choferes", { replace: true });
     } catch (err) {
       const parsed = parseApiError(err);

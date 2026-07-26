@@ -14,6 +14,7 @@ import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import {
@@ -148,6 +149,7 @@ export const RecordDetailPage = () => {
   const { user } = useAuth();
   const isChofer = user?.cargo === "CHOFER";
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const { refresh: refreshRecords } = useDataRefresh("records");
 
   const [record, setRecord] = useState(null);
   const [files, setFiles] = useState([]);
@@ -227,6 +229,7 @@ export const RecordDetailPage = () => {
       setRecord(updated);
       setForm(toFormState(updated));
       setSaveSuccess(true);
+      refreshRecords();
     } catch (err) {
       setSaveError(parseApiError(err).message);
     } finally {
@@ -264,6 +267,7 @@ export const RecordDetailPage = () => {
     setDeleteError("");
     try {
       await deleteRecordRequest(id);
+      refreshRecords();
       navigate(location.state?.from ?? backToSection(record), { replace: true });
     } catch (err) {
       setDeleteError(parseApiError(err).message);
@@ -461,7 +465,8 @@ const RecordSummaryView = ({
           </h3>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <InfoRow label="Precio/km" value={record.precioKm ?? "-"} />
-            <InfoRow label="Total" value={record.total ?? "-"} />
+            <InfoRow label="Total estimado" value={record.total ?? "-"} />
+            <InfoRow label="Monto recibido" value={record.pagoRecibido ?? "-"} />
           </div>
         </div>
       )}
@@ -699,7 +704,7 @@ const RecordEditForm = ({
         {!isChofer && (
           <div className="border-t border-line/10 pt-5">
             <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-              Datos economicos (planificados)
+              Datos economicos
             </h3>
 
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
@@ -723,10 +728,11 @@ const RecordEditForm = ({
               />
               <TextField
                 id="pagoRecibido"
-                label="Pago previsto"
+                label="Monto recibido"
                 type="number"
                 step="0.01"
                 min="0"
+                placeholder="Lo que efectivamente se cobro (columna MONTO en Sheets)"
                 value={form.pagoRecibido}
                 onChange={handleChange("pagoRecibido")}
               />

@@ -11,6 +11,7 @@ import { StatCard } from "../../components/ui/StatCard";
 import { TextField } from "../../components/ui/TextField";
 import { VehicleStatusBadge } from "../../components/ui/VehicleStatusBadge";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, GRUPO_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
 import { formatDate, toDateInputValue } from "../../lib/format";
@@ -143,6 +144,7 @@ export const VehicleDetailPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const { refresh: refreshVehicles } = useDataRefresh("vehicles");
 
   const [vehicle, setVehicle] = useState(null);
   const [form, setForm] = useState(null);
@@ -221,6 +223,7 @@ export const VehicleDetailPage = () => {
       setFiles({});
       setEditing(false);
       setSaveSuccess(true);
+      refreshVehicles();
     } catch (err) {
       const parsed = parseApiError(err);
       setSaveError(parsed.message);
@@ -235,6 +238,7 @@ export const VehicleDetailPage = () => {
     setDeleteError("");
     try {
       await deleteVehicleRequest(id);
+      refreshVehicles();
       navigate("/vehiculos", { replace: true });
     } catch (err) {
       setDeleteError(parseApiError(err).message);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -10,6 +10,7 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS } from "../../lib/constants";
@@ -52,6 +53,8 @@ const buildAddress = ({ calle, cap, ciudad }) => {
 
 export const NewDhlAbServiceRecordPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const [form, setForm] = useState(INITIAL_FORM);
@@ -99,7 +102,15 @@ export const NewDhlAbServiceRecordPage = () => {
 
     try {
       const record = await createRecordRequest(payload);
-      navigate(`/records/${record.id}`, { replace: true });
+      refreshRecords();
+      // Se preserva backgroundLocation (si esta pantalla se abrio como overlay sobre
+      // una lista, ver App.jsx) para que el detalle del registro recien creado
+      // tambien se muestre como overlay, en vez de que la lista de fondo se
+      // desmonte en esta transicion.
+      navigate(`/records/${record.id}`, {
+        replace: true,
+        state: { backgroundLocation: location.state?.backgroundLocation },
+      });
     } catch (err) {
       const parsed = parseApiError(err);
       setFormError(parsed.message);

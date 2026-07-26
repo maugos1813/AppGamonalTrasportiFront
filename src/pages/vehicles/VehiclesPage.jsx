@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
@@ -9,6 +9,7 @@ import { PageLoader } from "../../components/ui/PageLoader";
 import { Spinner } from "../../components/ui/Spinner";
 import { VehicleStatusBadge } from "../../components/ui/VehicleStatusBadge";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import {
   AREA_OPTIONS,
@@ -58,24 +59,29 @@ const VehicleAvatar = ({ vehicle, className }) =>
 // Card compacta, mismo patron que DriverCard: avatar circular + nombre arriba,
 // targa/area/estado en una fila chica abajo - en vez de la foto grande que ocupaba
 // un tercio de la card y dejaba poco lugar para el texto.
-const VehicleCard = ({ vehicle }) => (
-  <Link to={`/vehiculos/${vehicle.id}`} className="block">
-    <GlassCard className="!p-4 transition-colors hover:bg-line/[0.09]">
-      <div className="flex items-center gap-3">
-        <VehicleAvatar vehicle={vehicle} className="h-10 w-10 shrink-0" />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[14px] font-medium text-ink-50">{vehicle.modelo}</h2>
-          <p className="truncate text-[12px] text-ink-300">{vehicle.targa}</p>
+// state: backgroundLocation - para que App.jsx renderice el detalle como overlay
+// sobre esta lista (que sigue montada), en vez de reemplazarla (ver App.jsx).
+const VehicleCard = ({ vehicle }) => {
+  const location = useLocation();
+  return (
+    <Link to={`/vehiculos/${vehicle.id}`} state={{ backgroundLocation: location }} className="block">
+      <GlassCard className="!p-4 transition-colors hover:bg-line/[0.09]">
+        <div className="flex items-center gap-3">
+          <VehicleAvatar vehicle={vehicle} className="h-10 w-10 shrink-0" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-[14px] font-medium text-ink-50">{vehicle.modelo}</h2>
+            <p className="truncate text-[12px] text-ink-300">{vehicle.targa}</p>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="truncate text-[11px] text-ink-400">{areaLabel(vehicle.area)}</span>
-        <VehicleStatusBadge status={vehicle.estado} className="shrink-0 !px-2 !py-0.5 !text-[11px]" />
-      </div>
-    </GlassCard>
-  </Link>
-);
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="truncate text-[11px] text-ink-400">{areaLabel(vehicle.area)}</span>
+          <VehicleStatusBadge status={vehicle.estado} className="shrink-0 !px-2 !py-0.5 !text-[11px]" />
+        </div>
+      </GlassCard>
+    </Link>
+  );
+};
 
 // @container (no breakpoints de viewport): la grilla ahora vive en una columna de
 // 2/3 de pantalla, no en el ancho completo - con sm:/lg:/xl: (que miran el viewport)
@@ -107,6 +113,7 @@ const GroupSection = ({ title, members }) => (
 // alimenta la campanita de notificaciones (computeVehicleDocumentAlerts), asi que
 // no hace falta pedir nada nuevo: ya se cuenta con la lista completa de vehiculos.
 const DocumentAlertsPanel = ({ vehicles }) => {
+  const location = useLocation();
   const alerts = vehicles ? computeVehicleDocumentAlerts(vehicles) : undefined;
 
   return (
@@ -129,6 +136,7 @@ const DocumentAlertsPanel = ({ vehicles }) => {
             <Link
               key={alert.id}
               to={alert.link}
+              state={{ backgroundLocation: location }}
               className="flex items-center gap-2.5 rounded-xl glass-surface-sm px-3 py-2.5 text-[13px] transition-colors hover:bg-line/[0.08]"
             >
               <span
@@ -154,6 +162,7 @@ const TAGLIANDO_DOT_CLASSES = {
 // Vehiculos con Tagliando urgente o proximo (nunca "ok" - esos no necesitan aviso),
 // mas urgentes primero y despues por km restante ascendente.
 const TagliandoPanel = ({ vehicles }) => {
+  const location = useLocation();
   const pending = vehicles
     ?.map((v) => ({ vehicle: v, status: getTagliandoStatus(v.kmUltimoMantenimiento, v.kmActual) }))
     .filter((item) => item.status && item.status.level !== "ok")
@@ -180,6 +189,7 @@ const TagliandoPanel = ({ vehicles }) => {
           <Link
             key={vehicle.id}
             to={`/vehiculos/${vehicle.id}`}
+            state={{ backgroundLocation: location }}
             className="flex items-center gap-2.5 rounded-xl glass-surface-sm px-3 py-2.5 text-[13px] transition-colors hover:bg-line/[0.08]"
           >
             <span className={clsx("h-2.5 w-2.5 shrink-0 rounded-full", TAGLIANDO_DOT_CLASSES[status.level])} />
@@ -298,8 +308,11 @@ const FleetRankingPanel = ({ records }) => {
 };
 
 export const VehiclesPage = () => {
+  const location = useLocation();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const { version: vehiclesVersion } = useDataRefresh("vehicles");
+  const { version: recordsVersion } = useDataRefresh("records");
 
   const [vehicles, setVehicles] = useState(null);
   const [monthlyRecords, setMonthlyRecords] = useState(null);
@@ -310,15 +323,18 @@ export const VehiclesPage = () => {
     listVehiclesRequest()
       .then(setVehicles)
       .catch((err) => setError(parseApiError(err).message));
-  }, [isPrivileged]);
+  }, [isPrivileged, vehiclesVersion]);
 
+  // Depende tambien de recordsVersion: el uso de flota/ranking sale de los registros
+  // del mes, no de los vehiculos - si se edita un km desde el detalle de un registro,
+  // esto tiene que reflejarse aca tambien.
   useEffect(() => {
     if (!isPrivileged) return;
     const now = new Date();
     listRecordsByMonthRequest(now.getFullYear(), now.getMonth() + 1)
       .then(setMonthlyRecords)
       .catch((err) => setError(parseApiError(err).message));
-  }, [isPrivileged]);
+  }, [isPrivileged, recordsVersion]);
 
   if (!isPrivileged) return <Navigate to="/" replace />;
 
@@ -331,7 +347,7 @@ export const VehiclesPage = () => {
           <h1 className="text-[24px] font-semibold text-ink-50">Vehiculos</h1>
           <p className="mt-1 text-[14px] text-ink-300">Flota de Gamonal Trasporti.</p>
         </div>
-        <Link to="/vehiculos/new">
+        <Link to="/vehiculos/new" state={{ backgroundLocation: location }}>
           <Button className="w-auto px-5">Nuevo vehiculo</Button>
         </Link>
       </div>

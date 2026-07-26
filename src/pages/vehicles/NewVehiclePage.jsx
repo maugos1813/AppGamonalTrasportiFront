@@ -7,6 +7,7 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
+import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
 import { createVehicleRequest } from "../../lib/vehicles.api";
@@ -30,6 +31,7 @@ export const NewVehiclePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const { refresh: refreshVehicles } = useDataRefresh("vehicles");
 
   const [form, setForm] = useState(INITIAL_FORM);
   const [files, setFiles] = useState({});
@@ -61,6 +63,7 @@ export const NewVehiclePage = () => {
 
     try {
       const vehicle = await createVehicleRequest(formData);
+      refreshVehicles();
       navigate(`/vehiculos`, { replace: true, state: { createdTarga: vehicle.targa } });
     } catch (err) {
       const parsed = parseApiError(err);
