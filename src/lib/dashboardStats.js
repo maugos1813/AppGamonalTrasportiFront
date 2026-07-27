@@ -516,9 +516,6 @@ export const isReperibilidadNoDisponibleHoy = (user, now = new Date()) =>
 // todavia hay que completar hoy, mas quien esta disponible esta noche por si sale un
 // pedido (choferes) o listo para salir (vehiculos).
 export const computeReperibilidadPiazza = (records, users, vehicles, now = new Date()) => {
-  const enServicioAhoraDriverIds = new Set(
-    records.filter((r) => r.estado === "IN_CONSEGNA").map((r) => r.driver?.id)
-  );
   const enServicioAhoraVehicleIds = new Set(
     records.filter((r) => r.estado === "IN_CONSEGNA").map((r) => r.vehicle?.id)
   );
@@ -527,18 +524,29 @@ export const computeReperibilidadPiazza = (records, users, vehicles, now = new D
     .filter((r) => !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r) && EN_PROCESO_STATUSES.includes(r.estado))
     .sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
+  // Servicio en curso o pendiente de cada chofer (cualquier tipo, no solo Extras
+  // Piazza) para mostrarlo inline en la tabla de "Choferes disponibles esta noche" -
+  // el de ETA mas proxima si tiene mas de uno. No excluye a nadie de la tabla (ver
+  // choferesPiazza abajo): un chofer con una consegna en curso ahora tambien tiene
+  // que verse, con el dato de que esta ocupado en vez de directamente desaparecer.
+  const servicioActualPorChofer = {};
+  [...records]
+    .filter((r) => r.driver?.id && EN_PROCESO_STATUSES.includes(r.estado))
+    .sort((a, b) => new Date(a.eta) - new Date(b.eta))
+    .forEach((r) => {
+      if (!servicioActualPorChofer[r.driver.id]) servicioActualPorChofer[r.driver.id] = r;
+    });
+
   const marcadoNoDisponibleHoy = (u) => isReperibilidadNoDisponibleHoy(u, now);
 
-  // choferesPiazza: version "editable" (todos los activos de Extras Piazza sin
-  // servicio en curso ahora, disponibles o no) para la tabla de Resumen > Reperibilita
-  // donde OWNER/ADMIN puede tocar el Si/No y el vehiculo asignado de cada uno.
-  // choferesDisponibles/choferesNoDisponibles siguen aparte para el resumen de texto
-  // (contadores y el aviso de "se marcaron no disponibles").
+  // choferesPiazza: version "editable" (todos los activos de Extras Piazza, con o sin
+  // servicio en curso) para la tabla de Resumen > Reperibilita donde OWNER/ADMIN puede
+  // tocar el Si/No y el vehiculo asignado de cada uno. choferesDisponibles/
+  // choferesNoDisponibles siguen aparte para el resumen de texto (contadores y el
+  // aviso de "se marcaron no disponibles").
   // Sin filtro de cargo: OWNER/ADMIN tambien pueden salir a manejar un servicio, asi
   // que tienen que poder aparecer y asignarse como cualquier otro chofer.
-  const choferesPiazza = users.filter(
-    (u) => u.estado === "ACTIVO" && u.area === "EXTRAS_PIAZZA" && !enServicioAhoraDriverIds.has(u.id)
-  );
+  const choferesPiazza = users.filter((u) => u.estado === "ACTIVO" && u.area === "EXTRAS_PIAZZA");
 
   const choferesDisponibles = choferesPiazza.filter((u) => !marcadoNoDisponibleHoy(u));
   const choferesNoDisponibles = choferesPiazza.filter((u) => marcadoNoDisponibleHoy(u));
@@ -550,7 +558,22 @@ export const computeReperibilidadPiazza = (records, users, vehicles, now = new D
       !enServicioAhoraVehicleIds.has(v.id)
   );
 
-  return { serviciosPendientes, choferesPiazza, choferesDisponibles, choferesNoDisponibles, vehiculosDisponibles };
+  // Choferes de CUALQUIER area con una nota de servicio futuro cargada (ver "Agregar
+  // chofer" en DailySummaryPage.jsx) - un aviso manual de que ese chofer va a tener
+  // otra consegna, aunque todavia no exista un Registro formal para esa fecha.
+  const choferesConServicioFuturo = users
+    .filter((u) => u.estado === "ACTIVO" && u.proximoServicioFecha)
+    .sort((a, b) => new Date(a.proximoServicioFecha) - new Date(b.proximoServicioFecha));
+
+  return {
+    serviciosPendientes,
+    servicioActualPorChofer,
+    choferesPiazza,
+    choferesDisponibles,
+    choferesNoDisponibles,
+    vehiculosDisponibles,
+    choferesConServicioFuturo,
+  };
 };
 
 // Servicios en curso o pendientes cuya fecha de servicio ya paso sin cerrarse.

@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { SEVERITY_DOT_CLASSES, SEVERITY_ITEM_CLASSES } from "../../components/layout/NotificationsBell";
 import { Alert } from "../../components/ui/Alert";
+import { AsignarServicioFuturoModal } from "../../components/ui/AsignarServicioFuturoModal";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
@@ -76,6 +77,13 @@ const groupAlerts = (alerts) => {
 
 const todayLabel = () =>
   new Date().toLocaleDateString("es-AR", { weekday: "long", day: "numeric", month: "long" });
+
+// Mismo formato que el value crudo de un <input type="date"> ("yyyy-mm-dd", hora local
+// del navegador) - para comparar sin pasar por Date/UTC.
+const todayDateInputValue = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
 
 const TAB_OPTIONS = [
   { value: "general", label: "General" },
@@ -254,6 +262,50 @@ export const DailySummaryPage = () => {
   const handleChangeVehiculo = (driverId) => (value) =>
     applyDriverUpdate(driverId, "vehiculoAsignadoId")(value || null);
 
+  // "Agregar chofer" (cualquier area): un solo PATCH con los 4 campos juntos, no uno
+  // por uno como en la tabla de arriba. Si la fecha elegida no es hoy, no se manda
+  // reperibilidadNoDisponible - una nota sobre un servicio dentro de unos dias no debe
+  // apagarle a nadie la disponibilidad de esta noche (ver isReperibilidadNoDisponibleHoy).
+  const [showAgregarChofer, setShowAgregarChofer] = useState(false);
+  const [agregarChoferSubmitting, setAgregarChoferSubmitting] = useState(false);
+  const [agregarChoferError, setAgregarChoferError] = useState("");
+
+  const handleAgregarChofer = async ({ driverId, vehiculoAsignadoId, disponible, fecha, nota }) => {
+    setAgregarChoferSubmitting(true);
+    setAgregarChoferError("");
+    // Comparacion de strings "yyyy-mm-dd" (el value crudo del <input type="date">), no
+    // Date: evita el desfasaje de huso horario de interpretar una fecha-sin-hora como
+    // medianoche UTC.
+    const esHoy = fecha === todayDateInputValue();
+    const payload = {
+      vehiculoAsignadoId,
+      proximoServicioFecha: fecha,
+      proximoServicioNota: nota,
+      ...(esHoy ? { reperibilidadNoDisponible: !disponible } : {}),
+    };
+    try {
+      const updated = await updateUserRequest(driverId, payload);
+      setDrivers((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+      setShowAgregarChofer(false);
+    } catch (err) {
+      setAgregarChoferError(parseApiError(err).message);
+    } finally {
+      setAgregarChoferSubmitting(false);
+    }
+  };
+
+  const handleQuitarServicioFuturo = (driverId) => async () => {
+    setSavingDriverField((prev) => ({ ...prev, [`${driverId}:proximoServicio`]: true }));
+    try {
+      const updated = await updateUserRequest(driverId, { proximoServicioFecha: null, proximoServicioNota: null });
+      setDrivers((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
+    } catch (err) {
+      setDriverFieldErrors((prev) => ({ ...prev, [driverId]: parseApiError(err).message }));
+    } finally {
+      setSavingDriverField((prev) => ({ ...prev, [`${driverId}:proximoServicio`]: false }));
+    }
+  };
+
   const vehicleOptions = useMemo(
     () => [
       { value: "", label: "Sin asignar" },
@@ -300,6 +352,17 @@ export const DailySummaryPage = () => {
     reperibilidad.vehiculosDisponibles.forEach((v) =>
       lines.push(`- ${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`)
     );
+
+    lines.push("", `Proximos servicios (${reperibilidad.choferesConServicioFuturo.length}):`);
+    if (reperibilidad.choferesConServicioFuturo.length === 0) lines.push("- Ninguno");
+    reperibilidad.choferesConServicioFuturo.forEach((u) => {
+      const vehiculo = u.vehiculoAsignado
+        ? `${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` - ${u.vehiculoAsignado.modelo}` : ""}`
+        : "sin vehiculo asignado";
+      const partes = [`${u.nombre} ${u.apellido}`, formatDate(u.proximoServicioFecha), vehiculo];
+      if (u.proximoServicioNota) partes.push(u.proximoServicioNota);
+      lines.push(`- ${partes.join(" | ")}`);
+    });
 
     navigator.clipboard
       .writeText(lines.join("\n"))
@@ -653,9 +716,14 @@ export const DailySummaryPage = () => {
                 <p className="text-[13px] text-ink-400">
                   Extras Piazza &middot; {reperibilidad.serviciosPendientes.length} servicio(s) pendiente(s)
                 </p>
-                <Button variant="ghost" className="w-auto px-4" onClick={handleCopyReperibilidad}>
-                  {copyFeedback || "Copiar como texto"}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button variant="ghost" className="w-auto px-4" onClick={() => setShowAgregarChofer(true)}>
+                    Agregar chofer
+                  </Button>
+                  <Button variant="ghost" className="w-auto px-4" onClick={handleCopyReperibilidad}>
+                    {copyFeedback || "Copiar como texto"}
+                  </Button>
+                </div>
               </div>
 
               <GlassCard>
@@ -709,8 +777,8 @@ export const DailySummaryPage = () => {
               <GlassCard>
                 <h2 className="text-[15px] font-semibold text-ink-50">Choferes disponibles esta noche</h2>
                 <p className="mt-1 text-[12px] text-ink-400">
-                  Extras Piazza, activos y sin servicio en curso ahora. Marca si esta disponible y con
-                  que vehiculo sale, para cualquier chofer de la lista.
+                  Todos los choferes activos de Extras Piazza, con o sin consegna en curso. Marca si
+                  esta disponible y con que vehiculo sale, para cualquier chofer de la lista.
                 </p>
 
                 {reperibilidad.choferesPiazza.length === 0 ? (
@@ -724,6 +792,7 @@ export const DailySummaryPage = () => {
                     </div>
                     {reperibilidad.choferesPiazza.map((u) => {
                       const disponible = !isReperibilidadNoDisponibleHoy(u);
+                      const servicioActual = reperibilidad.servicioActualPorChofer[u.id];
                       return (
                         <div key={u.id} className="flex flex-col gap-1">
                           <div className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2">
@@ -747,12 +816,67 @@ export const DailySummaryPage = () => {
                               onChange={(e) => handleChangeVehiculo(u.id)(e.target.value)}
                             />
                           </div>
+                          {servicioActual && (
+                            <Link
+                              to={`/records/${servicioActual.id}`}
+                              className="px-3 text-[12px] text-ink-400 hover:text-ink-200 hover:underline"
+                            >
+                              {RECORD_STATUS_LABELS[servicioActual.estado] ?? servicioActual.estado} a{" "}
+                              {servicioActual.destinazione} &middot; ETA {formatDateTime(servicioActual.eta)}
+                            </Link>
+                          )}
                           {driverFieldErrors[u.id] && (
                             <span className="px-3 text-[12px] text-danger-500">{driverFieldErrors[u.id]}</span>
                           )}
                         </div>
                       );
                     })}
+                  </div>
+                )}
+              </GlassCard>
+
+              <GlassCard>
+                <h2 className="text-[15px] font-semibold text-ink-50">Proximos servicios</h2>
+                <p className="mt-1 text-[12px] text-ink-400">
+                  Choferes de cualquier area con un aviso manual de un servicio futuro (ver "Agregar
+                  chofer" arriba).
+                </p>
+
+                {reperibilidad.choferesConServicioFuturo.length === 0 ? (
+                  <p className="mt-3 text-[13px] text-ink-300">Sin proximos servicios anotados.</p>
+                ) : (
+                  <div className="mt-3 flex flex-col gap-2">
+                    {reperibilidad.choferesConServicioFuturo.map((u) => (
+                      <div key={u.id} className="flex flex-col gap-1">
+                        <div className="flex flex-wrap items-center gap-3 rounded-xl glass-surface-sm px-3 py-2">
+                          <span className="min-w-0 flex-1 truncate text-[13px] text-ink-50">
+                            {u.nombre} {u.apellido}
+                          </span>
+                          <span className="shrink-0 text-[12px] text-ink-300">
+                            {formatDate(u.proximoServicioFecha)}
+                          </span>
+                          <span className="min-w-0 flex-1 truncate text-[12px] text-ink-400">
+                            {u.proximoServicioNota || "Sin nota"}
+                          </span>
+                          <span className="shrink-0 text-[12px] text-ink-400">
+                            {u.vehiculoAsignado
+                              ? `${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` - ${u.vehiculoAsignado.modelo}` : ""}`
+                              : "Sin vehiculo"}
+                          </span>
+                          <Button
+                            variant="ghost"
+                            className="w-auto shrink-0 px-3 py-1.5 text-[12px]"
+                            loading={Boolean(savingDriverField[`${u.id}:proximoServicio`])}
+                            onClick={handleQuitarServicioFuturo(u.id)}
+                          >
+                            Quitar
+                          </Button>
+                        </div>
+                        {driverFieldErrors[u.id] && (
+                          <span className="px-3 text-[12px] text-danger-500">{driverFieldErrors[u.id]}</span>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
               </GlassCard>
@@ -778,6 +902,18 @@ export const DailySummaryPage = () => {
             </>
           )}
         </>
+      )}
+
+      {isPrivileged && drivers && vehicles && (
+        <AsignarServicioFuturoModal
+          open={showAgregarChofer}
+          drivers={drivers}
+          vehicles={vehicles}
+          loading={agregarChoferSubmitting}
+          error={agregarChoferError}
+          onSubmit={handleAgregarChofer}
+          onClose={() => setShowAgregarChofer(false)}
+        />
       )}
     </div>
   );
