@@ -175,6 +175,7 @@ export const NewDhlAbServiceRecordPage = () => {
               label="Estado"
               placeholder="Escribe para buscar un estado"
               options={RECORD_STATUS_OPTIONS}
+              maxSuggestions={RECORD_STATUS_OPTIONS.length}
               value={form.estado}
               onChange={(v) => setField("estado", v)}
             />

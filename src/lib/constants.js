@@ -8,11 +8,18 @@ export const AREA_OPTIONS = [
   { value: "FARMACIA", label: "Farmacia" },
 ];
 
-// Seccion de Registros/Control economico a la que queda acotado un ADMIN "de area"
-// (ver lib/permissions.js). Un area sin entrada aca (ej. FARMACIA) no tiene seccion
-// propia todavia.
-export const ADMIN_AREA_RECORDS_SECTION = { EXTRAS_PIAZZA: "extras-piazza", DHL: "dhl-ab-service" };
-export const ADMIN_AREA_DASHBOARD_SECTION = { EXTRAS_PIAZZA: "extras_piazza", DHL: "dhl_ab" };
+// Seccion(es) de Registros/Control economico a las que queda acotado un ADMIN "de
+// area" (ver lib/permissions.js) - lista, no un solo valor, porque el ADMIN de DHL
+// tambien administra Extras Stefania (no tiene area propia todavia). Un area sin
+// entrada aca (ej. FARMACIA) no tiene seccion propia todavia.
+export const ADMIN_AREA_RECORDS_SECTION = {
+  EXTRAS_PIAZZA: ["extras-piazza"],
+  DHL: ["dhl-ab-service", "extras-stefania"],
+};
+export const ADMIN_AREA_DASHBOARD_SECTION = {
+  EXTRAS_PIAZZA: ["extras_piazza"],
+  DHL: ["dhl_ab", "extras_stefania"],
+};
 
 export const CARGO_LABELS = {
   OWNER: "Socio",

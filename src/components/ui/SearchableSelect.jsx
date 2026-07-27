@@ -2,12 +2,14 @@ import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { Spinner } from "./Spinner";
 
-const MAX_SUGGESTIONS = 5;
+const DEFAULT_MAX_SUGGESTIONS = 5;
 
-// Input con sugerencias filtradas en vivo (maximo 5), fondo solido para que se lea
-// bien aunque haya otros campos debajo. Si se pasa onCreateNew, permite crear una
-// opcion nueva al aceptar un texto que no matchea ninguna existente (ej: Cliente);
-// sin esa prop, solo permite elegir entre las opciones dadas (ej: Chofer, Vehiculo, Estado).
+// Input con sugerencias filtradas en vivo (maximo `maxSuggestions`, default 5), fondo
+// solido para que se lea bien aunque haya otros campos debajo. Si se pasa onCreateNew,
+// permite crear una opcion nueva al aceptar un texto que no matchea ninguna existente
+// (ej: Cliente); sin esa prop, solo permite elegir entre las opciones dadas (ej: Chofer,
+// Vehiculo, Estado). Para listas cortas y fijas (ej: Estado) conviene pasar
+// maxSuggestions=options.length para que se vean todas sin tener que escribir.
 export const SearchableSelect = ({
   id,
   label,
@@ -18,6 +20,7 @@ export const SearchableSelect = ({
   createLabel = (text) => `+ Crear "${text}"`,
   placeholder = "Escribe para buscar...",
   error,
+  maxSuggestions = DEFAULT_MAX_SUGGESTIONS,
 }) => {
   const [query, setQuery] = useState("");
   // Separado de "query": mientras no se escriba nada nuevo desde que se abrio el
@@ -92,7 +95,7 @@ export const SearchableSelect = ({
   const filtered = (filterQuery.trim()
     ? options.filter((o) => o.label.toLowerCase().includes(filterQuery.trim().toLowerCase()))
     : options
-  ).slice(0, MAX_SUGGESTIONS);
+  ).slice(0, maxSuggestions);
 
   const exactMatch = findExactMatch(query);
   const showCreateOption = Boolean(onCreateNew) && query.trim() && !exactMatch;

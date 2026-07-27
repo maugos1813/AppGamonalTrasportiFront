@@ -16,6 +16,7 @@ import { MecanicaPage } from "./pages/mecanica/MecanicaPage";
 import { DailySummaryPage } from "./pages/notifications/DailySummaryPage";
 import { ProfilePage } from "./pages/profile/ProfilePage";
 import { NewDhlAbServiceRecordPage } from "./pages/records/NewDhlAbServiceRecordPage";
+import { NewExtrasStefaniaRecordPage } from "./pages/records/NewExtrasStefaniaRecordPage";
 import { NewRecordPage } from "./pages/records/NewRecordPage";
 import { RecordDetailPage } from "./pages/records/RecordDetailPage";
 import { RecordsListPage } from "./pages/records/RecordsListPage";
@@ -34,6 +35,7 @@ const OverlayRoutes = () => (
     <Route element={<ProtectedRoute />}>
       <Route path="/records/extras-piazza/new" element={<NewRecordPage />} />
       <Route path="/records/dhl-ab-service/new" element={<NewDhlAbServiceRecordPage />} />
+      <Route path="/records/extras-stefania/new" element={<NewExtrasStefaniaRecordPage />} />
       <Route path="/records/:id" element={<RecordDetailPage />} />
       <Route path="/choferes/new" element={<NewDriverPage />} />
       <Route path="/choferes/:id" element={<DriverDetailPage />} />
@@ -73,6 +75,8 @@ function App() {
             <Route path="/records/extras-piazza/new" element={<NewRecordPage />} />
             <Route path="/records/dhl-ab-service" element={<RecordsListPage section="dhl-ab-service" />} />
             <Route path="/records/dhl-ab-service/new" element={<NewDhlAbServiceRecordPage />} />
+            <Route path="/records/extras-stefania" element={<RecordsListPage section="extras-stefania" />} />
+            <Route path="/records/extras-stefania/new" element={<NewExtrasStefaniaRecordPage />} />
             <Route path="/records/:id" element={<RecordDetailPage />} />
             <Route path="/choferes" element={<DriversPage />} />
             <Route path="/choferes/new" element={<NewDriverPage />} />

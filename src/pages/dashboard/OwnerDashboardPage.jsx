@@ -21,9 +21,10 @@ import {
   computeMonthlyKmTrend,
   computeMonthlyRevenueTrend,
   isDhlAbRecord,
+  isExtrasStefaniaRecord,
 } from "../../lib/dashboardStats";
 import { formatCurrency, formatCurrencyCompact } from "../../lib/format";
-import { scopedDashboardSection } from "../../lib/permissions";
+import { scopedDashboardSections } from "../../lib/permissions";
 import { listRecordsRequest } from "../../lib/records.api";
 
 const PERIOD_OPTIONS = [
@@ -41,11 +42,13 @@ const PERIOD_DELTA_LABEL = {
 const SECTION_OPTIONS = [
   { value: "extras_piazza", label: "Extras Piazza" },
   { value: "dhl_ab", label: "DHL - AB Service" },
+  { value: "extras_stefania", label: "Extras Stefania" },
 ];
 
 const SECTION_LABEL = {
   extras_piazza: "Extras Piazza",
   dhl_ab: "DHL - AB Service",
+  extras_stefania: "Extras Stefania",
 };
 
 // Sub-division de Extras Piazza (Record.extrasPiazzaZona). Hoy toda la operacion de
@@ -114,13 +117,14 @@ const EconomicBreakdownModal = ({ title, sublabel, rows, total, onClose }) => {
 
 export const OwnerDashboardPage = () => {
   const { user } = useAuth();
-  // ADMIN "de area" (ver lib/permissions.js): arranca ya en su unica seccion, el
-  // backend tampoco le manda registros de la otra.
-  const scopedSection = scopedDashboardSection(user);
+  // ADMIN "de area" (ver lib/permissions.js): arranca ya en la primera de sus
+  // secciones, el backend tampoco le manda registros de las demas. Puede ser mas de
+  // una (ej. DHL: DHL - AB Service + Extras Stefania).
+  const scopedSections = scopedDashboardSections(user);
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
-  const [section, setSection] = useState(scopedSection ?? "extras_piazza");
+  const [section, setSection] = useState(scopedSections?.[0] ?? "extras_piazza");
   const [zona, setZona] = useState("TODAS");
   const [openBreakdown, setOpenBreakdown] = useState(null);
 
@@ -144,13 +148,18 @@ export const OwnerDashboardPage = () => {
   const loaded = Boolean(records);
 
   // Todo el bloque de Control economico mira solo la seccion elegida (Extras
-  // Piazza o DHL - AB Service): son negocios con estructuras de costos distintas
-  // (ver isDhlAbRecord/recordCost en dashboardStats.js), asi que no tiene sentido
-  // mezclarlos en el mismo numero. Dentro de Extras Piazza, ademas se acota por
-  // zona (Milano/Roma/Sin zona) - DHL/AB Service no tiene este concepto.
+  // Piazza, DHL - AB Service o Extras Stefania): son negocios con estructuras de
+  // costos distintas (ver isDhlAbRecord/recordCost en dashboardStats.js), asi que
+  // no tiene sentido mezclarlos en el mismo numero. Dentro de Extras Piazza,
+  // ademas se acota por zona (Milano/Roma/Sin zona) - las otras 2 secciones no
+  // tienen este concepto.
   const scopedRecords = useMemo(() => {
     if (!loaded) return null;
-    const bySection = records.filter((r) => (section === "dhl_ab" ? isDhlAbRecord(r) : !isDhlAbRecord(r)));
+    const bySection = records.filter((r) => {
+      if (section === "dhl_ab") return isDhlAbRecord(r);
+      if (section === "extras_stefania") return isExtrasStefaniaRecord(r);
+      return !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r);
+    });
     if (section !== "extras_piazza" || zona === "TODAS") return bySection;
     // Sin zona cargada cuenta como Milano (ver comentario de ZONA_OPTIONS).
     return bySection.filter((r) =>
@@ -189,12 +198,18 @@ export const OwnerDashboardPage = () => {
           <h1 className="text-[24px] font-semibold text-ink-50">Hola, {user?.nombre}</h1>
           <p className="mt-1 text-[14px] text-ink-300">Vision general del negocio.</p>
         </div>
-        {/* Extras Piazza y DHL/AB Service tienen estructuras de costos distintas (ver
-            recordCost en dashboardStats.js), asi que todo Control economico de abajo
-            mira solo la seccion elegida aca. Un ADMIN de area no tiene otra seccion
-            a la que cambiar (el backend tampoco le manda esos registros). */}
-        {!scopedSection && (
-          <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={setSection} />
+        {/* Las 3 secciones tienen estructuras de costos distintas (ver recordCost en
+            dashboardStats.js), asi que todo Control economico de abajo mira solo la
+            seccion elegida aca. Un ADMIN de area con una sola seccion no tiene otra
+            a la que cambiar (el backend tampoco le manda esos registros); uno con 2+
+            (ej. DHL: DHL - AB Service + Extras Stefania) si necesita elegir entre
+            las suyas. */}
+        {(!scopedSections || scopedSections.length > 1) && (
+          <SegmentedControl
+            options={scopedSections ? SECTION_OPTIONS.filter((o) => scopedSections.includes(o.value)) : SECTION_OPTIONS}
+            value={section}
+            onChange={setSection}
+          />
         )}
       </div>
 

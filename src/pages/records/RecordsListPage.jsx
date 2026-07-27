@@ -19,7 +19,7 @@ import {
   TERMINADOS_STATUSES,
 } from "../../lib/constants";
 import { formatDate, formatDateTime, formatTimeRemaining } from "../../lib/format";
-import { scopedRecordsSection } from "../../lib/permissions";
+import { scopedRecordsSections } from "../../lib/permissions";
 import {
   listPendingRecordsRequest,
   listRecordsByDayRequest,
@@ -63,6 +63,7 @@ const TAB_STATUSES = {
 // tienen spedizzione cargada, asi que se tratan como Extras Piazza por defecto.
 // "DHL - AB Service" agrupa ambos spedizzione; el alta desde esta seccion crea
 // siempre servicios DHL (AB_SERVICE por ahora solo llega via sincronizacion externa).
+// "Extras Stefania" la administra el mismo ADMIN de DHL (ver ADMIN_AREA_RECORDS_SECTION).
 const SECTIONS = {
   "extras-piazza": {
     label: "Extras Piazza",
@@ -75,6 +76,12 @@ const SECTIONS = {
     matchesSpedizzione: (s) => s === "DHL" || s === "AB_SERVICE",
     allowCreate: true,
     newPath: "/records/dhl-ab-service/new",
+  },
+  "extras-stefania": {
+    label: "Extras Stefania",
+    matchesSpedizzione: (s) => s === "EXTRAS_STEFANIA",
+    allowCreate: true,
+    newPath: "/records/extras-stefania/new",
   },
 };
 const SECTION_OPTIONS = Object.entries(SECTIONS).map(([value, s]) => ({ value, label: s.label }));
@@ -104,6 +111,7 @@ const driverName = (record) =>
   record.driver ? `${record.driver.nombre} ${record.driver.apellido}` : "Sin chofer asignado";
 
 const isDhlAb = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
+const isExtrasStefania = (record) => record.spedizzione === "EXTRAS_STEFANIA";
 
 const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
 
@@ -143,9 +151,15 @@ const shiftMonth = ({ year, month }, delta) => {
 
 // Igual al SegmentedControl visualmente, pero enrutado (NavLink) en vez de
 // controlado por estado, para que la seccion quede reflejada en la URL.
-const SectionTabs = () => (
+// allowedSections: si el ADMIN esta acotado a mas de una seccion (ej. DHL: DHL - AB
+// Service + Extras Stefania), solo se muestran esas, nunca las que no puede ver.
+const SectionTabs = ({ allowedSections }) => {
+  const options = allowedSections
+    ? SECTION_OPTIONS.filter((opt) => allowedSections.includes(opt.value))
+    : SECTION_OPTIONS;
+  return (
   <div className="inline-flex items-center gap-1 rounded-full glass-surface-sm p-1">
-    {SECTION_OPTIONS.map((opt) => (
+    {options.map((opt) => (
       <NavLink
         key={opt.value}
         to={`/records/${opt.value}`}
@@ -159,7 +173,8 @@ const SectionTabs = () => (
       </NavLink>
     ))}
   </div>
-);
+  );
+};
 
 const ChevronIcon = ({ open }) => (
   <svg
@@ -294,10 +309,14 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => {
         <span className="min-w-0 truncate font-medium text-ink-50">{record.codigo}</span>
         <span
           className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
-            isDhlAb(record) ? "bg-accent-500/15 text-accent-300" : "bg-line/15 text-ink-300"
+            isDhlAb(record)
+              ? "bg-accent-500/15 text-accent-300"
+              : isExtrasStefania(record)
+                ? "bg-success-500/15 text-success-500"
+                : "bg-line/15 text-ink-300"
           }`}
         >
-          {isDhlAb(record) ? "DHL/AB" : "Extras Piazza"}
+          {isDhlAb(record) ? "DHL/AB" : isExtrasStefania(record) ? "Extras Stefania" : "Extras Piazza"}
         </span>
       </div>
       <span className="min-w-0 truncate text-ink-300">{record.destinazione}</span>
@@ -330,7 +349,7 @@ const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId, s
       <p className="mb-3 px-1 text-[12px] text-ink-400">
         {scopedLabel
           ? `Servicios de hoy de ${scopedLabel}, ordenado por lo mas urgente.`
-          : "Servicios de hoy: Extras Piazza y DHL - AB Service juntos, ordenado por lo mas urgente."}
+          : "Servicios de hoy: Extras Piazza, DHL - AB Service y Extras Stefania juntos, ordenado por lo mas urgente."}
       </p>
 
       <div className="flex flex-col gap-2 overflow-y-auto">
@@ -361,9 +380,11 @@ export const RecordsListPage = ({ section }) => {
   const { version, refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  // ADMIN "de area" (ver lib/permissions.js): solo puede estar en su propia seccion,
-  // la otra ni siquiera se le ofrece (el backend tampoco le manda esos registros).
-  const scopedSection = scopedRecordsSection(user);
+  // ADMIN "de area" (ver lib/permissions.js): solo puede estar en su(s) propia(s)
+  // seccion(es), las demas ni siquiera se le ofrecen (el backend tampoco le manda
+  // esos registros). Puede ser mas de una (ej. DHL: DHL - AB Service + Extras
+  // Stefania), por eso es un array.
+  const scopedSections = scopedRecordsSections(user);
   const sectionConfig = SECTIONS[section];
   const [error, setError] = useState("");
   const [tab, setTab] = useState("en_proceso");
@@ -591,24 +612,26 @@ export const RecordsListPage = ({ section }) => {
     ? groupSummaryByDay(summary.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione)))
     : null;
 
-  // Total de KM del mes, Extras Piazza vs DHL/AB Service - de todo el mes (no solo
-  // la seccion que se esta mirando), para tener una idea general del volumen sin
-  // tener que cambiar de pestana. DHL/AB pesa x2 en los rankings (ver kmMultiplier
-  // en dashboardStats.js), asi que se muestra el crudo y el ponderado por separado.
+  // Total de KM del mes, Extras Piazza vs DHL/AB Service vs Extras Stefania - de todo
+  // el mes (no solo la seccion que se esta mirando), para tener una idea general del
+  // volumen sin tener que cambiar de pestana. DHL/AB pesa x2 en los rankings (ver
+  // kmMultiplier en dashboardStats.js), asi que se muestra el crudo y el ponderado por
+  // separado. Extras Stefania pesa x1, igual que Extras Piazza.
   const monthKmTotals = summary?.reduce(
     (acc, r) => {
-      const km = r.kilometrosReales ?? r.kilometros ?? 0;
+      const km = r.kilometros ?? r.kilometrosReales ?? 0;
       if (isDhlAb(r)) acc.dhlAb += km;
+      else if (isExtrasStefania(r)) acc.extrasStefania += km;
       else acc.extrasPiazza += km;
       return acc;
     },
-    { extrasPiazza: 0, dhlAb: 0 }
+    { extrasPiazza: 0, dhlAb: 0, extrasStefania: 0 }
   );
 
-  // Un ADMIN de area no tiene ni siquiera la otra seccion como opcion (backend
-  // tampoco le manda esos registros) - se lo redirige de vuelta a la suya.
-  if (scopedSection && scopedSection !== section) {
-    return <Navigate to={`/records/${scopedSection}`} replace />;
+  // Un ADMIN de area no tiene ninguna otra seccion como opcion (backend tampoco le
+  // manda esos registros) - se lo redirige de vuelta a la primera de las suyas.
+  if (scopedSections && !scopedSections.includes(section)) {
+    return <Navigate to={`/records/${scopedSections[0]}`} replace />;
   }
 
   return (
@@ -623,9 +646,10 @@ export const RecordsListPage = ({ section }) => {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Un ADMIN de area no tiene otra seccion a la que ir, asi que no se le
-              muestra el selector (llevaria a una seccion vacia). */}
-          {!scopedSection && <SectionTabs />}
+          {/* Un ADMIN de area con una sola seccion no tiene a donde mas ir, asi que no
+              se le muestra el selector. Uno con 2+ (ej. DHL: DHL - AB Service +
+              Extras Stefania) si necesita elegir entre las suyas. */}
+          {(!scopedSections || scopedSections.length > 1) && <SectionTabs allowedSections={scopedSections} />}
           {/* En proceso/Terminados solo tiene sentido para el chofer: no tiene el panel
               de Pendientes ni navegacion mes a mes, asi que es su unica forma de acotar
               la lista. El OWNER/ADMIN ya tiene Pendientes a la derecha, asi que ve todo
@@ -740,7 +764,8 @@ export const RecordsListPage = ({ section }) => {
                   {monthKmTotals && (
                     <p className="text-[11px] normal-case text-ink-400">
                       Extras Piazza: {fmtKm(monthKmTotals.extrasPiazza)} km · DHL - AB Service:{" "}
-                      {fmtKm(monthKmTotals.dhlAb)} km x2 = {fmtKm(monthKmTotals.dhlAb * 2)} km
+                      {fmtKm(monthKmTotals.dhlAb)} km x2 = {fmtKm(monthKmTotals.dhlAb * 2)} km · Extras Stefania:{" "}
+                      {fmtKm(monthKmTotals.extrasStefania)} km
                     </p>
                   )}
                 </div>
@@ -839,7 +864,11 @@ export const RecordsListPage = ({ section }) => {
           <PendingPanel
             records={pendingRecords}
             closeTo={`/records/${section}`}
-            scopedLabel={scopedSection ? sectionConfig.label : null}
+            scopedLabel={
+              scopedSections
+                ? scopedSections.map((s) => SECTIONS[s]?.label).filter(Boolean).join(" y ")
+                : null
+            }
             onChangeEstado={handleChangeEstado}
             updatingId={updatingId}
           />

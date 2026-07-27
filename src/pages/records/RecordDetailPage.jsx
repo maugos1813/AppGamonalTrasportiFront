@@ -108,7 +108,9 @@ const toFormState = (record) => ({
 const backToSection = (record) =>
   record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE"
     ? "/records/dhl-ab-service"
-    : "/records/extras-piazza";
+    : record.spedizzione === "EXTRAS_STEFANIA"
+      ? "/records/extras-stefania"
+      : "/records/extras-piazza";
 
 const TrashIcon = (props) => (
   <svg
@@ -543,7 +545,11 @@ const RecordEditForm = ({
   onSubmit,
   onCancel,
 }) => {
-  const isExtrasPiazza = record.spedizzione !== "DHL" && record.spedizzione !== "AB_SERVICE";
+  const isDhlAb = record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
+  const isExtrasStefania = record.spedizzione === "EXTRAS_STEFANIA";
+  // Extras Stefania no tiene ni Aplicativo (propio de DHL) ni Zona (propio de Extras
+  // Piazza) - ningun campo especial en este bloque.
+  const isExtrasPiazza = !isDhlAb && !isExtrasStefania;
 
   return (
     <GlassCard>
@@ -593,7 +599,7 @@ const RecordEditForm = ({
                 value={form.vehicleId}
                 onChange={(v) => setField("vehicleId", v)}
               />
-              {!isExtrasPiazza && (
+              {isDhlAb && (
                 <SearchableSelect
                   id="aplicativo"
                   label="Numero de aplicativo"
@@ -655,6 +661,7 @@ const RecordEditForm = ({
           label="Estado"
           placeholder="Escribe para buscar un estado"
           options={RECORD_STATUS_OPTIONS}
+          maxSuggestions={RECORD_STATUS_OPTIONS.length}
           value={form.estado}
           onChange={(v) => setField("estado", v)}
         />

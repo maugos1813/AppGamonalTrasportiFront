@@ -14,7 +14,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
+import { RECORD_STATUS_OPTIONS } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -24,7 +24,6 @@ const INITIAL_FORM = {
   clientId: "",
   driverId: "",
   vehicleId: "",
-  extrasPiazzaZona: "",
   stops: [{ direccion: "", cap: "" }],
   descripcion: "",
   fechaServicio: "",
@@ -42,7 +41,7 @@ const INITIAL_FORM = {
   costoEspera: "",
 };
 
-export const NewRecordPage = () => {
+export const NewExtrasStefaniaRecordPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { refresh: refreshRecords } = useDataRefresh("records");
@@ -81,10 +80,10 @@ export const NewRecordPage = () => {
 
     const trimmedStops = form.stops.map(combineStopAddress).filter(Boolean);
 
-    // Esta pantalla solo se usa hoy para la seccion "Extras Piazza" (DHL/AB Service
-    // todavia no tiene su propia alta), asi que el spedizzione queda fijo aca.
+    // Esta pantalla es la unica alta de la seccion "Extras Stefania", asi que el
+    // spedizzione queda fijo aca (igual que "Extras Piazza" en NewRecordPage.jsx).
     const payload = Object.fromEntries(
-      Object.entries({ ...form, stops: trimmedStops, spedizzione: "EXTRA_PIAZZA" }).filter(
+      Object.entries({ ...form, stops: trimmedStops, spedizzione: "EXTRAS_STEFANIA" }).filter(
         ([key, value]) => key === "stops" || value !== ""
       )
     );
@@ -109,11 +108,11 @@ export const NewRecordPage = () => {
     }
   };
 
-  if (!isPrivileged) return <Navigate to="/records/extras-piazza" replace />;
+  if (!isPrivileged) return <Navigate to="/records/extras-stefania" replace />;
 
   if (loadError) {
     return (
-      <SlideOverPanel closeTo="/records/extras-piazza">
+      <SlideOverPanel closeTo="/records/extras-stefania">
         <Alert>{loadError}</Alert>
       </SlideOverPanel>
     );
@@ -123,7 +122,7 @@ export const NewRecordPage = () => {
 
   if (!loaded) {
     return (
-      <SlideOverPanel closeTo="/records/extras-piazza">
+      <SlideOverPanel closeTo="/records/extras-stefania">
         <PageLoader />
       </SlideOverPanel>
     );
@@ -136,11 +135,11 @@ export const NewRecordPage = () => {
   }));
 
   return (
-    <SlideOverPanel closeTo="/records/extras-piazza">
+    <SlideOverPanel closeTo="/records/extras-stefania">
     <div className="flex flex-col gap-6">
       <div>
         <Link
-          to="/records/extras-piazza"
+          to="/records/extras-stefania"
           className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
         >
           &larr; Mis registros
@@ -148,7 +147,7 @@ export const NewRecordPage = () => {
       </div>
 
       <div>
-        <h1 className="text-[24px] font-semibold text-ink-50">Nuevo servicio</h1>
+        <h1 className="text-[24px] font-semibold text-ink-50">Nuevo servicio - Extras Stefania</h1>
         <p className="mt-1 text-[14px] text-ink-300">Completa los datos para crear un servicio.</p>
       </div>
 
@@ -207,16 +206,6 @@ export const NewRecordPage = () => {
               maxSuggestions={RECORD_STATUS_OPTIONS.length}
               value={form.estado}
               onChange={(v) => setField("estado", v)}
-            />
-
-            <SearchableSelect
-              id="extrasPiazzaZona"
-              label="Zona"
-              placeholder="Escribe para buscar una zona"
-              options={EXTRAS_PIAZZA_ZONA_OPTIONS}
-              value={form.extrasPiazzaZona}
-              onChange={(v) => setField("extrasPiazzaZona", v)}
-              error={fieldErrors.extrasPiazzaZona?.[0]}
             />
 
             <TextField

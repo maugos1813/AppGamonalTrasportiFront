@@ -138,6 +138,7 @@ const ECONOMIC_COST_FIELD_LABELS = {
 };
 
 export const isDhlAbRecord = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
+export const isExtrasStefaniaRecord = (record) => record.spedizzione === "EXTRAS_STEFANIA";
 
 // Tarifa de referencia para estimar lo facturado (rimborso km estandar).
 const DHL_KM_RATE = 0.43;
@@ -325,7 +326,7 @@ export const computeMonthlyKmTrend = (records, now = new Date()) => {
   records.forEach((r) => {
     const date = new Date(r.fechaServicio);
     if (date.getFullYear() !== year) return;
-    buckets[date.getMonth()].km += r.kilometros ?? 0;
+    buckets[date.getMonth()].km += r.kilometros ?? r.kilometrosReales ?? 0;
   });
 
   return buckets;
@@ -412,15 +413,20 @@ export const computeWorkHours = (records, now = new Date()) => {
 const kmMultiplier = (record) =>
   record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE" ? 2 : 1;
 
-// Km reales si el chofer ya los cargo, si no los planificados - asi un servicio
-// recien creado no queda en cero solo porque todavia no se cerro.
-const recordKm = (record) => (record.kilometrosReales ?? record.kilometros ?? 0) * kmMultiplier(record);
+// Km planificados (los que carga admin/owner al crear el servicio) tienen prioridad
+// sobre los reales - reales solo se usa de respaldo para el historico viejo que no
+// tiene planificado cargado.
+const recordKm = (record) => (record.kilometros ?? record.kilometrosReales ?? 0) * kmMultiplier(record);
 
 // Categoria "cruda" (sin el peso x2) por spedizzione, para poder mostrar el
 // desglose en el modal de detalle - un registro sin spedizzione reconocido se
 // trata como Extras Piazza (mismo criterio que kmMultiplier).
 const kmCategory = (record) =>
-  record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE" ? record.spedizzione : "EXTRA_PIAZZA";
+  record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE"
+    ? record.spedizzione
+    : isExtrasStefaniaRecord(record)
+      ? "EXTRAS_STEFANIA"
+      : "EXTRA_PIAZZA";
 
 export const computeDriverKmRanking = (records, period, now = new Date()) => {
   const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
@@ -433,11 +439,11 @@ export const computeDriverKmRanking = (records, period, now = new Date()) => {
       nombre: `${r.driver.nombre} ${r.driver.apellido}`,
       km: 0,
       servicios: 0,
-      breakdown: { EXTRA_PIAZZA: 0, DHL: 0, AB_SERVICE: 0 },
+      breakdown: { EXTRA_PIAZZA: 0, DHL: 0, AB_SERVICE: 0, EXTRAS_STEFANIA: 0 },
     };
     entry.km += recordKm(r);
     entry.servicios += 1;
-    entry.breakdown[kmCategory(r)] += r.kilometrosReales ?? r.kilometros ?? 0;
+    entry.breakdown[kmCategory(r)] += r.kilometros ?? r.kilometrosReales ?? 0;
     totals.set(r.driver.id, entry);
   });
 
@@ -455,11 +461,11 @@ export const computeFleetKmUsage = (records, period, now = new Date()) => {
       nombre: `${r.vehicle.targa}${r.vehicle.modelo ? ` - ${r.vehicle.modelo}` : ""}`,
       km: 0,
       servicios: 0,
-      breakdown: { EXTRA_PIAZZA: 0, DHL: 0, AB_SERVICE: 0 },
+      breakdown: { EXTRA_PIAZZA: 0, DHL: 0, AB_SERVICE: 0, EXTRAS_STEFANIA: 0 },
     };
     entry.km += recordKm(r);
     entry.servicios += 1;
-    entry.breakdown[kmCategory(r)] += r.kilometrosReales ?? r.kilometros ?? 0;
+    entry.breakdown[kmCategory(r)] += r.kilometros ?? r.kilometrosReales ?? 0;
     totals.set(r.vehicle.id, entry);
   });
 
@@ -475,7 +481,9 @@ const SIN_ZONA_KEY = "SIN_ZONA";
 // no se completa en la practica), asi que "Sin zona" va a dominar hasta que se
 // empiece a usar - queda listo para cuando eso pase.
 export const computeExtrasPiazzaZonaBreakdown = (records, period, now = new Date()) => {
-  const scoped = records.filter((r) => !isDhlAbRecord(r) && isWithinPeriod(r.fechaServicio, period, now));
+  const scoped = records.filter(
+    (r) => !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r) && isWithinPeriod(r.fechaServicio, period, now)
+  );
   const totals = new Map();
 
   scoped.forEach((r) => {
@@ -486,7 +494,7 @@ export const computeExtrasPiazzaZonaBreakdown = (records, period, now = new Date
       km: 0,
       servicios: 0,
     };
-    entry.km += r.kilometrosReales ?? r.kilometros ?? 0;
+    entry.km += r.kilometros ?? r.kilometrosReales ?? 0;
     entry.servicios += 1;
     totals.set(key, entry);
   });
@@ -516,7 +524,7 @@ export const computeReperibilidadPiazza = (records, users, vehicles, now = new D
   );
 
   const serviciosPendientes = records
-    .filter((r) => !isDhlAbRecord(r) && EN_PROCESO_STATUSES.includes(r.estado))
+    .filter((r) => !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r) && EN_PROCESO_STATUSES.includes(r.estado))
     .sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
   const marcadoNoDisponibleHoy = (u) => isReperibilidadNoDisponibleHoy(u, now);
