@@ -16,6 +16,10 @@ export const listPendingRecordsRequest = () =>
 export const searchRecordsRequest = (q) =>
   api.get("/records/search", { params: { q } }).then((res) => res.data.data.records);
 
+// Registros cuyo ultimo intento de sincronizar con AppSheet fallo (campanita OWNER/ADMIN).
+export const listAppsheetSyncFailuresRequest = () =>
+  api.get("/records/sync-fallidos").then((res) => res.data.data.records);
+
 // Resumen liviano (id/fechaServicio/estado) de un mes, para armar el acordeon de
 // dias sin traer stops/ruta/economico de cada registro.
 export const listRecordsSummaryByMonthRequest = (year, month) =>

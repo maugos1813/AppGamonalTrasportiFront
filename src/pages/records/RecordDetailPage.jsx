@@ -313,6 +313,13 @@ export const RecordDetailPage = () => {
         </Link>
       </div>
 
+      {record.appsheetSyncFallido && (
+        <div className="rounded-xl border border-status-rischedulato/25 bg-status-rischedulato/5 px-4 py-3 text-[13px] text-status-rischedulato">
+          Este servicio se guardo en la app pero no se pudo sincronizar con AppSheet. Se va a
+          reintentar la proxima vez que se edite, o se puede avisar a soporte para forzarlo antes.
+        </div>
+      )}
+
       {isEditing ? (
         <RecordEditForm
           record={record}

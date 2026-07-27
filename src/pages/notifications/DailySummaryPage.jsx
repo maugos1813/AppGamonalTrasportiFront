@@ -53,6 +53,7 @@ const CATEGORY_RULES = [
   { prefix: "overdue-", label: "Servicios vencidos" },
   { prefix: "maintenance-", label: "Vehiculo en mantenimiento" },
   { prefix: "evidence-", label: "Evidencia faltante" },
+  { prefix: "appsheet-sync-", label: "Sincronizacion con AppSheet" },
 ];
 const OTHER_LABEL = "Otros";
 const CATEGORY_ORDER = [...CATEGORY_RULES.map((r) => r.label), OTHER_LABEL].filter(

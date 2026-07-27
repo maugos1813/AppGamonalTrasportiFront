@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import {
+  computeAppsheetSyncAlerts,
   computeBirthdayAlerts,
   computeCurrentService,
   computeDriverDocumentAlerts,
@@ -13,7 +14,12 @@ import {
 } from "../lib/dashboardStats";
 import { listDocumentsRequest } from "../lib/documents.api";
 import { formatDate } from "../lib/format";
-import { listPendingRecordsRequest, listRecordFilesRequest, listRecordsRequest } from "../lib/records.api";
+import {
+  listAppsheetSyncFailuresRequest,
+  listPendingRecordsRequest,
+  listRecordFilesRequest,
+  listRecordsRequest,
+} from "../lib/records.api";
 import { listUsersRequest } from "../lib/users.api";
 import { getVehicleRequest, listVehiclesRequest } from "../lib/vehicles.api";
 
@@ -89,11 +95,12 @@ const buildChoferAlerts = async () => {
 // tardaran en cargar. computeLocationPermissionAlerts solo necesita saber que chofer
 // esta "en camino" ahora mismo, asi que le alcanza con los pendientes de hoy.
 const buildOwnerAlerts = async () => {
-  const [pendingRecords, users, vehicles, documents] = await Promise.all([
+  const [pendingRecords, users, vehicles, documents, syncFailures] = await Promise.all([
     listPendingRecordsRequest(),
     listUsersRequest(),
     listVehiclesRequest(),
     listDocumentsRequest(),
+    listAppsheetSyncFailuresRequest(),
   ]);
 
   return sortBySeverity([
@@ -102,6 +109,7 @@ const buildOwnerAlerts = async () => {
     ...computeVehicleDocumentAlerts(vehicles),
     ...computeVehicleMaintenanceAlerts(vehicles),
     ...computeBirthdayAlerts(users),
+    ...computeAppsheetSyncAlerts(syncFailures),
   ]);
 };
 

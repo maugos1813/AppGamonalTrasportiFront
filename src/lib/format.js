@@ -19,6 +19,10 @@ export const formatDateLong = (value) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
+// hour12: false fuerza reloj 24h - sin esto, "es-AR" en algunos motores/OS igual
+// devuelve "05:00 p. m." en vez de "17:00", justo la ambiguedad que se quiere evitar
+// (ver tambien toRomeParts/fromRomeParts en el backend para el mismo criterio del
+// lado de la sincronizacion con AppSheet).
 export const formatDateTime = (value) => {
   if (!value) return "-";
   return new Date(value).toLocaleString("es-AR", {
@@ -27,6 +31,7 @@ export const formatDateTime = (value) => {
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 };
 
@@ -35,7 +40,7 @@ export const formatDateTime = (value) => {
 export const addMinutes = (value, minutes) => {
   if (!value || minutes == null) return "-";
   const date = new Date(new Date(value).getTime() + minutes * 60000);
-  return date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
+  return date.toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hour12: false });
 };
 
 // Cuenta regresiva hasta una fecha limite (ej: la ETA de un servicio). Devuelve

@@ -553,6 +553,18 @@ export const computeOverdueServices = (records, now = new Date()) =>
       new Date(r.fechaServicio) < now
   );
 
+// Servicios cuyo ultimo intento de sincronizar con AppSheet (alta o edicion) fallo -
+// ver appsheetSyncFallido en record.service.js (backend). "records" ya viene filtrado
+// del backend (listAppsheetSyncFailuresRequest -> GET /records/sync-fallidos), esto
+// solo arma el shape de alerta para la campanita.
+export const computeAppsheetSyncAlerts = (records) =>
+  records.map((r) => ({
+    id: `appsheet-sync-${r.id}`,
+    severity: "warning",
+    message: `El servicio ${r.codigo} se guardo pero no se pudo sincronizar con AppSheet.`,
+    link: `/records/${r.id}`,
+  }));
+
 // --- Notificaciones OWNER/ADMIN (campanita) ---------------------------------
 
 const MINUTE_MS = 60 * 1000;
