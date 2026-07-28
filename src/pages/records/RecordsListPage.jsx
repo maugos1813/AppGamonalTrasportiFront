@@ -23,6 +23,7 @@ import { scopedRecordsSections } from "../../lib/permissions";
 import {
   listPendingRecordsRequest,
   listRecordsByDayRequest,
+  listRecordsByMonthRequest,
   listRecordsRequest,
   listRecordsSummaryByMonthRequest,
   searchRecordsRequest,
@@ -446,6 +447,14 @@ export const RecordsListPage = ({ section }) => {
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
 
+  // Filtro "Solo sin cobrar": igual que el buscador, reemplaza el acordeon mientras
+  // esta activo, pero acotado al mes que se esta navegando (no todo el historico,
+  // que puede ser miles de registros). Pide el mes completo con detalle economico
+  // (listRecordsByMonthRequest) porque el resumen liviano del acordeon no trae
+  // pagoRecibido.
+  const [showUnpaidOnly, setShowUnpaidOnly] = useState(false);
+  const [unpaidRecords, setUnpaidRecords] = useState(null);
+
   // Fuerza un re-render cada minuto para que "tiempo restante antes de vencer" no quede desactualizado.
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -557,6 +566,27 @@ export const RecordsListPage = ({ section }) => {
     };
   }, [isPrivileged, viewDate.year, viewDate.month, version]);
 
+  useEffect(() => {
+    if (!isPrivileged || !showUnpaidOnly) {
+      setUnpaidRecords(null);
+      return;
+    }
+    let cancelled = false;
+    setUnpaidRecords(null);
+
+    listRecordsByMonthRequest(viewDate.year, viewDate.month)
+      .then((data) => {
+        if (!cancelled) setUnpaidRecords(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(parseApiError(err).message);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isPrivileged, showUnpaidOnly, viewDate.year, viewDate.month, version]);
+
   const fetchDay = (day) => {
     setLoadingDays((prev) => new Set(prev).add(day.key));
     const d = new Date(day.date);
@@ -611,6 +641,9 @@ export const RecordsListPage = ({ section }) => {
   const summaryDays = summary
     ? groupSummaryByDay(summary.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione)))
     : null;
+  const unpaidVisibleRecords = unpaidRecords
+    ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && r.pagoRecibido == null)
+    .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
   // Total de KM del mes, Extras Piazza vs DHL/AB Service vs Extras Stefania - de todo
   // el mes (no solo la seccion que se esta mirando), para tener una idea general del
@@ -711,13 +744,24 @@ export const RecordsListPage = ({ section }) => {
       )}
 
       {isPrivileged && (
-        <TextField
-          id="records-search"
-          placeholder="Buscar por codigo, cliente o chofer..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="sm:max-w-sm"
-        />
+        <div className="flex flex-wrap items-center gap-3">
+          <TextField
+            id="records-search"
+            placeholder="Buscar por codigo, cliente o chofer..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="sm:max-w-sm"
+          />
+          <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ink-300">
+            <input
+              type="checkbox"
+              checked={showUnpaidOnly}
+              onChange={(e) => setShowUnpaidOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-line/20 bg-transparent accent-accent-500"
+            />
+            Solo sin cobrar
+          </label>
+        </div>
       )}
 
       <Alert>{error}</Alert>
@@ -791,6 +835,29 @@ export const RecordsListPage = ({ section }) => {
                       <CompactRowHeader />
                       <div className="flex flex-col gap-0.5 px-2">
                         {searchResults.map((record) => (
+                          <RecordRow key={record.id} record={record} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : showUnpaidOnly ? (
+              <div className="border-t border-line/10 px-2 pb-4 pt-3">
+                {unpaidVisibleRecords === undefined ? (
+                  <div className="flex justify-center py-8">
+                    <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+                  </div>
+                ) : unpaidVisibleRecords.length === 0 ? (
+                  <p className="py-4 text-center text-[14px] text-ink-300">
+                    Ningun servicio de {sectionConfig.label} sin cobrar este mes.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[720px]">
+                      <CompactRowHeader />
+                      <div className="flex flex-col gap-0.5 px-2">
+                        {unpaidVisibleRecords.map((record) => (
                           <RecordRow key={record.id} record={record} />
                         ))}
                       </div>
