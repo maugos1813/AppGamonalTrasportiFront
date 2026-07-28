@@ -94,9 +94,15 @@ export const MapPage = () => {
   // Instancia nativa de la linea de ruta dibujada a mano (ver el useEffect mas abajo),
   // para poder borrarla explicitamente antes de dibujar la siguiente.
   const polylineRef = useRef(null);
+  // Segunda linea, independiente de la de arriba: el recorrido GPS real superpuesto a
+  // la ruta planificada de un servicio de Pendientes (ver showRutaReal mas abajo) -
+  // ref propio para poder mostrar las dos rutas a la vez sin que se pisen entre si.
+  const overlayPolylineRef = useRef(null);
   const [openInfoId, setOpenInfoId] = useState(null);
   const [showAreaC, setShowAreaC] = useState(true);
   const [showAreaB, setShowAreaB] = useState(true);
+  const [showRutaReal, setShowRutaReal] = useState(false);
+  const [overlayGpsPoints, setOverlayGpsPoints] = useState(null);
   const [section, setSection] = useState("pendientes");
 
   const [locations, setLocations] = useState(null);
@@ -203,8 +209,27 @@ export const MapPage = () => {
     };
   }, [section, rutaChoferId, rutaChoferDate]);
 
+  // Solo ayer/hoy/manana (hora local de quien mira el mapa) - "records" trae todo el
+  // historico sin acotar por fecha, y un servicio viejo que quedo pendiente sin
+  // cerrarse (o uno cargado para dentro de varios dias) no tiene que ensuciar esta
+  // lista, pensada para lo que hay que resolver ahora.
+  const pendingDayKeys = useMemo(() => {
+    const today = new Date();
+    return new Set(
+      [-1, 0, 1].map((offset) => {
+        const d = new Date(today);
+        d.setDate(d.getDate() + offset);
+        return toLocalDateInputValue(d);
+      })
+    );
+  }, []);
+
   const pendingRecords = (records ?? [])
-    .filter((r) => EN_PROCESO_STATUSES.includes(r.estado))
+    .filter(
+      (r) =>
+        EN_PROCESO_STATUSES.includes(r.estado) &&
+        pendingDayKeys.has(toLocalDateInputValue(new Date(r.fechaServicio)))
+    )
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
   // Vista "Choferes": una fila por chofer (no por servicio - un chofer con varias
@@ -327,6 +352,34 @@ export const MapPage = () => {
     };
   }, [selectedRecordId]);
 
+  // Recorrido real (GPS) superpuesto al planificado, solo si el checkbox esta activo -
+  // se pide para el chofer y el dia (fechaServicio) del servicio seleccionado, mismo
+  // endpoint que ya usa "Ruta chofer" (findLocationPingsByDriverAndRange en el backend).
+  // Se apaga (null) al destildar el checkbox, deseleccionar el servicio, o cambiar de
+  // seccion - asi no queda una linea vieja dibujada de un servicio que ya no se mira.
+  useEffect(() => {
+    if (!showRutaReal || section !== "pendientes" || !selectedRecordDetail) {
+      setOverlayGpsPoints(null);
+      return;
+    }
+
+    let cancelled = false;
+    setOverlayGpsPoints(null);
+    const fecha = toLocalDateInputValue(new Date(selectedRecordDetail.fechaServicio));
+    const [year, month, day] = fecha.split("-").map(Number);
+    getDriverRouteHistoryRequest(selectedRecordDetail.driver.id, year, month, day)
+      .then((data) => {
+        if (!cancelled) setOverlayGpsPoints(data);
+      })
+      .catch(() => {
+        if (!cancelled) setOverlayGpsPoints([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showRutaReal, section, selectedRecordDetail]);
+
   // Solo "Pendientes" selecciona un registro (ver mas abajo): ETA en vivo si el chofer
   // ya esta en camino, si no el planificado como fallback mientras todavia no sale.
   const selectedRouteGeometry = selectedLiveEta?.geometria ?? selectedRecordDetail?.ruta?.geometria;
@@ -334,7 +387,10 @@ export const MapPage = () => {
     () => selectedRouteGeometry?.coordinates?.map(([lng, lat]) => ({ lat, lng })),
     [selectedRouteGeometry]
   );
-  const selectedDestination = selectedRecordDetail?.stops?.[selectedRecordDetail.stops.length - 1];
+  // Paradas del servicio seleccionado, ya en orden (ver RECORD_RELATIONS_SELECT en el
+  // backend, orderBy orden asc) - se muestran todas con su letra (A, B, C...), no solo
+  // la ultima, para poder seguir el recorrido parada por parada en el mapa.
+  const selectedStops = selectedRecordDetail?.stops ?? [];
 
   // "Ruta chofer": los puntos GPS guardados ese dia, tal cual (no es una ruta
   // calculada/ruteada como la de un servicio, es el historial real punto a punto).
@@ -348,6 +404,14 @@ export const MapPage = () => {
   const activeRoutePositions = section === "ruta-chofer" ? rutaChoferPositions : selectedRoutePositions;
   const activeRouteColor =
     section === "ruta-chofer" ? HISTORY_ROUTE_COLOR : selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR;
+
+  // Recorrido real (GPS) del servicio de Pendientes seleccionado, superpuesto a
+  // activeRoutePositions (la ruta planificada/en vivo) - segunda linea independiente,
+  // ver overlayPolylineRef mas abajo.
+  const overlayGpsPositions = useMemo(
+    () => (showRutaReal ? overlayGpsPoints?.map((p) => ({ lat: p.lat, lng: p.lng })) : null),
+    [showRutaReal, overlayGpsPoints]
+  );
 
   // Dibuja la ruta activa a mano (sin el componente <Polyline>): asi se controla
   // directo la instancia nativa de Google Maps y se garantiza que nunca haya 2 lineas
@@ -379,17 +443,44 @@ export const MapPage = () => {
     };
   }, [map, activeRoutePositions, activeRouteColor]);
 
-  // Centra y ajusta el zoom del mapa para que la ruta activa quede completamente
-  // visible. Solo se reajusta cuando cambia la seleccion (o el chofer/dia elegido en
-  // "Ruta chofer"), no en cada refresco de datos, para no pelearse con el pan/zoom
-  // manual del usuario mientras mira el mapa.
+  // Segunda linea, en paralelo a la de arriba y sin tocarla: el recorrido GPS real
+  // (overlayGpsPositions) al lado de la ruta planificada/en vivo, cuando "Recorrido
+  // real (GPS)" esta activo. Mismo criterio de "borrar antes de redibujar".
   useEffect(() => {
-    if (!map || !activeRoutePositions?.length) return;
+    if (!map) return;
+
+    if (overlayPolylineRef.current) {
+      overlayPolylineRef.current.setMap(null);
+      overlayPolylineRef.current = null;
+    }
+
+    if (!overlayGpsPositions?.length) return;
+
+    overlayPolylineRef.current = new window.google.maps.Polyline({
+      path: overlayGpsPositions,
+      strokeColor: HISTORY_ROUTE_COLOR,
+      strokeWeight: 4,
+      map,
+    });
+
+    return () => {
+      overlayPolylineRef.current?.setMap(null);
+      overlayPolylineRef.current = null;
+    };
+  }, [map, overlayGpsPositions]);
+
+  // Centra y ajusta el zoom del mapa para que la ruta activa (y el recorrido real
+  // superpuesto, si esta activo) queden completamente visibles. Solo se reajusta al
+  // cambiar de seleccion (o al cargar el overlay), no en cada refresco de datos, para
+  // no pelearse con el pan/zoom manual del usuario mientras mira el mapa.
+  useEffect(() => {
+    if (!map || (!activeRoutePositions?.length && !overlayGpsPositions?.length)) return;
     const bounds = new window.google.maps.LatLngBounds();
-    activeRoutePositions.forEach((point) => bounds.extend(point));
+    activeRoutePositions?.forEach((point) => bounds.extend(point));
+    overlayGpsPositions?.forEach((point) => bounds.extend(point));
     map.fitBounds(bounds, 40);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, selectedRecordId, rutaChoferId, rutaChoferDate]);
+  }, [map, selectedRecordId, rutaChoferId, rutaChoferDate, overlayGpsPositions]);
 
   if (!isPrivileged) return <Navigate to="/" replace />;
 
@@ -645,6 +736,21 @@ export const MapPage = () => {
                 <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AREA_B_COLOR }} />
                 Area B
               </label>
+              {section === "pendientes" && selectedRecordId && (
+                <label className="flex cursor-pointer items-center gap-2 border-t border-line/10 pt-1.5">
+                  <input
+                    type="checkbox"
+                    checked={showRutaReal}
+                    onChange={(e) => setShowRutaReal(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-[#a855f7]"
+                  />
+                  <span
+                    className="inline-block h-2.5 w-2.5 rounded-sm"
+                    style={{ backgroundColor: HISTORY_ROUTE_COLOR }}
+                  />
+                  Recorrido real (GPS)
+                </label>
+              )}
               {showsDriverLocations && (
                 <div className="flex items-center gap-2 border-t border-line/10 pt-1.5">
                   <span
@@ -771,26 +877,35 @@ export const MapPage = () => {
                   );
                 })}
 
-                {selectedDestination?.lat != null && selectedDestination?.lng != null && (
-                  <Marker
-                    position={{ lat: selectedDestination.lat, lng: selectedDestination.lng }}
-                    onClick={() => setOpenInfoId("destination")}
-                    icon={{
-                      path: window.google.maps.SymbolPath.CIRCLE,
-                      scale: 8,
-                      fillColor: DESTINATION_COLOR,
-                      fillOpacity: 0.8,
-                      strokeColor: DESTINATION_COLOR,
-                      strokeWeight: 1,
-                    }}
-                  >
-                    {openInfoId === "destination" && (
-                      <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
-                        <div className="text-[13px]">Destino: {selectedDestination.direccion}</div>
-                      </InfoWindow>
-                    )}
-                  </Marker>
-                )}
+                {selectedStops.map((stop, i) => {
+                  if (stop.lat == null || stop.lng == null) return null;
+                  const markerId = `stop-${i}`;
+                  const letter = String.fromCharCode(65 + i);
+                  return (
+                    <Marker
+                      key={markerId}
+                      position={{ lat: stop.lat, lng: stop.lng }}
+                      onClick={() => setOpenInfoId(markerId)}
+                      label={{ text: letter, color: "#ffffff", fontWeight: "700", fontSize: "12px" }}
+                      icon={{
+                        path: window.google.maps.SymbolPath.CIRCLE,
+                        scale: 10,
+                        fillColor: DESTINATION_COLOR,
+                        fillOpacity: 0.9,
+                        strokeColor: DESTINATION_COLOR,
+                        strokeWeight: 1,
+                      }}
+                    >
+                      {openInfoId === markerId && (
+                        <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
+                          <div className="text-[13px]">
+                            Parada {letter}: {stop.direccion}
+                          </div>
+                        </InfoWindow>
+                      )}
+                    </Marker>
+                  );
+                })}
 
                 {rutaChoferPositions?.length > 0 && (
                   <>
