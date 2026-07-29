@@ -1,17 +1,14 @@
 import clsx from "clsx";
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
-import { ClientDistributionChart } from "../../components/charts/ClientDistributionChart";
-import { EconomicsChart } from "../../components/charts/EconomicsChart";
-import { KmTrendChart } from "../../components/charts/KmTrendChart";
-import { RevenueTrendChart } from "../../components/charts/RevenueTrendChart";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { PageLoader } from "../../components/ui/PageLoader";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
+import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { CHART_COLORS } from "../../lib/constants";
@@ -26,6 +23,21 @@ import {
 import { formatCurrency, formatCurrencyCompact } from "../../lib/format";
 import { scopedDashboardSections } from "../../lib/permissions";
 import { listRecordsRequest } from "../../lib/records.api";
+
+// Lazy: los 4 graficos (y recharts, la libreria detras) se descargan y ejecutan en
+// paralelo en vez de bloquear el primer pintado de la pagina (titulo + anillos de
+// Control economico, arriba de todo esto en el JSX) - sin esto el navegador tenia que
+// terminar de parsear recharts antes de mostrar cualquier cosa.
+const ClientDistributionChart = lazy(() => import("../../components/charts/ClientDistributionChart"));
+const EconomicsChart = lazy(() => import("../../components/charts/EconomicsChart"));
+const KmTrendChart = lazy(() => import("../../components/charts/KmTrendChart"));
+const RevenueTrendChart = lazy(() => import("../../components/charts/RevenueTrendChart"));
+
+const ChartFallback = () => (
+  <div className="flex h-full items-center justify-center">
+    <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+  </div>
+);
 
 const PERIOD_OPTIONS = [
   { value: "hoy", label: "Hoy" },
@@ -316,7 +328,9 @@ export const OwnerDashboardPage = () => {
             Tendencia {new Date().getFullYear()}
           </h3>
           <div className="mt-3 h-[240px]">
-            <RevenueTrendChart data={monthlyTrend} />
+            <Suspense fallback={<ChartFallback />}>
+              <RevenueTrendChart data={monthlyTrend} />
+            </Suspense>
           </div>
         </GlassCard>
 
@@ -328,7 +342,9 @@ export const OwnerDashboardPage = () => {
             Kilometros {new Date().getFullYear()}
           </h3>
           <div className="mt-3 h-[240px]">
-            <KmTrendChart data={monthlyKmTrend} />
+            <Suspense fallback={<ChartFallback />}>
+              <KmTrendChart data={monthlyKmTrend} />
+            </Suspense>
           </div>
         </GlassCard>
 
@@ -339,11 +355,13 @@ export const OwnerDashboardPage = () => {
                 Facturacion vs costos
               </h3>
               <div className="h-[220px]">
-                <EconomicsChart
-                  facturacion={economicStats.facturacion}
-                  costos={economicStats.costos}
-                  ganancia={economicStats.ganancia}
-                />
+                <Suspense fallback={<ChartFallback />}>
+                  <EconomicsChart
+                    facturacion={economicStats.facturacion}
+                    costos={economicStats.costos}
+                    ganancia={economicStats.ganancia}
+                  />
+                </Suspense>
               </div>
             </div>
             <div>
@@ -351,7 +369,9 @@ export const OwnerDashboardPage = () => {
                 Distribucion por cliente
               </h3>
               <div className="h-[220px]">
-                <ClientDistributionChart data={clientDistribution} />
+                <Suspense fallback={<ChartFallback />}>
+                  <ClientDistributionChart data={clientDistribution} />
+                </Suspense>
               </div>
             </div>
           </div>

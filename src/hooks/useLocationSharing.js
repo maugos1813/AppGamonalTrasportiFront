@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { cancelIdle, scheduleIdle } from "../lib/idle";
 import { reportLocationPermissionRequest, updateMyLocationRequest } from "../lib/users.api";
 
 // Solo existe implementacion nativa (Android/iOS); en el navegador normal no se usa.
@@ -131,11 +132,16 @@ export const useLocationSharing = () => {
       }
     };
 
-    tick();
+    // Primer tick diferido a cuando el navegador este libre: reporta ubicacion via
+    // geolocation/API y compite por conexion/CPU con lo que si bloquea el primer
+    // pintado (los datos propios del Dashboard del chofer) - no hace falta que sea
+    // lo primero en salir.
+    const idleId = scheduleIdle(tick);
     const intervalId = setInterval(tick, CHECK_INTERVAL_MS);
 
     return () => {
       cancelled = true;
+      cancelIdle(idleId);
       clearInterval(intervalId);
       stopNativeTracking();
     };

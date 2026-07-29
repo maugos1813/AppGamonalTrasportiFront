@@ -40,3 +40,4 @@ export const ClientDistributionChart = ({ data }) => {
     </div>
   );
 };
+export default ClientDistributionChart;

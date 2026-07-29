@@ -48,3 +48,4 @@ export const RevenueTrendChart = ({ data }) => {
     </ResponsiveContainer>
   );
 };
+export default RevenueTrendChart;

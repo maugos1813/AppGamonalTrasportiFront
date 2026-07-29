@@ -41,3 +41,4 @@ export const KmTrendChart = ({ data }) => {
     </ResponsiveContainer>
   );
 };
+export default KmTrendChart;

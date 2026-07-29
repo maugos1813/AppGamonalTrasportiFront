@@ -42,3 +42,4 @@ export const EconomicsChart = ({ facturacion, costos, ganancia }) => {
     </ResponsiveContainer>
   );
 };
+export default EconomicsChart;

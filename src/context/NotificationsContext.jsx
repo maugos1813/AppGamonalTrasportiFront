@@ -14,6 +14,7 @@ import {
 } from "../lib/dashboardStats";
 import { listDocumentsRequest } from "../lib/documents.api";
 import { formatDate } from "../lib/format";
+import { cancelIdle, scheduleIdle } from "../lib/idle";
 import {
   listAppsheetSyncFailuresRequest,
   listPendingRecordsRequest,
@@ -153,11 +154,12 @@ export const NotificationsProvider = ({ children }) => {
         });
     };
 
-    run();
+    const idleId = scheduleIdle(run);
     const intervalId = isPrivileged ? setInterval(run, OWNER_REFRESH_MS) : null;
 
     return () => {
       cancelled = true;
+      cancelIdle(idleId);
       if (intervalId) clearInterval(intervalId);
     };
   }, [isChofer, isPrivileged, pathname]);
