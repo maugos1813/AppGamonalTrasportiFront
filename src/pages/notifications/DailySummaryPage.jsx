@@ -99,6 +99,42 @@ const driverName = (record) =>
 
 const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
 
+// Bloque de texto de una zona para el "Copiar como texto" de Reperibilita - junta
+// servicios/choferes/vehiculos de esa zona seguidos, en vez de 3 listas separadas que
+// mezclan Milano y Roma (ver handleCopyReperibilidad).
+const buildZoneBlock = (label, servicios, choferesDisp, vehiculosDisp) => {
+  const lines = [`=== ${label} ===`, "", `Servicios pendientes (${servicios.length}):`];
+  if (servicios.length === 0) lines.push("- Ninguno");
+  servicios.forEach((r) => {
+    const partes = [
+      r.codigo,
+      driverName(r),
+      r.vehicle?.targa ?? "Sin vehiculo",
+      r.client?.nombre ?? "Sin cliente",
+      r.destinazione,
+      RECORD_STATUS_LABELS[r.estado] ?? r.estado,
+      `ETA ${formatDateTime(r.eta)}`,
+    ];
+    if (r.comentarios) partes.push(r.comentarios);
+    lines.push(`- ${partes.join(" | ")}`);
+  });
+
+  lines.push("", `Choferes disponibles esta noche (${choferesDisp.length}):`);
+  if (choferesDisp.length === 0) lines.push("- Ninguno");
+  choferesDisp.forEach((u) => {
+    const vehiculo = u.vehiculoAsignado
+      ? `${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` - ${u.vehiculoAsignado.modelo}` : ""}`
+      : "sin vehiculo asignado";
+    lines.push(`- ${u.nombre} ${u.apellido} (${vehiculo})`);
+  });
+
+  lines.push("", `Vehiculos disponibles (${vehiculosDisp.length}):`);
+  if (vehiculosDisp.length === 0) lines.push("- Ninguno");
+  vehiculosDisp.forEach((v) => lines.push(`- ${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`));
+
+  return lines;
+};
+
 // Ranking de choferes o vehiculos por KM esta semana (computeDriverKmRanking /
 // computeFleetKmUsage), mas quien de la lista activa no aparece en el ranking - no
 // tuvo ningun servicio esta semana.
@@ -131,6 +167,150 @@ const RankingCard = ({ title, subtitle, entries, emptyLabel, inactiveLabel, inac
         <p className="text-[12px] font-medium text-status-rischedulato">{inactiveLabel}</p>
         <p className="mt-1 text-[12px] text-ink-300">{inactiveNames.join(", ")}</p>
       </div>
+    )}
+  </GlassCard>
+);
+
+// Tabla de "Servicios pendientes" (Reperibilita > Extras Piazza) - se reusa tal cual
+// para el desglose por zona (Milano/Roma) que se agrega debajo del listado general,
+// asi no se duplica el markup de la tabla 3 veces.
+const PendingServicesCard = ({ title, subtitle, items, emptyLabel }) => (
+  <GlassCard>
+    <h2 className="text-[15px] font-semibold text-ink-50">{title}</h2>
+    <p className="mt-1 text-[12px] text-ink-400">{subtitle}</p>
+
+    {items.length === 0 ? (
+      <p className="mt-3 text-[13px] text-ink-300">{emptyLabel}</p>
+    ) : (
+      <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[760px] border-collapse text-[13px]">
+          <thead>
+            <tr className="text-left text-[11px] uppercase tracking-wide text-ink-500">
+              <th className="pb-2 pr-3 font-medium">Chofer</th>
+              <th className="pb-2 pr-3 font-medium">Vehiculo</th>
+              <th className="pb-2 pr-3 font-medium">Cliente</th>
+              <th className="pb-2 pr-3 font-medium">Lugar</th>
+              <th className="pb-2 pr-3 font-medium">Estado</th>
+              <th className="pb-2 pr-3 font-medium">ETA</th>
+              <th className="pb-2 font-medium">Comentarios</th>
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((r) => (
+              <tr key={r.id} className="border-t border-line/10">
+                <td className="py-2 pr-3">
+                  <Link to={`/records/${r.id}`} className="text-ink-50 hover:underline">
+                    {driverName(r)}
+                  </Link>
+                </td>
+                <td className="py-2 pr-3 text-ink-300">{r.vehicle?.targa ?? "-"}</td>
+                <td className="py-2 pr-3 text-ink-300">{r.client?.nombre ?? "-"}</td>
+                <td className="py-2 pr-3 text-ink-300">{r.destinazione}</td>
+                <td className="py-2 pr-3">
+                  <StatusBadge status={r.estado} className="px-2 py-0.5 text-[11px]" />
+                </td>
+                <td className="py-2 pr-3 text-ink-300">{formatDateTime(r.eta)}</td>
+                <td className="py-2 text-ink-300">{r.comentarios || "-"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </GlassCard>
+);
+
+// Tabla de "Choferes disponibles esta noche" - se reusa para el desglose por zona
+// (Milano/Roma) igual que PendingServicesCard arriba, mismo motivo (no duplicar el
+// markup 3 veces).
+const AvailableDriversCard = ({
+  title,
+  subtitle,
+  drivers,
+  emptyLabel,
+  vehicleOptions,
+  savingDriverField,
+  driverFieldErrors,
+  servicioActualPorChofer,
+  onChangeDisponible,
+  onChangeVehiculo,
+}) => (
+  <GlassCard>
+    <h2 className="text-[15px] font-semibold text-ink-50">{title}</h2>
+    <p className="mt-1 text-[12px] text-ink-400">{subtitle}</p>
+
+    {drivers.length === 0 ? (
+      <p className="mt-3 text-[13px] text-ink-300">{emptyLabel}</p>
+    ) : (
+      <div className="mt-3 flex flex-col gap-2">
+        <div className="flex items-center gap-3 px-3 text-[11px] uppercase tracking-wide text-ink-500">
+          <span className="min-w-0 flex-1">Chofer</span>
+          <span className="w-20 shrink-0">Disponible</span>
+          <span className="w-52 shrink-0">Vehiculo</span>
+        </div>
+        {drivers.map((u) => {
+          const disponible = !isReperibilidadNoDisponibleHoy(u);
+          const servicioActual = servicioActualPorChofer[u.id];
+          return (
+            <div key={u.id} className="flex flex-col gap-1">
+              <div className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2">
+                <span className="min-w-0 flex-1 truncate text-[13px] text-ink-50">
+                  {u.nombre} {u.apellido}
+                </span>
+                <Select
+                  id={`disponible-${u.id}`}
+                  className="w-20 px-2.5 py-1.5 pr-7 text-[12px]"
+                  options={DISPONIBLE_OPTIONS}
+                  value={disponible ? "SI" : "NO"}
+                  disabled={Boolean(savingDriverField[`${u.id}:reperibilidadNoDisponible`])}
+                  onChange={(e) => onChangeDisponible(u.id)(e.target.value)}
+                />
+                <Select
+                  id={`vehiculo-${u.id}`}
+                  className="w-52 px-2.5 py-1.5 pr-7 text-[12px]"
+                  options={vehicleOptions}
+                  value={u.vehiculoAsignadoId ?? ""}
+                  disabled={Boolean(savingDriverField[`${u.id}:vehiculoAsignadoId`])}
+                  onChange={(e) => onChangeVehiculo(u.id)(e.target.value)}
+                />
+              </div>
+              {servicioActual && (
+                <Link
+                  to={`/records/${servicioActual.id}`}
+                  className="px-3 text-[12px] text-ink-400 hover:text-ink-200 hover:underline"
+                >
+                  {RECORD_STATUS_LABELS[servicioActual.estado] ?? servicioActual.estado} a{" "}
+                  {servicioActual.destinazione} &middot; ETA {formatDateTime(servicioActual.eta)}
+                </Link>
+              )}
+              {driverFieldErrors[u.id] && (
+                <span className="px-3 text-[12px] text-danger-500">{driverFieldErrors[u.id]}</span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </GlassCard>
+);
+
+// Lista de "Vehiculos disponibles" - se reusa para el desglose por zona (Milano/Roma),
+// mismo motivo que PendingServicesCard/AvailableDriversCard arriba.
+const AvailableVehiclesCard = ({ title, subtitle, vehicles, emptyLabel }) => (
+  <GlassCard>
+    <h2 className="text-[15px] font-semibold text-ink-50">{title}</h2>
+    <p className="mt-1 text-[12px] text-ink-400">{subtitle}</p>
+    {vehicles.length === 0 ? (
+      <p className="mt-3 text-[13px] text-ink-300">{emptyLabel}</p>
+    ) : (
+      <ul className="mt-3 flex flex-col gap-1.5">
+        {vehicles.map((v) => (
+          <li key={v.id} className="rounded-xl glass-surface-sm px-3 py-2 text-[13px] text-ink-50">
+            {v.targa}
+            {v.modelo ? ` - ${v.modelo}` : ""}
+          </li>
+        ))}
+      </ul>
     )}
   </GlassCard>
 );
@@ -236,6 +416,41 @@ export const DailySummaryPage = () => {
     () => (records && drivers && vehicles ? computeReperibilidadPiazza(records, drivers, vehicles) : null),
     [records, drivers, vehicles]
   );
+  // Servicios pendientes separados por zona (Milano/Roma), en vez de un solo listado
+  // general - reemplaza la tabla unica de antes (mostrar ambas duplicaba cada fila).
+  // SIN_ZONA junta los que todavia no tienen ZONA cargada, para no perderlos de vista.
+  const pendientesPorZona = useMemo(() => {
+    const groups = { MILANO: [], ROMA: [], SIN_ZONA: [] };
+    reperibilidad?.serviciosPendientes.forEach((r) => {
+      const key = r.extrasPiazzaZona === "MILANO" || r.extrasPiazzaZona === "ROMA" ? r.extrasPiazzaZona : "SIN_ZONA";
+      groups[key].push(r);
+    });
+    return groups;
+  }, [reperibilidad]);
+  // Choferes disponibles esta noche, separados por zona igual que arriba - no hay un
+  // campo "zona" propio del chofer, se usa "grupo" (sucursal) como proxy: MILANO_NORD/
+  // MILANO_SUD -> Milano, ROMA -> Roma. El resto (SOCIEDAD, FARMACIA, sin grupo
+  // cargado) cae en SIN_GRUPO para no perderlos de vista.
+  const choferesPiazzaPorZona = useMemo(() => {
+    const groups = { MILANO: [], ROMA: [], SIN_GRUPO: [] };
+    reperibilidad?.choferesPiazza.forEach((u) => {
+      const key =
+        u.grupo === "MILANO_NORD" || u.grupo === "MILANO_SUD" ? "MILANO" : u.grupo === "ROMA" ? "ROMA" : "SIN_GRUPO";
+      groups[key].push(u);
+    });
+    return groups;
+  }, [reperibilidad]);
+  // Vehiculos disponibles, separados por zona con el mismo criterio de grupo que los
+  // choferes de arriba (Vehiculo tambien tiene "grupo", ver schema.prisma).
+  const vehiculosDisponiblesPorZona = useMemo(() => {
+    const groups = { MILANO: [], ROMA: [], SIN_GRUPO: [] };
+    reperibilidad?.vehiculosDisponibles.forEach((v) => {
+      const key =
+        v.grupo === "MILANO_NORD" || v.grupo === "MILANO_SUD" ? "MILANO" : v.grupo === "ROMA" ? "ROMA" : "SIN_GRUPO";
+      groups[key].push(v);
+    });
+    return groups;
+  }, [reperibilidad]);
   // Edicion en linea de la tabla de choferes (Si/No + vehiculo asignado): guarda por
   // chofer, no bloquea el resto de la fila mientras una de las dos guarda. drivers
   // se actualiza en el propio array cargado (no se vuelve a pedir la lista completa),
@@ -320,38 +535,39 @@ export const DailySummaryPage = () => {
   const [copyFeedback, setCopyFeedback] = useState("");
   const handleCopyReperibilidad = () => {
     if (!reperibilidad) return;
+
+    // Mismo filtro de "disponible" que reperibilidad.choferesDisponibles, aplicado
+    // sobre el desglose por zona en vez del listado plano.
+    const choferesDispPorZona = {
+      MILANO: choferesPiazzaPorZona.MILANO.filter((u) => !isReperibilidadNoDisponibleHoy(u)),
+      ROMA: choferesPiazzaPorZona.ROMA.filter((u) => !isReperibilidadNoDisponibleHoy(u)),
+      SIN_GRUPO: choferesPiazzaPorZona.SIN_GRUPO.filter((u) => !isReperibilidadNoDisponibleHoy(u)),
+    };
+
     const lines = [`Reperibilita Extras Piazza - ${todayLabel()}`, ""];
-
-    lines.push(`Servicios pendientes (${reperibilidad.serviciosPendientes.length}):`);
-    if (reperibilidad.serviciosPendientes.length === 0) lines.push("- Ninguno");
-    reperibilidad.serviciosPendientes.forEach((r) => {
-      const partes = [
-        r.codigo,
-        driverName(r),
-        r.vehicle?.targa ?? "Sin vehiculo",
-        r.client?.nombre ?? "Sin cliente",
-        r.destinazione,
-        RECORD_STATUS_LABELS[r.estado] ?? r.estado,
-        `ETA ${formatDateTime(r.eta)}`,
-      ];
-      if (r.comentarios) partes.push(r.comentarios);
-      lines.push(`- ${partes.join(" | ")}`);
-    });
-
-    lines.push("", `Choferes disponibles esta noche (${reperibilidad.choferesDisponibles.length}):`);
-    if (reperibilidad.choferesDisponibles.length === 0) lines.push("- Ninguno");
-    reperibilidad.choferesDisponibles.forEach((u) => {
-      const vehiculo = u.vehiculoAsignado
-        ? `${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` - ${u.vehiculoAsignado.modelo}` : ""}`
-        : "sin vehiculo asignado";
-      lines.push(`- ${u.nombre} ${u.apellido} (${vehiculo})`);
-    });
-
-    lines.push("", `Vehiculos disponibles (${reperibilidad.vehiculosDisponibles.length}):`);
-    if (reperibilidad.vehiculosDisponibles.length === 0) lines.push("- Ninguno");
-    reperibilidad.vehiculosDisponibles.forEach((v) =>
-      lines.push(`- ${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`)
+    lines.push(
+      ...buildZoneBlock("MILANO", pendientesPorZona.MILANO, choferesDispPorZona.MILANO, vehiculosDisponiblesPorZona.MILANO)
     );
+    lines.push(
+      "",
+      ...buildZoneBlock("ROMA", pendientesPorZona.ROMA, choferesDispPorZona.ROMA, vehiculosDisponiblesPorZona.ROMA)
+    );
+
+    const haySinGrupo =
+      pendientesPorZona.SIN_ZONA.length > 0 ||
+      choferesDispPorZona.SIN_GRUPO.length > 0 ||
+      vehiculosDisponiblesPorZona.SIN_GRUPO.length > 0;
+    if (haySinGrupo) {
+      lines.push(
+        "",
+        ...buildZoneBlock(
+          "SIN ZONA/GRUPO",
+          pendientesPorZona.SIN_ZONA,
+          choferesDispPorZona.SIN_GRUPO,
+          vehiculosDisponiblesPorZona.SIN_GRUPO
+        )
+      );
+    }
 
     lines.push("", `Proximos servicios (${reperibilidad.choferesConServicioFuturo.length}):`);
     if (reperibilidad.choferesConServicioFuturo.length === 0) lines.push("- Ninguno");
@@ -726,114 +942,69 @@ export const DailySummaryPage = () => {
                 </div>
               </div>
 
-              <GlassCard>
-                <h2 className="text-[15px] font-semibold text-ink-50">Servicios pendientes</h2>
-                <p className="mt-1 text-[12px] text-ink-400">
-                  Extras Piazza que todavia hay que completar hoy.
-                </p>
+              <PendingServicesCard
+                title="Servicios pendientes · Milano"
+                subtitle="Extras Piazza de zona Milano que todavia hay que completar hoy."
+                items={pendientesPorZona.MILANO}
+                emptyLabel="No hay servicios pendientes en Milano."
+              />
 
-                {reperibilidad.serviciosPendientes.length === 0 ? (
-                  <p className="mt-3 text-[13px] text-ink-300">
-                    No hay servicios pendientes de Extras Piazza.
-                  </p>
-                ) : (
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full min-w-[760px] border-collapse text-[13px]">
-                      <thead>
-                        <tr className="text-left text-[11px] uppercase tracking-wide text-ink-500">
-                          <th className="pb-2 pr-3 font-medium">Chofer</th>
-                          <th className="pb-2 pr-3 font-medium">Vehiculo</th>
-                          <th className="pb-2 pr-3 font-medium">Cliente</th>
-                          <th className="pb-2 pr-3 font-medium">Lugar</th>
-                          <th className="pb-2 pr-3 font-medium">Estado</th>
-                          <th className="pb-2 pr-3 font-medium">ETA</th>
-                          <th className="pb-2 font-medium">Comentarios</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {reperibilidad.serviciosPendientes.map((r) => (
-                          <tr key={r.id} className="border-t border-line/10">
-                            <td className="py-2 pr-3">
-                              <Link to={`/records/${r.id}`} className="text-ink-50 hover:underline">
-                                {driverName(r)}
-                              </Link>
-                            </td>
-                            <td className="py-2 pr-3 text-ink-300">{r.vehicle?.targa ?? "-"}</td>
-                            <td className="py-2 pr-3 text-ink-300">{r.client?.nombre ?? "-"}</td>
-                            <td className="py-2 pr-3 text-ink-300">{r.destinazione}</td>
-                            <td className="py-2 pr-3">
-                              <StatusBadge status={r.estado} className="px-2 py-0.5 text-[11px]" />
-                            </td>
-                            <td className="py-2 pr-3 text-ink-300">{formatDateTime(r.eta)}</td>
-                            <td className="py-2 text-ink-300">{r.comentarios || "-"}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </GlassCard>
+              <PendingServicesCard
+                title="Servicios pendientes · Roma"
+                subtitle="Extras Piazza de zona Roma que todavia hay que completar hoy."
+                items={pendientesPorZona.ROMA}
+                emptyLabel="No hay servicios pendientes en Roma."
+              />
 
-              <GlassCard>
-                <h2 className="text-[15px] font-semibold text-ink-50">Choferes disponibles esta noche</h2>
-                <p className="mt-1 text-[12px] text-ink-400">
-                  Todos los choferes activos de Extras Piazza, con o sin consegna en curso. Marca si
-                  esta disponible y con que vehiculo sale, para cualquier chofer de la lista.
-                </p>
+              {pendientesPorZona.SIN_ZONA.length > 0 && (
+                <PendingServicesCard
+                  title="Servicios pendientes · Sin zona"
+                  subtitle="Todavia no tienen ZONA cargada (ver Nuevo servicio Extras Piazza)."
+                  items={pendientesPorZona.SIN_ZONA}
+                  emptyLabel=""
+                />
+              )}
 
-                {reperibilidad.choferesPiazza.length === 0 ? (
-                  <p className="mt-3 text-[13px] text-ink-300">Sin choferes de Extras Piazza activos.</p>
-                ) : (
-                  <div className="mt-3 flex flex-col gap-2">
-                    <div className="flex items-center gap-3 px-3 text-[11px] uppercase tracking-wide text-ink-500">
-                      <span className="min-w-0 flex-1">Chofer</span>
-                      <span className="w-20 shrink-0">Disponible</span>
-                      <span className="w-52 shrink-0">Vehiculo</span>
-                    </div>
-                    {reperibilidad.choferesPiazza.map((u) => {
-                      const disponible = !isReperibilidadNoDisponibleHoy(u);
-                      const servicioActual = reperibilidad.servicioActualPorChofer[u.id];
-                      return (
-                        <div key={u.id} className="flex flex-col gap-1">
-                          <div className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2">
-                            <span className="min-w-0 flex-1 truncate text-[13px] text-ink-50">
-                              {u.nombre} {u.apellido}
-                            </span>
-                            <Select
-                              id={`disponible-${u.id}`}
-                              className="w-20 px-2.5 py-1.5 pr-7 text-[12px]"
-                              options={DISPONIBLE_OPTIONS}
-                              value={disponible ? "SI" : "NO"}
-                              disabled={Boolean(savingDriverField[`${u.id}:reperibilidadNoDisponible`])}
-                              onChange={(e) => handleChangeDisponible(u.id)(e.target.value)}
-                            />
-                            <Select
-                              id={`vehiculo-${u.id}`}
-                              className="w-52 px-2.5 py-1.5 pr-7 text-[12px]"
-                              options={vehicleOptions}
-                              value={u.vehiculoAsignadoId ?? ""}
-                              disabled={Boolean(savingDriverField[`${u.id}:vehiculoAsignadoId`])}
-                              onChange={(e) => handleChangeVehiculo(u.id)(e.target.value)}
-                            />
-                          </div>
-                          {servicioActual && (
-                            <Link
-                              to={`/records/${servicioActual.id}`}
-                              className="px-3 text-[12px] text-ink-400 hover:text-ink-200 hover:underline"
-                            >
-                              {RECORD_STATUS_LABELS[servicioActual.estado] ?? servicioActual.estado} a{" "}
-                              {servicioActual.destinazione} &middot; ETA {formatDateTime(servicioActual.eta)}
-                            </Link>
-                          )}
-                          {driverFieldErrors[u.id] && (
-                            <span className="px-3 text-[12px] text-danger-500">{driverFieldErrors[u.id]}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </GlassCard>
+              <AvailableDriversCard
+                title="Choferes disponibles esta noche · Milano"
+                subtitle="Grupo Milano Nord/Sud. Marca si esta disponible y con que vehiculo sale."
+                drivers={choferesPiazzaPorZona.MILANO}
+                emptyLabel="Sin choferes de Extras Piazza Milano activos."
+                vehicleOptions={vehicleOptions}
+                savingDriverField={savingDriverField}
+                driverFieldErrors={driverFieldErrors}
+                servicioActualPorChofer={reperibilidad.servicioActualPorChofer}
+                onChangeDisponible={handleChangeDisponible}
+                onChangeVehiculo={handleChangeVehiculo}
+              />
+
+              <AvailableDriversCard
+                title="Choferes disponibles esta noche · Roma"
+                subtitle="Grupo Roma. Marca si esta disponible y con que vehiculo sale."
+                drivers={choferesPiazzaPorZona.ROMA}
+                emptyLabel="Sin choferes de Extras Piazza Roma activos."
+                vehicleOptions={vehicleOptions}
+                savingDriverField={savingDriverField}
+                driverFieldErrors={driverFieldErrors}
+                servicioActualPorChofer={reperibilidad.servicioActualPorChofer}
+                onChangeDisponible={handleChangeDisponible}
+                onChangeVehiculo={handleChangeVehiculo}
+              />
+
+              {choferesPiazzaPorZona.SIN_GRUPO.length > 0 && (
+                <AvailableDriversCard
+                  title="Choferes disponibles esta noche · Sin grupo"
+                  subtitle="Sin Milano Nord/Sud ni Roma cargado (ver ficha del chofer)."
+                  drivers={choferesPiazzaPorZona.SIN_GRUPO}
+                  emptyLabel=""
+                  vehicleOptions={vehicleOptions}
+                  savingDriverField={savingDriverField}
+                  driverFieldErrors={driverFieldErrors}
+                  servicioActualPorChofer={reperibilidad.servicioActualPorChofer}
+                  onChangeDisponible={handleChangeDisponible}
+                  onChangeVehiculo={handleChangeVehiculo}
+                />
+              )}
 
               <GlassCard>
                 <h2 className="text-[15px] font-semibold text-ink-50">Proximos servicios</h2>
@@ -881,24 +1052,28 @@ export const DailySummaryPage = () => {
                 )}
               </GlassCard>
 
-              <GlassCard>
-                <h2 className="text-[15px] font-semibold text-ink-50">Vehiculos disponibles</h2>
-                <p className="mt-1 text-[12px] text-ink-400">
-                  Extras Piazza, disponibles y sin servicio en curso ahora.
-                </p>
-                {reperibilidad.vehiculosDisponibles.length === 0 ? (
-                  <p className="mt-3 text-[13px] text-ink-300">Ninguno disponible ahora.</p>
-                ) : (
-                  <ul className="mt-3 flex flex-col gap-1.5">
-                    {reperibilidad.vehiculosDisponibles.map((v) => (
-                      <li key={v.id} className="rounded-xl glass-surface-sm px-3 py-2 text-[13px] text-ink-50">
-                        {v.targa}
-                        {v.modelo ? ` - ${v.modelo}` : ""}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </GlassCard>
+              <AvailableVehiclesCard
+                title="Vehiculos disponibles · Milano"
+                subtitle="Grupo Milano Nord/Sud, disponibles y sin servicio en curso ahora."
+                vehicles={vehiculosDisponiblesPorZona.MILANO}
+                emptyLabel="Ninguno disponible en Milano ahora."
+              />
+
+              <AvailableVehiclesCard
+                title="Vehiculos disponibles · Roma"
+                subtitle="Grupo Roma, disponibles y sin servicio en curso ahora."
+                vehicles={vehiculosDisponiblesPorZona.ROMA}
+                emptyLabel="Ninguno disponible en Roma ahora."
+              />
+
+              {vehiculosDisponiblesPorZona.SIN_GRUPO.length > 0 && (
+                <AvailableVehiclesCard
+                  title="Vehiculos disponibles · Sin grupo"
+                  subtitle="Sin Milano Nord/Sud ni Roma cargado (ver ficha del vehiculo)."
+                  vehicles={vehiculosDisponiblesPorZona.SIN_GRUPO}
+                  emptyLabel=""
+                />
+              )}
             </>
           )}
         </>

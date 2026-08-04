@@ -9,13 +9,14 @@ import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
+import { AREA_OPTIONS, GRUPO_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
 import { createVehicleRequest } from "../../lib/vehicles.api";
 
 const INITIAL_FORM = {
   targa: "",
   modelo: "",
   area: "",
+  grupo: "",
   estado: "DISPONIBLE",
   poliza: "",
   rTecnica: "",
@@ -121,6 +122,15 @@ export const NewVehiclePage = () => {
               value={form.area}
               onChange={(v) => setField("area", v)}
               error={fieldErrors.area?.[0]}
+            />
+            <SearchableSelect
+              id="grupo"
+              label="Grupo"
+              placeholder="Escribe para buscar un grupo"
+              options={GRUPO_OPTIONS}
+              value={form.grupo}
+              onChange={(v) => setField("grupo", v)}
+              error={fieldErrors.grupo?.[0]}
             />
             <SearchableSelect
               id="estado"

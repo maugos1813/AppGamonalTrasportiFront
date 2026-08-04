@@ -35,6 +35,7 @@ const INITIAL_FORM = {
   kilometros: "",
   areaC: "",
   costoEspera: "",
+  costoOtros: "",
   costoCombustible: "",
   peajes: "",
   vignetta: "",
@@ -392,6 +393,16 @@ export const NewDhlAbServiceRecordPage = () => {
               min="0"
               value={form.costoTraforoFrejusBrennero}
               onChange={handleChange("costoTraforoFrejusBrennero")}
+            />
+            <TextField
+              id="costoOtros"
+              label="Otros"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Viaticos, etc."
+              value={form.costoOtros}
+              onChange={handleChange("costoOtros")}
             />
           </div>
         </GlassCard>

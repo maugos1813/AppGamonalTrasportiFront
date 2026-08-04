@@ -125,6 +125,7 @@ const ECONOMIC_COST_FIELDS = [
   "costoTraforoFrejusBrennero",
   "areaC",
   "costoEspera",
+  "costoOtros",
 ];
 
 const ECONOMIC_COST_FIELD_LABELS = {
@@ -135,6 +136,7 @@ const ECONOMIC_COST_FIELD_LABELS = {
   costoTraforoFrejusBrennero: "Traforo/Frejus/Brennero",
   areaC: "Area C",
   costoEspera: "Espera",
+  costoOtros: "Otros",
 };
 
 export const isDhlAbRecord = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
@@ -301,11 +303,14 @@ const MONTH_LABELS = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "S
 // Facturacion y ganancia mes a mes del anio en curso (Ene-Dic), para el grafico de
 // tendencia del dashboard OWNER. A diferencia de computeEconomicStats (que solo mira
 // el periodo elegido en el selector), esto siempre es el anio calendario completo.
+// ANNULLATO se excluye: un servicio anulado no se llego a hacer, no debe sumar
+// facturacion/km aunque haya quedado con esos campos cargados de antes de anularlo.
 export const computeMonthlyRevenueTrend = (records, now = new Date()) => {
   const year = now.getFullYear();
   const buckets = MONTH_LABELS.map((month) => ({ month, facturacion: 0, ganancia: 0 }));
 
   records.forEach((r) => {
+    if (r.estado === "ANNULLATO") return;
     const date = new Date(r.fechaServicio);
     if (date.getFullYear() !== year) return;
     const bucket = buckets[date.getMonth()];
@@ -318,15 +323,19 @@ export const computeMonthlyRevenueTrend = (records, now = new Date()) => {
 
 // Kilometros mes a mes del anio en curso, mismo criterio que computeMonthlyRevenueTrend
 // (anio calendario completo, no el periodo del selector Hoy/Semana/Mes) - para el
-// grafico de tendencia de km del dashboard OWNER.
+// grafico de tendencia de km del dashboard OWNER. A diferencia de recordKm (usado en
+// los rankings de choferes/vehiculos, donde planificado tiene prioridad a proposito -
+// ver comentario ahi), esto busca reflejar el km real recorrido: si el chofer ya cargo
+// el km real del viaje, se usa ese en vez del planificado original.
 export const computeMonthlyKmTrend = (records, now = new Date()) => {
   const year = now.getFullYear();
   const buckets = MONTH_LABELS.map((month) => ({ month, km: 0 }));
 
   records.forEach((r) => {
+    if (r.estado === "ANNULLATO") return;
     const date = new Date(r.fechaServicio);
     if (date.getFullYear() !== year) return;
-    buckets[date.getMonth()].km += r.kilometros ?? r.kilometrosReales ?? 0;
+    buckets[date.getMonth()].km += r.kilometrosReales ?? r.kilometros ?? 0;
   });
 
   return buckets;
@@ -516,8 +525,13 @@ export const isReperibilidadNoDisponibleHoy = (user, now = new Date()) =>
 // todavia hay que completar hoy, mas quien esta disponible esta noche por si sale un
 // pedido (choferes) o listo para salir (vehiculos).
 export const computeReperibilidadPiazza = (records, users, vehicles, now = new Date()) => {
+  // Mismo criterio que servicioActualPorChofer de abajo: un vehiculo con un servicio
+  // IN_SOSPESO/RITIRATO ya esta afectado a ese servicio (aparece en "Servicios
+  // pendientes"), no solo cuando esta IN_CONSEGNA - antes esto solo miraba IN_CONSEGNA,
+  // asi que un vehiculo con un servicio pendiente todavia sin arrancar seguia
+  // apareciendo como "disponible" en la lista de abajo.
   const enServicioAhoraVehicleIds = new Set(
-    records.filter((r) => r.estado === "IN_CONSEGNA").map((r) => r.vehicle?.id)
+    records.filter((r) => EN_PROCESO_STATUSES.includes(r.estado)).map((r) => r.vehicle?.id)
   );
 
   const serviciosPendientes = records

@@ -10,7 +10,7 @@ import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS } from "../../lib/constants";
+import { AREA_OPTIONS, GRUPO_OPTIONS } from "../../lib/constants";
 import { createUserRequest } from "../../lib/users.api";
 
 const INITIAL_FORM = {
@@ -20,6 +20,7 @@ const INITIAL_FORM = {
   password: "",
   numeroCelular: "",
   area: "",
+  grupo: "",
   fechaNacimiento: "",
 };
 
@@ -46,7 +47,12 @@ export const NewDriverPage = () => {
     setFieldErrors({});
 
     try {
-      await createUserRequest({ ...form, cargo: "CHOFER" });
+      // grupo es opcional en el backend, pero solo si no se manda: "" no matchea
+      // ningun valor del enum y tira 400 (ver z.enum(...).optional() en
+      // user.validator.js) - se omite en vez de mandarlo vacio si no se eligio.
+      const payload = { ...form, cargo: "CHOFER" };
+      if (!payload.grupo) delete payload.grupo;
+      await createUserRequest(payload);
       refreshDrivers();
       navigate("/choferes", { replace: true });
     } catch (err) {
@@ -132,6 +138,15 @@ export const NewDriverPage = () => {
               value={form.area}
               onChange={(v) => setField("area", v)}
               error={fieldErrors.area?.[0]}
+            />
+            <SearchableSelect
+              id="grupo"
+              label="Grupo"
+              placeholder="Escribe para buscar un grupo"
+              options={GRUPO_OPTIONS}
+              value={form.grupo}
+              onChange={(v) => setField("grupo", v)}
+              error={fieldErrors.grupo?.[0]}
             />
             <TextField
               id="fechaNacimiento"

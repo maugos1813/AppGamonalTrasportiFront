@@ -39,6 +39,7 @@ const INITIAL_FORM = {
   costoTraforoFrejusBrennero: "",
   areaC: "",
   costoEspera: "",
+  costoOtros: "",
 };
 
 export const NewExtrasStefaniaRecordPage = () => {
@@ -348,6 +349,16 @@ export const NewExtrasStefaniaRecordPage = () => {
               min="0"
               value={form.costoEspera}
               onChange={handleChange("costoEspera")}
+            />
+            <TextField
+              id="costoOtros"
+              label="Otros"
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Viaticos, etc."
+              value={form.costoOtros}
+              onChange={handleChange("costoOtros")}
             />
           </div>
         </GlassCard>

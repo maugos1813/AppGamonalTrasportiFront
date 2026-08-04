@@ -24,7 +24,7 @@ import {
   RECORD_STATUS_OPTIONS,
   TIPO_ARCHIVO_LABELS,
 } from "../../lib/constants";
-import { formatDateTime, toDateTimeInputValue } from "../../lib/format";
+import { formatCurrency, formatDateTime, toDateTimeInputValue } from "../../lib/format";
 import {
   deleteRecordRequest,
   getRecordRequest,
@@ -66,6 +66,7 @@ const OWNER_FIELDS = [
   "peajes",
   "vignetta",
   "costoHotel",
+  "costoOtros",
   "pagoRecibido",
   "costoCombustible",
   "clienteConfirmado",
@@ -99,6 +100,7 @@ const toFormState = (record) => ({
   peajes: record.peajes ?? "",
   vignetta: record.vignetta ?? "",
   costoHotel: record.costoHotel ?? "",
+  costoOtros: record.costoOtros ?? "",
   pagoRecibido: record.pagoRecibido ?? "",
   costoCombustible: record.costoCombustible ?? "",
   clienteConfirmado: record.clienteConfirmado ?? false,
@@ -126,6 +128,57 @@ const TrashIcon = (props) => (
     <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" />
     <path d="M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13" />
     <path d="M10 11v6M14 11v6" />
+  </svg>
+);
+
+// Mismos componentes de "total" que ya calcula el backend (ver computeTotals en
+// record.service.js): costoCombustible y pagoRecibido quedan fuera a proposito - el
+// pedido puntual de este texto es poder ver/pasar rapido cuanto cuesta el servicio
+// SIN combustible (costo operativo real), no el total facturado.
+const COST_BREAKDOWN_FIELDS = [
+  ["areaC", "Area C"],
+  ["costoEspera", "Espera"],
+  ["costoTraforoFrejusBrennero", "Traforo Frejus/Brennero"],
+  ["peajes", "Peajes"],
+  ["vignetta", "Vignetta"],
+  ["costoHotel", "Hotel"],
+  ["costoOtros", "Otros"],
+];
+
+const buildCostText = (record) => {
+  const lines = [
+    `Costos del servicio ${record.codigo}`,
+    `${record.client?.nombre ?? "Sin cliente"} - ${record.destinazione}`,
+    formatDateTime(record.fechaServicio),
+    "",
+  ];
+
+  if (record.kilometros != null && record.precioKm != null) {
+    lines.push(`Km (${record.kilometros} x ${formatCurrency(record.precioKm)}/km): ${formatCurrency(record.totalKm)}`);
+  }
+  COST_BREAKDOWN_FIELDS.forEach(([field, label]) => {
+    if (record[field]) lines.push(`${label}: ${formatCurrency(record[field])}`);
+  });
+
+  lines.push("", `TOTAL sin combustible: ${formatCurrency(record.total)}`);
+  lines.push("", `Combustible (no incluido en el total): ${formatCurrency(record.costoCombustible)}`);
+  lines.push(`Monto recibido: ${formatCurrency(record.pagoRecibido)}`);
+
+  return lines.join("\n");
+};
+
+const CopyIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <rect x="9" y="9" width="12" height="12" rx="2" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
   </svg>
 );
 
@@ -385,7 +438,19 @@ const RecordSummaryView = ({
   uploading,
   uploadError,
   onUpload,
-}) => (
+}) => {
+  const [copyCostsFeedback, setCopyCostsFeedback] = useState("");
+  const onCopyCosts = () => {
+    navigator.clipboard
+      .writeText(buildCostText(record))
+      .then(() => {
+        setCopyCostsFeedback("Copiado");
+        setTimeout(() => setCopyCostsFeedback(""), 2000);
+      })
+      .catch(() => setCopyCostsFeedback("No se pudo copiar"));
+  };
+
+  return (
   <>
     <GlassCard>
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -469,13 +534,43 @@ const RecordSummaryView = ({
 
       {!isChofer && (
         <div className="mt-6 border-t border-line/10 pt-6">
-          <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-            Detalle economico
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">
+              Detalle economico
+            </h3>
+            <button
+              type="button"
+              onClick={onCopyCosts}
+              className="flex items-center gap-1.5 rounded-full glass-surface-sm px-3 py-1.5 text-[12px] font-medium text-ink-200 transition-colors hover:bg-line/10"
+            >
+              <CopyIcon className="h-[14px] w-[14px]" />
+              {copyCostsFeedback || "Copiar costos"}
+            </button>
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <InfoRow label="Precio/km" value={record.precioKm ?? "-"} />
-            <InfoRow label="Total estimado" value={record.total ?? "-"} />
-            <InfoRow label="Monto recibido" value={record.pagoRecibido ?? "-"} />
+            <InfoRow label="Km x precio" value={record.totalKm != null ? formatCurrency(record.totalKm) : "-"} />
+            <InfoRow label="Area C" value={record.areaC ? formatCurrency(record.areaC) : "-"} />
+            <InfoRow label="Espera" value={record.costoEspera ? formatCurrency(record.costoEspera) : "-"} />
+            <InfoRow
+              label="Traforo Frejus/Brennero"
+              value={record.costoTraforoFrejusBrennero ? formatCurrency(record.costoTraforoFrejusBrennero) : "-"}
+            />
+            <InfoRow label="Peajes" value={record.peajes ? formatCurrency(record.peajes) : "-"} />
+            <InfoRow label="Vignetta" value={record.vignetta ? formatCurrency(record.vignetta) : "-"} />
+            <InfoRow label="Hotel" value={record.costoHotel ? formatCurrency(record.costoHotel) : "-"} />
+            <InfoRow label="Otros" value={record.costoOtros ? formatCurrency(record.costoOtros) : "-"} />
+            <InfoRow
+              label="Total sin combustible"
+              value={record.total != null ? formatCurrency(record.total) : "-"}
+            />
+          </div>
+          <div className="mt-4 grid grid-cols-1 gap-4 border-t border-line/10 pt-4 sm:grid-cols-3">
+            <InfoRow
+              label="Combustible (fuera del total)"
+              value={record.costoCombustible ? formatCurrency(record.costoCombustible) : "-"}
+            />
+            <InfoRow label="Monto recibido" value={record.pagoRecibido ? formatCurrency(record.pagoRecibido) : "-"} />
           </div>
         </div>
       )}
@@ -524,7 +619,8 @@ const RecordSummaryView = ({
       </ul>
     </GlassCard>
   </>
-);
+  );
+};
 
 // Vista de edicion, aparte de RecordSummaryView (ver comentario ahi) - se muestra en
 // vez del resumen mientras isEditing es true, nunca junto a el.
@@ -812,6 +908,16 @@ const RecordEditForm = ({
                 min="0"
                 value={form.costoEspera}
                 onChange={handleChange("costoEspera")}
+              />
+              <TextField
+                id="costoOtros"
+                label="Otros"
+                type="number"
+                step="0.01"
+                min="0"
+                placeholder="Viaticos, etc."
+                value={form.costoOtros}
+                onChange={handleChange("costoOtros")}
               />
             </div>
 
