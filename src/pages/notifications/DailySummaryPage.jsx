@@ -41,6 +41,23 @@ const DISPONIBLE_OPTIONS = [
   { value: "NO", label: "No" },
 ];
 
+// Filtro de zona de la pestana Semanal (rentabilidad, ranking de choferes/vehiculos) -
+// "Todos" por defecto para no cambiar lo que ya se ve hoy (Milano+Roma mezclado).
+const SEMANAL_ZONA_OPTIONS = [
+  { value: "TODOS", label: "Todos" },
+  { value: "MILANO", label: "Milano" },
+  { value: "ROMA", label: "Roma" },
+];
+
+// Choferes/vehiculos no tienen extrasPiazzaZona (eso es del Record) - se usan de grupo
+// (MILANO_NORD/MILANO_SUD/ROMA, el mismo campo que ya separa Reperibilita) para saber
+// si entran en el filtro de zona de Semanal.
+const grupoMatchesZona = (grupo, zona) => {
+  if (zona === "TODOS") return true;
+  if (zona === "MILANO") return grupo === "MILANO_NORD" || grupo === "MILANO_SUD";
+  return grupo === "ROMA";
+};
+
 // Misma fuente que useNotifications (ver dashboardStats.js): cada alerta arma su id con
 // un prefijo por tipo de origen. Se usa solo para agrupar visualmente aca, no cambia la
 // logica de que alertas existen (esa sigue siendo la unica fuente de verdad).
@@ -349,6 +366,21 @@ export const DailySummaryPage = () => {
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const { alerts, loading } = useNotifications();
   const groups = useMemo(() => groupAlerts(alerts), [alerts]);
+  // Filtro de zona del Diario (solo OWNER/ADMIN - el chofer no ve este switch, sus
+  // alertas son personales y no llevan grupo). Alertas sin grupo (cumpleanios,
+  // servicios vencidos, fallos de sync) se muestran siempre: no son de un chofer/
+  // vehiculo puntual, no hay zona que filtrar.
+  const [diarioZona, setDiarioZona] = useState("TODOS");
+  const visibleGroups = useMemo(
+    () =>
+      groups
+        .map((group) => ({
+          ...group,
+          items: group.items.filter((a) => a.grupo == null || grupoMatchesZona(a.grupo, diarioZona)),
+        }))
+        .filter((group) => group.items.length > 0),
+    [groups, diarioZona]
+  );
 
   const [tab, setTab] = useState(isPrivileged ? "general" : "diario");
 
@@ -405,13 +437,32 @@ export const DailySummaryPage = () => {
 
   const weeklyLoaded = Boolean(records && drivers && vehicles);
 
-  const driverRanking = useMemo(() => (records ? computeDriverKmRanking(records, "semana") : []), [records]);
-  const fleetRanking = useMemo(() => (records ? computeFleetKmUsage(records, "semana") : []), [records]);
+  // Filtro de zona de la pestana Semanal - acota SOLO lo que usa esta pestana
+  // (ranking/rentabilidad), no "records" en si (records tambien alimenta General y
+  // Reperibilita, que tienen su propio criterio de zona - ver computeReperibilidadPiazza).
+  const [semanalZona, setSemanalZona] = useState("TODOS");
+  const semanalRecords = useMemo(() => {
+    if (!records) return null;
+    if (semanalZona === "TODOS") return records;
+    return records.filter((r) => r.extrasPiazzaZona === semanalZona);
+  }, [records, semanalZona]);
+
+  const driverRanking = useMemo(
+    () => (semanalRecords ? computeDriverKmRanking(semanalRecords, "semana") : []),
+    [semanalRecords]
+  );
+  const fleetRanking = useMemo(
+    () => (semanalRecords ? computeFleetKmUsage(semanalRecords, "semana") : []),
+    [semanalRecords]
+  );
   const zonaBreakdown = useMemo(
     () => (records ? computeExtrasPiazzaZonaBreakdown(records, "semana") : []),
     [records]
   );
-  const economicStats = useMemo(() => (records ? computeEconomicStats(records, "semana") : null), [records]);
+  const economicStats = useMemo(
+    () => (semanalRecords ? computeEconomicStats(semanalRecords, "semana") : null),
+    [semanalRecords]
+  );
   const reperibilidad = useMemo(
     () => (records && drivers && vehicles ? computeReperibilidadPiazza(records, drivers, vehicles) : null),
     [records, drivers, vehicles]
@@ -544,7 +595,7 @@ export const DailySummaryPage = () => {
       SIN_GRUPO: choferesPiazzaPorZona.SIN_GRUPO.filter((u) => !isReperibilidadNoDisponibleHoy(u)),
     };
 
-    const lines = [`Reperibilita Extras Piazza - ${todayLabel()}`, ""];
+    const lines = [`Reperibilita Extras Piazza + DHL Roma - ${todayLabel()}`, ""];
     lines.push(
       ...buildZoneBlock("MILANO", pendientesPorZona.MILANO, choferesDispPorZona.MILANO, vehiculosDisponiblesPorZona.MILANO)
     );
@@ -593,17 +644,19 @@ export const DailySummaryPage = () => {
     if (!drivers) return [];
     const activeIds = new Set(driverRanking.map((e) => e.id));
     return drivers
-      .filter((d) => d.estado === "ACTIVO" && !activeIds.has(d.id))
+      .filter((d) => d.estado === "ACTIVO" && grupoMatchesZona(d.grupo, semanalZona) && !activeIds.has(d.id))
       .map((d) => `${d.nombre} ${d.apellido}`);
-  }, [drivers, driverRanking]);
+  }, [drivers, driverRanking, semanalZona]);
 
   const inactiveVehicleNames = useMemo(() => {
     if (!vehicles) return [];
     const activeIds = new Set(fleetRanking.map((e) => e.id));
     return vehicles
-      .filter((v) => v.estado !== "FUERA_DE_SERVICIO" && !activeIds.has(v.id))
+      .filter(
+        (v) => v.estado !== "FUERA_DE_SERVICIO" && grupoMatchesZona(v.grupo, semanalZona) && !activeIds.has(v.id)
+      )
       .map((v) => `${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`);
-  }, [vehicles, fleetRanking]);
+  }, [vehicles, fleetRanking, semanalZona]);
 
   const servicePeriodStats = useMemo(
     () => (records ? computeServicePeriodStats(records, "hoy") : null),
@@ -824,18 +877,24 @@ export const DailySummaryPage = () => {
 
       {tab === "diario" && (
         <>
+          {isPrivileged && !loading && groups.length > 0 && (
+            <div className="flex justify-end">
+              <SegmentedControl options={SEMANAL_ZONA_OPTIONS} value={diarioZona} onChange={setDiarioZona} />
+            </div>
+          )}
+
           {loading && (
             <PageLoader />
           )}
 
-          {!loading && groups.length === 0 && (
+          {!loading && visibleGroups.length === 0 && (
             <GlassCard className="text-center text-[14px] text-ink-300">
               Sin alertas pendientes. Todo al dia.
             </GlassCard>
           )}
 
           {!loading &&
-            groups.map((group) => (
+            visibleGroups.map((group) => (
               <GlassCard key={group.label}>
                 <h2 className="text-[15px] font-semibold text-ink-50">
                   {group.label} <span className="text-ink-400">({group.items.length})</span>
@@ -880,6 +939,10 @@ export const DailySummaryPage = () => {
 
           {weeklyLoaded && (
             <>
+              <div className="flex justify-end">
+                <SegmentedControl options={SEMANAL_ZONA_OPTIONS} value={semanalZona} onChange={setSemanalZona} />
+              </div>
+
               <RankingCard
                 title="Choferes esta semana"
                 subtitle="KM recorridos (planificado o real), de mayor a menor."
@@ -896,17 +959,20 @@ export const DailySummaryPage = () => {
                 inactiveLabel={`Sin uso esta semana (${inactiveVehicleNames.length})`}
                 inactiveNames={inactiveVehicleNames}
               />
-              <RankingCard
-                title="Extras Piazza por zona"
-                subtitle="Milano vs Roma, KM y servicios de la semana. La mayoria va a aparecer 'Sin zona' hasta que se cargue en Nuevo servicio."
-                entries={zonaBreakdown}
-                emptyLabel="Sin servicios de Extras Piazza esta semana todavia."
-                inactiveLabel=""
-                inactiveNames={[]}
-              />
+              {semanalZona === "TODOS" && (
+                <RankingCard
+                  title="Extras Piazza por zona"
+                  subtitle="Milano vs Roma, KM y servicios de la semana."
+                  entries={zonaBreakdown}
+                  emptyLabel="Sin servicios de Extras Piazza esta semana todavia."
+                  inactiveLabel=""
+                  inactiveNames={[]}
+                />
+              )}
               <GlassCard>
                 <h2 className="mb-3 text-[15px] font-semibold text-ink-50">
                   Servicios de la semana &middot; Extras Piazza + DHL/AB Service
+                  {semanalZona !== "TODOS" && ` (${SEMANAL_ZONA_OPTIONS.find((o) => o.value === semanalZona)?.label})`}
                 </h2>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <ProfitLossList title="Mas rentables" items={economicStats.masRentables} tone="green" />
@@ -930,7 +996,7 @@ export const DailySummaryPage = () => {
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <p className="text-[13px] text-ink-400">
-                  Extras Piazza &middot; {reperibilidad.serviciosPendientes.length} servicio(s) pendiente(s)
+                  Extras Piazza + DHL Roma &middot; {reperibilidad.serviciosPendientes.length} servicio(s) pendiente(s)
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Button variant="ghost" className="w-auto px-4" onClick={() => setShowAgregarChofer(true)}>
@@ -951,7 +1017,7 @@ export const DailySummaryPage = () => {
 
               <PendingServicesCard
                 title="Servicios pendientes · Roma"
-                subtitle="Extras Piazza de zona Roma que todavia hay que completar hoy."
+                subtitle="Extras Piazza + DHL de zona Roma que todavia hay que completar hoy."
                 items={pendientesPorZona.ROMA}
                 emptyLabel="No hay servicios pendientes en Roma."
               />
@@ -980,7 +1046,7 @@ export const DailySummaryPage = () => {
 
               <AvailableDriversCard
                 title="Choferes disponibles esta noche · Roma"
-                subtitle="Grupo Roma. Marca si esta disponible y con que vehiculo sale."
+                subtitle="Grupo Roma (Extras Piazza + DHL). Marca si esta disponible y con que vehiculo sale."
                 drivers={choferesPiazzaPorZona.ROMA}
                 emptyLabel="Sin choferes de Extras Piazza Roma activos."
                 vehicleOptions={vehicleOptions}
@@ -1061,7 +1127,7 @@ export const DailySummaryPage = () => {
 
               <AvailableVehiclesCard
                 title="Vehiculos disponibles · Roma"
-                subtitle="Grupo Roma, disponibles y sin servicio en curso ahora."
+                subtitle="Grupo Roma (Extras Piazza + DHL), disponibles y sin servicio en curso ahora."
                 vehicles={vehiculosDisponiblesPorZona.ROMA}
                 emptyLabel="Ninguno disponible en Roma ahora."
               />

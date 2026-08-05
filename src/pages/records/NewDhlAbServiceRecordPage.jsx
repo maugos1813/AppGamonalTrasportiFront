@@ -13,7 +13,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS } from "../../lib/constants";
+import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -23,6 +23,9 @@ const INITIAL_FORM = {
   driverId: "",
   vehicleId: "",
   aplicativo: "",
+  // Default Milano (no vacio) - mismo criterio que NewRecordPage.jsx, para que el
+  // switch Milano/Roma de Registros no vuelva a quedar con registros "sin zona".
+  extrasPiazzaZona: "MILANO",
   spedizzione: "DHL",
   estado: "IN_SOSPESO",
   fechaServicio: "",
@@ -58,7 +61,13 @@ export const NewDhlAbServiceRecordPage = () => {
   const { refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  const [form, setForm] = useState(INITIAL_FORM);
+  // Zona activa en Registros al abrir "Nuevo servicio" (ver RecordsListPage.jsx) pisa
+  // el default Milano de INITIAL_FORM, para que crear desde la pestana Roma arranque
+  // en Roma igual que crear desde Milano arranca en Milano.
+  const [form, setForm] = useState(() => ({
+    ...INITIAL_FORM,
+    extrasPiazzaZona: location.state?.zona ?? INITIAL_FORM.extrasPiazzaZona,
+  }));
   const [drivers, setDrivers] = useState(null);
   const [vehicles, setVehicles] = useState(null);
   const [clients, setClients] = useState(null);
@@ -146,6 +155,23 @@ export const NewDhlAbServiceRecordPage = () => {
     value: v.id,
     label: `${v.targa} - ${v.modelo}`,
   }));
+  // Aplicativo acotado a la zona elegida (MILANO_1..18 o ROMA_1..10) - mezclar los 28
+  // en una sola lista larga hacia mas dificil encontrar el circuito correcto, sobre
+  // todo en Roma (10 circuitos perdidos entre los 18 de Milano).
+  const aplicativoOptions = APLICATIVO_OPTIONS.filter((opt) =>
+    opt.value.startsWith(`${form.extrasPiazzaZona}_`)
+  );
+
+  // Si se cambia la zona con un aplicativo ya elegido de la otra, se limpia - un
+  // MILANO_5 cargado con Zona Roma quedaria inconsistente (y probablemente ni pase la
+  // validacion si mas adelante el backend cruza ambos campos).
+  const handleChangeZona = (zona) => {
+    setForm((prev) => ({
+      ...prev,
+      extrasPiazzaZona: zona,
+      aplicativo: prev.aplicativo.startsWith(`${zona}_`) ? prev.aplicativo : "",
+    }));
+  };
 
   return (
     <SlideOverPanel closeTo="/records/dhl-ab-service">
@@ -242,10 +268,20 @@ export const NewDhlAbServiceRecordPage = () => {
             />
 
             <SearchableSelect
+              id="extrasPiazzaZona"
+              label="Zona"
+              placeholder="Escribe para buscar una zona"
+              options={ZONA_OPTIONS}
+              value={form.extrasPiazzaZona}
+              onChange={handleChangeZona}
+              error={fieldErrors.extrasPiazzaZona?.[0]}
+            />
+
+            <SearchableSelect
               id="aplicativo"
               label="Numero de aplicativo"
               placeholder="Escribe para buscar un aplicativo"
-              options={APLICATIVO_OPTIONS}
+              options={aplicativoOptions}
               value={form.aplicativo}
               onChange={(v) => setField("aplicativo", v)}
               error={fieldErrors.aplicativo?.[0]}

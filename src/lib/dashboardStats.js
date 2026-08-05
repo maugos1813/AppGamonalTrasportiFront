@@ -521,9 +521,21 @@ export const isReperibilidadNoDisponibleHoy = (user, now = new Date()) =>
     user.reperibilidadNoDisponible && user.reperibilidadActualizada && isSameDay(user.reperibilidadActualizada, now)
   );
 
-// Reperibilita de Extras Piazza (vista "Resumen > Reperibilita"): servicios que
-// todavia hay que completar hoy, mas quien esta disponible esta noche por si sale un
-// pedido (choferes) o listo para salir (vehiculos).
+// DHL en Roma (a diferencia de Milano) tambien entra en Reperibilita - a proposito
+// no se agrega AB Service ni DHL Milano aca (no hay AB Service en Roma, y sumar DHL
+// Milano inundaria la lista con el historico que nunca tuvo Zona cargada, cambiando
+// el comportamiento de Milano sin que se haya pedido).
+const isDhlRomaRecord = (r) => r.spedizzione === "DHL" && r.extrasPiazzaZona === "ROMA";
+
+// Un chofer/vehiculo entra en Reperibilita si es de Extras Piazza (cualquier grupo,
+// igual que siempre) o si es de DHL Y esta en el grupo Roma - mismo criterio que
+// isDhlRomaRecord de arriba, aplicado a User/Vehiculo en vez de a Record.
+const isReperibilidadElegible = (entity) =>
+  entity.area === "EXTRAS_PIAZZA" || (entity.area === "DHL" && entity.grupo === "ROMA");
+
+// Reperibilita de Extras Piazza + DHL Roma (vista "Resumen > Reperibilita"): servicios
+// que todavia hay que completar hoy, mas quien esta disponible esta noche por si sale
+// un pedido (choferes) o listo para salir (vehiculos).
 export const computeReperibilidadPiazza = (records, users, vehicles, now = new Date()) => {
   // Mismo criterio que servicioActualPorChofer de abajo: un vehiculo con un servicio
   // IN_SOSPESO/RITIRATO ya esta afectado a ese servicio (aparece en "Servicios
@@ -535,7 +547,12 @@ export const computeReperibilidadPiazza = (records, users, vehicles, now = new D
   );
 
   const serviciosPendientes = records
-    .filter((r) => !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r) && EN_PROCESO_STATUSES.includes(r.estado))
+    .filter(
+      (r) =>
+        !isExtrasStefaniaRecord(r) &&
+        (!isDhlAbRecord(r) || isDhlRomaRecord(r)) &&
+        EN_PROCESO_STATUSES.includes(r.estado)
+    )
     .sort((a, b) => new Date(a.eta) - new Date(b.eta));
 
   // Servicio en curso o pendiente de cada chofer (cualquier tipo, no solo Extras
@@ -553,23 +570,20 @@ export const computeReperibilidadPiazza = (records, users, vehicles, now = new D
 
   const marcadoNoDisponibleHoy = (u) => isReperibilidadNoDisponibleHoy(u, now);
 
-  // choferesPiazza: version "editable" (todos los activos de Extras Piazza, con o sin
-  // servicio en curso) para la tabla de Resumen > Reperibilita donde OWNER/ADMIN puede
-  // tocar el Si/No y el vehiculo asignado de cada uno. choferesDisponibles/
-  // choferesNoDisponibles siguen aparte para el resumen de texto (contadores y el
-  // aviso de "se marcaron no disponibles").
+  // choferesPiazza: version "editable" (todos los activos elegibles - Extras Piazza de
+  // cualquier grupo, o DHL del grupo Roma - con o sin servicio en curso) para la tabla
+  // de Resumen > Reperibilita donde OWNER/ADMIN puede tocar el Si/No y el vehiculo
+  // asignado de cada uno. choferesDisponibles/choferesNoDisponibles siguen aparte para
+  // el resumen de texto (contadores y el aviso de "se marcaron no disponibles").
   // Sin filtro de cargo: OWNER/ADMIN tambien pueden salir a manejar un servicio, asi
   // que tienen que poder aparecer y asignarse como cualquier otro chofer.
-  const choferesPiazza = users.filter((u) => u.estado === "ACTIVO" && u.area === "EXTRAS_PIAZZA");
+  const choferesPiazza = users.filter((u) => u.estado === "ACTIVO" && isReperibilidadElegible(u));
 
   const choferesDisponibles = choferesPiazza.filter((u) => !marcadoNoDisponibleHoy(u));
   const choferesNoDisponibles = choferesPiazza.filter((u) => marcadoNoDisponibleHoy(u));
 
   const vehiculosDisponibles = vehicles.filter(
-    (v) =>
-      v.area === "EXTRAS_PIAZZA" &&
-      v.estado === "DISPONIBLE" &&
-      !enServicioAhoraVehicleIds.has(v.id)
+    (v) => isReperibilidadElegible(v) && v.estado === "DISPONIBLE" && !enServicioAhoraVehicleIds.has(v.id)
   );
 
   // Choferes de CUALQUIER area con una nota de servicio futuro cargada (ver "Agregar
@@ -639,6 +653,10 @@ export const computeDriverDocumentAlerts = (documents, users, now = new Date()) 
         message: `${tipo} de ${nombre} vence el ${formatDate(d.fechaScadenza)}`,
         link: `/choferes/${d.usuarioId}`,
         date: d.fechaScadenza,
+        // Grupo del chofer (Milano Nord/Sud/Roma/etc) - para poder filtrar por zona en
+        // Resumen > Diario (ver DIARIO_ZONA_OPTIONS en DailySummaryPage.jsx). null si el
+        // chofer no tiene grupo cargado.
+        grupo: user?.grupo ?? null,
       };
     });
 };
@@ -655,6 +673,7 @@ export const computeVehicleDocumentAlerts = (vehicles, now = new Date()) => {
         message: `Poliza de seguro de ${v.targa} vence el ${formatDate(v.poliza)}`,
         link: `/vehiculos/${v.id}`,
         date: v.poliza,
+        grupo: v.grupo ?? null,
       });
     }
     if (v.rTecnica && daysUntil(v.rTecnica, now) <= DOCUMENT_WARNING_DAYS) {
@@ -664,6 +683,7 @@ export const computeVehicleDocumentAlerts = (vehicles, now = new Date()) => {
         message: `Revision tecnica de ${v.targa} vence el ${formatDate(v.rTecnica)}`,
         link: `/vehiculos/${v.id}`,
         date: v.rTecnica,
+        grupo: v.grupo ?? null,
       });
     }
   });
@@ -687,6 +707,7 @@ export const getVehicleMaintenanceAlert = (vehicle, { withLink = true } = {}) =>
         ? `${vehicle.targa} ya paso el km de Tagliando (${Math.round(status.usado).toLocaleString("es-AR")} km desde el ultimo mantenimiento).`
         : `${vehicle.targa} esta cerca del Tagliando: quedan ${Math.round(status.restante).toLocaleString("es-AR")} km.`,
     ...(withLink ? { link: "/mecanica" } : {}),
+    grupo: vehicle.grupo ?? null,
   };
 };
 
@@ -718,6 +739,7 @@ export const computeLocationPermissionAlerts = (users, records) => {
           ? `${nombre} tiene un servicio en camino pero su GPS no comparte en segundo plano.`
           : `${nombre} no tiene el permiso de ubicacion en "Permitir todo el tiempo".`,
         link: `/choferes/${u.id}`,
+        grupo: u.grupo ?? null,
       };
     });
 };

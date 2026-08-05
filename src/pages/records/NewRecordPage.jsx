@@ -24,7 +24,10 @@ const INITIAL_FORM = {
   clientId: "",
   driverId: "",
   vehicleId: "",
-  extrasPiazzaZona: "",
+  // Default Milano (no vacio): asi un servicio nuevo no cae en "sin zona" a menos que
+  // se elija Roma a proposito - eso fue justamente lo que dejo el switch Milano/Roma
+  // de Registros sin poder confiar en el filtro (ver backfill-zona-milano.js).
+  extrasPiazzaZona: "MILANO",
   stops: [{ direccion: "", cap: "" }],
   descripcion: "",
   fechaServicio: "",
@@ -49,7 +52,12 @@ export const NewRecordPage = () => {
   const { refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  const [form, setForm] = useState(INITIAL_FORM);
+  // Mismo criterio que NewDhlAbServiceRecordPage.jsx: la zona activa en Registros al
+  // abrir "Nuevo servicio" pisa el default Milano.
+  const [form, setForm] = useState(() => ({
+    ...INITIAL_FORM,
+    extrasPiazzaZona: location.state?.zona ?? INITIAL_FORM.extrasPiazzaZona,
+  }));
   const [drivers, setDrivers] = useState(null);
   const [vehicles, setVehicles] = useState(null);
   const [clients, setClients] = useState(null);

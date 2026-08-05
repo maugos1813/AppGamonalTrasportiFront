@@ -59,6 +59,17 @@ export const EXTRAS_PIAZZA_ZONA_LABELS = Object.fromEntries(
   EXTRAS_PIAZZA_ZONA_OPTIONS.map((opt) => [opt.value, opt.label])
 );
 
+// Mismo campo/valores que EXTRAS_PIAZZA_ZONA_OPTIONS (MILANO/ROMA, el campo en la
+// base es el mismo "extrasPiazzaZona" para cualquier spedizzione, ver
+// record.service.js), version generica para usar en DHL/AB Service - ahi el label
+// "Extras Milano/Roma" no aplica.
+export const ZONA_OPTIONS = [
+  { value: "MILANO", label: "Milano" },
+  { value: "ROMA", label: "Roma" },
+];
+
+export const ZONA_LABELS = Object.fromEntries(ZONA_OPTIONS.map((opt) => [opt.value, opt.label]));
+
 export const RECORD_STATUS_OPTIONS = [
   { value: "IN_SOSPESO", label: "En suspenso" },
   { value: "IN_CONSEGNA", label: "En camino" },
@@ -70,10 +81,13 @@ export const RECORD_STATUS_OPTIONS = [
 
 // Circuito/aplicativo de reparto asignado al servicio (se carga por servicio, no por
 // chofer, para conservar el historial exacto aunque el chofer cambie de aplicativo).
-export const APLICATIVO_OPTIONS = Array.from({ length: 18 }, (_, i) => ({
-  value: `MILANO_${i + 1}`,
-  label: `MILANO ${i + 1}`,
-}));
+// ROMA_1..10 se agrego cuando arranco DHL en Roma (esa operacion tiene 10 circuitos,
+// no 18) - se suma a los MILANO_1..18 ya existentes en vez de renombrarlos, para no
+// tocar el historico ya cargado.
+export const APLICATIVO_OPTIONS = [
+  ...Array.from({ length: 18 }, (_, i) => ({ value: `MILANO_${i + 1}`, label: `MILANO ${i + 1}` })),
+  ...Array.from({ length: 10 }, (_, i) => ({ value: `ROMA_${i + 1}`, label: `ROMA ${i + 1}` })),
+];
 
 export const APLICATIVO_LABELS = Object.fromEntries(
   APLICATIVO_OPTIONS.map((opt) => [opt.value, opt.label])

@@ -87,6 +87,22 @@ const SECTIONS = {
 };
 const SECTION_OPTIONS = Object.entries(SECTIONS).map(([value, s]) => ({ value, label: s.label }));
 
+// Switch Milano/Roma dentro de cada seccion (ver extrasPiazzaZona en el registro).
+// Extras Stefania no tiene, no opera por zona. El orden importa: es tambien el orden
+// en que aparecen las opciones del SegmentedControl, y options[0] es el default al
+// entrar a la seccion - Roma primero en DHL porque es la operacion nueva que se quiere
+// ver de entrada; Milano primero en Extras Piazza, que es como opera desde siempre.
+const ZONA_OPTIONS_BY_SECTION = {
+  "extras-piazza": [
+    { value: "MILANO", label: "Milano" },
+    { value: "ROMA", label: "Roma" },
+  ],
+  "dhl-ab-service": [
+    { value: "ROMA", label: "Roma" },
+    { value: "MILANO", label: "Milano" },
+  ],
+};
+
 // El backend arma los rangos /:year/:month/:day en UTC (buildDateRange). El resumen
 // del mes se agrupa client-side, asi que tiene que usar el mismo criterio de "dia"
 // (UTC), o el conteo del resumen y lo que trae el fetch puntual de un dia no van a
@@ -387,8 +403,12 @@ export const RecordsListPage = ({ section }) => {
   // Stefania), por eso es un array.
   const scopedSections = scopedRecordsSections(user);
   const sectionConfig = SECTIONS[section];
+  const zonaOptions = ZONA_OPTIONS_BY_SECTION[section];
   const [error, setError] = useState("");
   const [tab, setTab] = useState("en_proceso");
+  const [zonaFilter, setZonaFilter] = useState(() => zonaOptions?.[0]?.value ?? null);
+  // Sin switch (Extras Stefania) matchea cualquier zona - no filtra nada.
+  const matchesZona = (r) => !zonaOptions || r.extrasPiazzaZona === zonaFilter;
 
   // Sincronizacion manual con AppSheet (antes vivia en Mi perfil) - solo
   // OWNER/ADMIN, un boton chico redondo arriba de la lista en vez de una seccion
@@ -636,13 +656,13 @@ export const RecordsListPage = ({ section }) => {
   }, [version]);
 
   const visibleRecords = records?.filter(
-    (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione)
+    (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r)
   );
   const summaryDays = summary
-    ? groupSummaryByDay(summary.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione)))
+    ? groupSummaryByDay(summary.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r)))
     : null;
   const unpaidVisibleRecords = unpaidRecords
-    ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && r.pagoRecibido == null)
+    ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r) && r.pagoRecibido == null)
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
   // Total de KM del mes, Extras Piazza vs DHL/AB Service vs Extras Stefania - de todo
@@ -683,6 +703,7 @@ export const RecordsListPage = ({ section }) => {
               se le muestra el selector. Uno con 2+ (ej. DHL: DHL - AB Service +
               Extras Stefania) si necesita elegir entre las suyas. */}
           {(!scopedSections || scopedSections.length > 1) && <SectionTabs allowedSections={scopedSections} />}
+          {zonaOptions && <SegmentedControl options={zonaOptions} value={zonaFilter} onChange={setZonaFilter} />}
           {/* En proceso/Terminados solo tiene sentido para el chofer: no tiene el panel
               de Pendientes ni navegacion mes a mes, asi que es su unica forma de acotar
               la lista. El OWNER/ADMIN ya tiene Pendientes a la derecha, asi que ve todo
@@ -705,7 +726,14 @@ export const RecordsListPage = ({ section }) => {
             </button>
           )}
           {isPrivileged && sectionConfig.allowCreate && (
-            <Link to={sectionConfig.newPath} state={{ backgroundLocation: location }}>
+            // Se manda la zona activa (si esta seccion tiene switch) para que el
+            // formulario de alta arranque en la misma zona que se esta mirando - antes
+            // "Nuevo servicio" desde Roma igual abria el formulario en Milano por
+            // defecto, distinto de lo que se ve en Milano (arranca en Milano siempre).
+            <Link
+              to={sectionConfig.newPath}
+              state={{ backgroundLocation: location, zona: zonaOptions ? zonaFilter : undefined }}
+            >
               <Button className="w-auto px-5">Nuevo servicio</Button>
             </Link>
           )}
@@ -881,7 +909,7 @@ export const RecordsListPage = ({ section }) => {
                 const dayOpen = openDays.has(day.key);
                 const loaded = dayRecords.get(day.key);
                 const dayVisibleRecords = loaded
-                  ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione))
+                  ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r))
                   .sort((a, b) => driverName(a).localeCompare(driverName(b)));
 
                 return (

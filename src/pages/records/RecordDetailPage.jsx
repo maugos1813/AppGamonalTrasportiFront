@@ -19,10 +19,10 @@ import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import {
   APLICATIVO_OPTIONS,
-  EXTRAS_PIAZZA_ZONA_LABELS,
-  EXTRAS_PIAZZA_ZONA_OPTIONS,
   RECORD_STATUS_OPTIONS,
   TIPO_ARCHIVO_LABELS,
+  ZONA_LABELS,
+  ZONA_OPTIONS,
 } from "../../lib/constants";
 import { formatCurrency, formatDateTime, toDateTimeInputValue } from "../../lib/format";
 import {
@@ -495,7 +495,7 @@ const RecordSummaryView = ({
         <InfoRow label="Cliente" value={record.client?.nombre} />
         {record.ciudad && <InfoRow label="Ciudad" value={record.ciudad} />}
         {record.extrasPiazzaZona && (
-          <InfoRow label="Zona" value={EXTRAS_PIAZZA_ZONA_LABELS[record.extrasPiazzaZona]} />
+          <InfoRow label="Zona" value={ZONA_LABELS[record.extrasPiazzaZona]} />
         )}
         <InfoRow
           label="Chofer"
@@ -642,10 +642,20 @@ const RecordEditForm = ({
   onCancel,
 }) => {
   const isDhlAb = record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
+  // Extras Stefania es el unico tipo sin Zona (Extras Piazza y DHL/AB Service si la
+  // usan, ver ZONA_OPTIONS mas abajo - DHL empezo a operar tambien en Roma).
   const isExtrasStefania = record.spedizzione === "EXTRAS_STEFANIA";
-  // Extras Stefania no tiene ni Aplicativo (propio de DHL) ni Zona (propio de Extras
-  // Piazza) - ningun campo especial en este bloque.
-  const isExtrasPiazza = !isDhlAb && !isExtrasStefania;
+
+  // Mismo criterio que NewDhlAbServiceRecordPage.jsx: el Aplicativo se acota a la zona
+  // elegida (MILANO_1..18 o ROMA_1..10), y cambiar de zona limpia un aplicativo que ya
+  // no corresponde.
+  const aplicativoOptions = APLICATIVO_OPTIONS.filter((opt) =>
+    opt.value.startsWith(`${form.extrasPiazzaZona}_`)
+  );
+  const handleChangeZona = (zona) => {
+    setField("extrasPiazzaZona", zona);
+    if (form.aplicativo && !form.aplicativo.startsWith(`${zona}_`)) setField("aplicativo", "");
+  };
 
   return (
     <GlassCard>
@@ -695,24 +705,24 @@ const RecordEditForm = ({
                 value={form.vehicleId}
                 onChange={(v) => setField("vehicleId", v)}
               />
+              {!isExtrasStefania && (
+                <SearchableSelect
+                  id="extrasPiazzaZona"
+                  label="Zona"
+                  placeholder="Escribe para buscar una zona"
+                  options={ZONA_OPTIONS}
+                  value={form.extrasPiazzaZona}
+                  onChange={handleChangeZona}
+                />
+              )}
               {isDhlAb && (
                 <SearchableSelect
                   id="aplicativo"
                   label="Numero de aplicativo"
                   placeholder="Escribe para buscar un aplicativo"
-                  options={APLICATIVO_OPTIONS}
+                  options={aplicativoOptions}
                   value={form.aplicativo}
                   onChange={(v) => setField("aplicativo", v)}
-                />
-              )}
-              {isExtrasPiazza && (
-                <SearchableSelect
-                  id="extrasPiazzaZona"
-                  label="Zona"
-                  placeholder="Escribe para buscar una zona"
-                  options={EXTRAS_PIAZZA_ZONA_OPTIONS}
-                  value={form.extrasPiazzaZona}
-                  onChange={(v) => setField("extrasPiazzaZona", v)}
                 />
               )}
               <TextField
