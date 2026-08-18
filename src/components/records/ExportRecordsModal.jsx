@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { SearchableSelect } from "../ui/SearchableSelect";
 import { TextField } from "../ui/TextField";
 import { RECORD_STATUS_OPTIONS, ZONA_OPTIONS } from "../../lib/constants";
+import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import { exportRecordsRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
@@ -124,7 +125,16 @@ export const ExportRecordsModal = ({ open, onClose }) => {
       downloadCsv(`registros${rango}.csv`, buildRecordsCsv(records));
       onClose();
     } catch (err) {
-      setExportError(err.response?.data?.message ?? "No se pudo generar el export.");
+      // parseApiError trae "details" (fieldErrors) ademas del message generico - sin
+      // esto un 400 de validacion solo mostraba "Datos invalidos" sin decir cual campo,
+      // imposible de diagnosticar desde la UI.
+      const parsed = parseApiError(err);
+      const detail = parsed.fieldErrors
+        ? Object.entries(parsed.fieldErrors)
+            .map(([field, messages]) => `${field}: ${messages.join(", ")}`)
+            .join(" | ")
+        : null;
+      setExportError(detail ? `${parsed.message} (${detail})` : parsed.message);
     } finally {
       setExporting(false);
     }
