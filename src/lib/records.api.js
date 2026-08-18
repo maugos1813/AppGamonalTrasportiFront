@@ -16,6 +16,11 @@ export const listPendingRecordsRequest = () =>
 export const searchRecordsRequest = (q) =>
   api.get("/records/search", { params: { q } }).then((res) => res.data.data.records);
 
+// Export CSV de Registros (ver ExportRecordsModal.jsx) - todos los filtros son
+// opcionales, se mandan tal cual (undefined se omite solo, axios no lo serializa).
+export const exportRecordsRequest = (filters) =>
+  api.get("/records/export", { params: filters }).then((res) => res.data.data.records);
+
 // Registros cuyo ultimo intento de sincronizar con AppSheet fallo (campanita OWNER/ADMIN).
 export const listAppsheetSyncFailuresRequest = () =>
   api.get("/records/sync-fallidos").then((res) => res.data.data.records);

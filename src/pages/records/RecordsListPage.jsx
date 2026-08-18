@@ -3,6 +3,7 @@ import { Link, NavLink, Navigate, useLocation } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { ExportRecordsModal } from "../../components/records/ExportRecordsModal";
 import { PageLoader } from "../../components/ui/PageLoader";
 import { Select } from "../../components/ui/Select";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
@@ -45,6 +46,22 @@ const SyncIcon = (props) => (
     <path d="M21 3v5h-5" />
     <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
     <path d="M3 21v-5h5" />
+  </svg>
+);
+
+const DownloadIcon = (props) => (
+  <svg
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.8"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M12 3v13" />
+    <path d="M7 11l5 5 5-5" />
+    <path d="M4 21h16" />
   </svg>
 );
 
@@ -417,6 +434,7 @@ export const RecordsListPage = ({ section }) => {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState(null);
   const [syncError, setSyncError] = useState("");
+  const [showExportModal, setShowExportModal] = useState(false);
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -725,6 +743,17 @@ export const RecordsListPage = ({ section }) => {
               <SyncIcon className={`h-[16px] w-[16px] ${syncing ? "animate-spin" : ""}`} />
             </button>
           )}
+          {isPrivileged && (
+            <button
+              type="button"
+              aria-label="Exportar a CSV"
+              title="Exportar registros a CSV"
+              onClick={() => setShowExportModal(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/15 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20"
+            >
+              <DownloadIcon className="h-[16px] w-[16px]" />
+            </button>
+          )}
           {isPrivileged && sectionConfig.allowCreate && (
             // Se manda la zona activa (si esta seccion tiene switch) para que el
             // formulario de alta arranque en la misma zona que se esta mirando - antes
@@ -974,6 +1003,10 @@ export const RecordsListPage = ({ section }) => {
             <RecordCard key={record.id} record={record} />
           ))}
         </div>
+      )}
+
+      {isPrivileged && (
+        <ExportRecordsModal open={showExportModal} onClose={() => setShowExportModal(false)} />
       )}
     </div>
   );
