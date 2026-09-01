@@ -9,16 +9,14 @@ export const AREA_OPTIONS = [
 ];
 
 // Seccion(es) de Registros/Control economico a las que queda acotado un ADMIN "de
-// area" (ver lib/permissions.js) - lista, no un solo valor, porque el ADMIN de DHL
-// tambien administra Extras Stefania (no tiene area propia todavia). Un area sin
-// entrada aca (ej. FARMACIA) no tiene seccion propia todavia.
+// area" (ver lib/permissions.js) - lista, no un solo valor, por si a futuro un area
+// vuelve a cubrir mas de una seccion. Un area sin entrada aca (ej. FARMACIA) no tiene
+// seccion propia todavia. "extras-stefania" se saco de DHL: esa seccion (y DHL Milano/
+// AB Service) ya no se ofrece en Registros para nadie, ni siquiera el ADMIN de area
+// DHL - ver VISIBLE_SECTION_KEYS en RecordsListPage.jsx.
 export const ADMIN_AREA_RECORDS_SECTION = {
   EXTRAS_PIAZZA: ["extras-piazza"],
-  DHL: ["dhl-ab-service", "extras-stefania"],
-};
-export const ADMIN_AREA_DASHBOARD_SECTION = {
-  EXTRAS_PIAZZA: ["extras_piazza"],
-  DHL: ["dhl_ab", "extras_stefania"],
+  DHL: ["dhl-ab-service"],
 };
 
 export const CARGO_LABELS = {

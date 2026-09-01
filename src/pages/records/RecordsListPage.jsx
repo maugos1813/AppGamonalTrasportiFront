@@ -82,6 +82,11 @@ const TAB_STATUSES = {
 // "DHL - AB Service" agrupa ambos spedizzione; el alta desde esta seccion crea
 // siempre servicios DHL (AB_SERVICE por ahora solo llega via sincronizacion externa).
 // "Extras Stefania" la administra el mismo ADMIN de DHL (ver ADMIN_AREA_RECORDS_SECTION).
+// Las 3 quedan definidas igual (rutas /new y edicion siguen andando si se entra por
+// URL directa), pero SECTION_OPTIONS de mas abajo solo ofrece navegar a "extras-piazza"
+// y "dhl-ab-service" (ahora acotada a DHL Roma) - pedido explicito: Registros solo
+// muestra Extras Piazza Milano/Roma + DHL Roma, ocultando DHL Milano/AB Service/Extras
+// Stefania para cualquiera que entre (OWNER, y tambien el ADMIN de area DHL).
 const SECTIONS = {
   "extras-piazza": {
     label: "Extras Piazza",
@@ -90,8 +95,8 @@ const SECTIONS = {
     newPath: "/records/extras-piazza/new",
   },
   "dhl-ab-service": {
-    label: "DHL - AB Service",
-    matchesSpedizzione: (s) => s === "DHL" || s === "AB_SERVICE",
+    label: "DHL Roma",
+    matchesSpedizzione: (s) => s === "DHL",
     allowCreate: true,
     newPath: "/records/dhl-ab-service/new",
   },
@@ -102,22 +107,19 @@ const SECTIONS = {
     newPath: "/records/extras-stefania/new",
   },
 };
-const SECTION_OPTIONS = Object.entries(SECTIONS).map(([value, s]) => ({ value, label: s.label }));
+const VISIBLE_SECTION_KEYS = ["extras-piazza", "dhl-ab-service"];
+const SECTION_OPTIONS = VISIBLE_SECTION_KEYS.map((value) => ({ value, label: SECTIONS[value].label }));
 
 // Switch Milano/Roma dentro de cada seccion (ver extrasPiazzaZona en el registro).
-// Extras Stefania no tiene, no opera por zona. El orden importa: es tambien el orden
-// en que aparecen las opciones del SegmentedControl, y options[0] es el default al
-// entrar a la seccion - Roma primero en DHL porque es la operacion nueva que se quiere
-// ver de entrada; Milano primero en Extras Piazza, que es como opera desde siempre.
+// Extras Stefania no tiene, no opera por zona. "dhl-ab-service" quedo acotada a un
+// solo valor (Roma) a proposito - ver comentario de SECTIONS arriba - asi que no
+// necesita switch, matchesZona igual exige "ROMA" con esta unica opcion.
 const ZONA_OPTIONS_BY_SECTION = {
   "extras-piazza": [
     { value: "MILANO", label: "Milano" },
     { value: "ROMA", label: "Roma" },
   ],
-  "dhl-ab-service": [
-    { value: "ROMA", label: "Roma" },
-    { value: "MILANO", label: "Milano" },
-  ],
+  "dhl-ab-service": [{ value: "ROMA", label: "Roma" }],
 };
 
 // El backend arma los rangos /:year/:month/:day en UTC (buildDateRange). El resumen
@@ -721,7 +723,11 @@ export const RecordsListPage = ({ section }) => {
               se le muestra el selector. Uno con 2+ (ej. DHL: DHL - AB Service +
               Extras Stefania) si necesita elegir entre las suyas. */}
           {(!scopedSections || scopedSections.length > 1) && <SectionTabs allowedSections={scopedSections} />}
-          {zonaOptions && <SegmentedControl options={zonaOptions} value={zonaFilter} onChange={setZonaFilter} />}
+          {/* zonaOptions con 1 solo valor (hoy: DHL Roma) no necesita switch - ya esta
+              fijo, mostrar un SegmentedControl de un boton no aporta nada. */}
+          {zonaOptions && zonaOptions.length > 1 && (
+            <SegmentedControl options={zonaOptions} value={zonaFilter} onChange={setZonaFilter} />
+          )}
           {/* En proceso/Terminados solo tiene sentido para el chofer: no tiene el panel
               de Pendientes ni navegacion mes a mes, asi que es su unica forma de acotar
               la lista. El OWNER/ADMIN ya tiene Pendientes a la derecha, asi que ve todo

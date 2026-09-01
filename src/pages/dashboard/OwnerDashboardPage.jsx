@@ -18,10 +18,10 @@ import {
   computeMonthlyKmTrend,
   computeMonthlyRevenueTrend,
   isDhlAbRecord,
+  isDhlRomaRecord,
   isExtrasStefaniaRecord,
 } from "../../lib/dashboardStats";
 import { formatCurrency, formatCurrencyCompact } from "../../lib/format";
-import { scopedDashboardSections } from "../../lib/permissions";
 import { listRecordsRequest } from "../../lib/records.api";
 
 // Lazy: los 4 graficos (y recharts, la libreria detras) se descargan y ejecutan en
@@ -51,30 +51,36 @@ const PERIOD_DELTA_LABEL = {
   mes: "vs mes pasado",
 };
 
-const SECTION_OPTIONS = [
-  { value: "extras_piazza", label: "Extras Piazza" },
-  { value: "dhl_ab", label: "DHL - AB Service" },
-  { value: "extras_stefania", label: "Extras Stefania" },
-];
-
-const SECTION_LABEL = {
-  extras_piazza: "Extras Piazza",
-  dhl_ab: "DHL - AB Service",
-  extras_stefania: "Extras Stefania",
+// Navegador de mes puntual para el periodo "Mes" del Control economico (antes
+// siempre mostraba el mes en curso, sin forma de mirar uno pasado) - mismo patron
+// que el acordeon de Registros (shiftMonth/monthLabel en RecordsListPage.jsx).
+const shiftMonth = ({ year, month }, delta) => {
+  const d = new Date(year, month - 1 + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
 };
+const monthLabel = (year, month) =>
+  new Date(year, month - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" }).toUpperCase();
 
-// Sub-division de Extras Piazza (Record.extrasPiazzaZona). Hoy toda la operacion de
-// Extras Piazza es Milano (Roma todavia no arranco) y casi ningun registro tiene la
-// zona cargada, asi que un registro sin zona cuenta como Milano (mismo criterio que
-// ya se usa con spedizzione null = Extras Piazza) en vez de un balde "sin zona"
-// aparte. "General" no filtra nada, para ver ambas zonas juntas. DHL/AB Service no
-// tiene este concepto, este selector solo aparece dentro de Extras Piazza.
-const ZONA_OPTIONS = [
+// Este dashboard es unicamente "Piazza + DHL Roma" (Extras Piazza Milano + Extras
+// Piazza Roma + DHL Roma) - pedido explicito: ya no se ofrece Extras Piazza/DHL -
+// AB Service/Extras Stefania como secciones aparte, ni siquiera al ADMIN de area
+// DHL (el selector de seccion que existia se saco entero, junto con
+// scopedDashboardSections/ADMIN_AREA_DASHBOARD_SECTION en lib/permissions.js y
+// lib/constants.js - ya no queda nada que scopear aca). Sin AB Service ni DHL
+// Milano en la cuenta - ver isDhlRomaRecord en dashboardStats.js. "General" junta
+// las 3; el resto aisla una sola.
+const MIS_AREAS_VISTA_OPTIONS = [
   { value: "TODAS", label: "General" },
-  { value: "MILANO", label: "Milano" },
-  { value: "ROMA", label: "Roma" },
+  { value: "PIAZZA_MILANO", label: "Piazza Milano" },
+  { value: "PIAZZA_ROMA", label: "Piazza Roma" },
+  { value: "DHL_ROMA", label: "DHL Roma" },
 ];
-const ZONA_LABELS = { TODAS: "Vista general", MILANO: "Piazza Milano", ROMA: "Piazza Roma" };
+const MIS_AREAS_VISTA_LABELS = {
+  TODAS: "Vista general",
+  PIAZZA_MILANO: "Piazza Milano",
+  PIAZZA_ROMA: "Piazza Roma",
+  DHL_ROMA: "DHL Roma",
+};
 
 // Detalle de que compone un anillo de Control economico (facturacion/costos/
 // ganancia), agrupado por categoria - ver facturacionBreakdown/costosBreakdown
@@ -129,16 +135,17 @@ const EconomicBreakdownModal = ({ title, sublabel, rows, total, onClose }) => {
 
 export const OwnerDashboardPage = () => {
   const { user } = useAuth();
-  // ADMIN "de area" (ver lib/permissions.js): arranca ya en la primera de sus
-  // secciones, el backend tampoco le manda registros de las demas. Puede ser mas de
-  // una (ej. DHL: DHL - AB Service + Extras Stefania).
-  const scopedSections = scopedDashboardSections(user);
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
-  const [section, setSection] = useState(scopedSections?.[0] ?? "extras_piazza");
-  const [zona, setZona] = useState("TODAS");
+  const [misAreasVista, setMisAreasVista] = useState("TODAS");
   const [openBreakdown, setOpenBreakdown] = useState(null);
+  // Mes puntual del periodo "Mes" (ver monthLabel/shiftMonth mas arriba) - arranca en
+  // el mes en curso, igual que antes de poder elegir otro.
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
+  });
 
   useEffect(() => {
     let cancelled = false;
@@ -159,33 +166,26 @@ export const OwnerDashboardPage = () => {
 
   const loaded = Boolean(records);
 
-  // Todo el bloque de Control economico mira solo la seccion elegida (Extras
-  // Piazza, DHL - AB Service o Extras Stefania): son negocios con estructuras de
-  // costos distintas (ver isDhlAbRecord/recordCost en dashboardStats.js), asi que
-  // no tiene sentido mezclarlos en el mismo numero. Dentro de Extras Piazza,
-  // ademas se acota por zona (Milano/Roma/Sin zona) - las otras 2 secciones no
-  // tienen este concepto.
+  // Todo el bloque de Control economico mira Piazza + DHL Roma (ver comentario de
+  // MIS_AREAS_VISTA_OPTIONS mas arriba) - sin zona cargada en Extras Piazza cuenta
+  // como Milano (mismo criterio que ya se usaba con spedizzione null = Extras Piazza).
   const scopedRecords = useMemo(() => {
     if (!loaded) return null;
-    const bySection = records.filter((r) => {
-      if (section === "dhl_ab") return isDhlAbRecord(r);
-      if (section === "extras_stefania") return isExtrasStefaniaRecord(r);
-      return !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r);
-    });
-    if (section !== "extras_piazza" || zona === "TODAS") return bySection;
-    // Sin zona cargada cuenta como Milano (ver comentario de ZONA_OPTIONS).
-    return bySection.filter((r) =>
-      zona === "MILANO" ? r.extrasPiazzaZona !== "ROMA" : r.extrasPiazzaZona === "ROMA"
-    );
-  }, [loaded, records, section, zona]);
+    const piazza = records.filter((r) => !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r));
+    const dhlRoma = records.filter((r) => isDhlRomaRecord(r));
+    if (misAreasVista === "PIAZZA_MILANO") return piazza.filter((r) => r.extrasPiazzaZona !== "ROMA");
+    if (misAreasVista === "PIAZZA_ROMA") return piazza.filter((r) => r.extrasPiazzaZona === "ROMA");
+    if (misAreasVista === "DHL_ROMA") return dhlRoma;
+    return [...piazza, ...dhlRoma];
+  }, [loaded, records, misAreasVista]);
 
   const economicStats = useMemo(
-    () => (loaded ? computeEconomicStats(scopedRecords, period) : null),
-    [loaded, scopedRecords, period]
+    () => (loaded ? computeEconomicStats(scopedRecords, period, new Date(), selectedMonth) : null),
+    [loaded, scopedRecords, period, selectedMonth]
   );
   const clientDistribution = useMemo(
-    () => (loaded ? computeClientDistribution(scopedRecords, period) : null),
-    [loaded, scopedRecords, period]
+    () => (loaded ? computeClientDistribution(scopedRecords, period, new Date(), selectedMonth) : null),
+    [loaded, scopedRecords, period, selectedMonth]
   );
   const monthlyTrend = useMemo(
     () => (loaded ? computeMonthlyRevenueTrend(scopedRecords) : null),
@@ -196,8 +196,11 @@ export const OwnerDashboardPage = () => {
     [loaded, scopedRecords]
   );
 
-  const sectionHeading =
-    section === "extras_piazza" ? `${SECTION_LABEL[section]} - ${ZONA_LABELS[zona]}` : SECTION_LABEL[section];
+  const sectionHeading = `Piazza + DHL Roma - ${MIS_AREAS_VISTA_LABELS[misAreasVista]}`;
+  // Para el sublabel de los modales de desglose (Facturacion/Costos/Ganancia): con
+  // "Mes" se ve el mes puntual elegido (ej. "MARZO 2026"), no la palabra generica "Mes".
+  const periodLabel =
+    period === "mes" ? monthLabel(selectedMonth.year, selectedMonth.month) : PERIOD_OPTIONS.find((o) => o.value === period)?.label;
 
   if (error) return <Alert>{error}</Alert>;
 
@@ -210,19 +213,6 @@ export const OwnerDashboardPage = () => {
           <h1 className="text-[24px] font-semibold text-ink-50">Hola, {user?.nombre}</h1>
           <p className="mt-1 text-[14px] text-ink-300">Vision general del negocio.</p>
         </div>
-        {/* Las 3 secciones tienen estructuras de costos distintas (ver recordCost en
-            dashboardStats.js), asi que todo Control economico de abajo mira solo la
-            seccion elegida aca. Un ADMIN de area con una sola seccion no tiene otra
-            a la que cambiar (el backend tampoco le manda esos registros); uno con 2+
-            (ej. DHL: DHL - AB Service + Extras Stefania) si necesita elegir entre
-            las suyas. */}
-        {(!scopedSections || scopedSections.length > 1) && (
-          <SegmentedControl
-            options={scopedSections ? SECTION_OPTIONS.filter((o) => scopedSections.includes(o.value)) : SECTION_OPTIONS}
-            value={section}
-            onChange={setSection}
-          />
-        )}
       </div>
 
       {/* Control economico: bloques de alto natural, en orden de prioridad (resumen ->
@@ -236,11 +226,33 @@ export const OwnerDashboardPage = () => {
           <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
         </div>
 
-        {/* Solo dentro de Extras Piazza: Milano/Roma/Sin zona (ver extrasPiazzaZona
-            en el schema). DHL/AB Service no se subdivide asi. */}
-        {section === "extras_piazza" && (
-          <SegmentedControl options={ZONA_OPTIONS} value={zona} onChange={setZona} />
+        {/* Solo con "Mes": elegir un mes puntual en vez de siempre el actual (mismo
+            patron que el acordeon de Registros - shiftMonth/monthLabel arriba). */}
+        {period === "mes" && (
+          <div className="flex items-center justify-between gap-2 rounded-xl glass-surface-sm px-4 py-2.5">
+            <button
+              type="button"
+              onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
+              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+            >
+              &larr; Mes anterior
+            </button>
+            <h3 className="text-[13px] font-semibold uppercase tracking-wide text-ink-100">
+              {monthLabel(selectedMonth.year, selectedMonth.month)}
+            </h3>
+            <button
+              type="button"
+              onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))}
+              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+            >
+              Mes siguiente &rarr;
+            </button>
+          </div>
         )}
+
+        {/* General/Piazza Milano/Piazza Roma/DHL Roma - ver MIS_AREAS_VISTA_OPTIONS
+            mas arriba. */}
+        <SegmentedControl options={MIS_AREAS_VISTA_OPTIONS} value={misAreasVista} onChange={setMisAreasVista} />
 
         {/* Anillos de progreso: cada uno cuenta algo distinto (no son 3 veces la
             misma metrica) - facturacion vs el periodo anterior, costos como % de lo
@@ -293,7 +305,7 @@ export const OwnerDashboardPage = () => {
         {openBreakdown === "facturacion" && (
           <EconomicBreakdownModal
             title="Facturacion"
-            sublabel={`${sectionHeading} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            sublabel={`${sectionHeading} - ${periodLabel}`}
             rows={economicStats.facturacionBreakdown}
             total={economicStats.facturacion}
             onClose={() => setOpenBreakdown(null)}
@@ -302,7 +314,7 @@ export const OwnerDashboardPage = () => {
         {openBreakdown === "costos" && (
           <EconomicBreakdownModal
             title="Costos operativos"
-            sublabel={`${sectionHeading} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            sublabel={`${sectionHeading} - ${periodLabel}`}
             rows={economicStats.costosBreakdown}
             total={economicStats.costos}
             onClose={() => setOpenBreakdown(null)}
@@ -311,7 +323,7 @@ export const OwnerDashboardPage = () => {
         {openBreakdown === "ganancia" && (
           <EconomicBreakdownModal
             title="Ganancia estimada"
-            sublabel={`${sectionHeading} - ${PERIOD_OPTIONS.find((o) => o.value === period)?.label}`}
+            sublabel={`${sectionHeading} - ${periodLabel}`}
             rows={[
               { label: "Facturacion", monto: economicStats.facturacion },
               { label: "Costos operativos", monto: -economicStats.costos },

@@ -22,17 +22,33 @@ const startOfWeek = (date) => {
 
 const startOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1);
 
-const isWithinPeriod = (value, period, now) => {
+// selectedMonth ({year, month(1-indexed)}) - solo se usa para period "mes": permite
+// elegir un mes puntual (no solo el actual) en el Control economico del dashboard OWNER
+// (ver PeriodPicker en OwnerDashboardPage.jsx). Sin selectedMonth, es el mes en curso -
+// mismo comportamiento de siempre, salvo que ahora tambien queda acotado hacia arriba
+// (antes "mes" no tenia techo: un registro de cualquier fecha futura, no solo de este
+// mes, contaba igual - bug latente sin efecto practico porque nunca hubo datos tan
+// adelantados, pero hacia falta un techo real para poder acotar un mes pasado).
+const monthRange = (now, selectedMonth) => {
+  const year = selectedMonth?.year ?? now.getFullYear();
+  const month = selectedMonth?.month ?? now.getMonth() + 1;
+  return { start: new Date(year, month - 1, 1), end: new Date(year, month, 1) };
+};
+
+const isWithinPeriod = (value, period, now, selectedMonth) => {
   const date = new Date(value);
   if (period === "hoy") return isSameDay(date, now);
   if (period === "semana") return date >= startOfWeek(now);
-  if (period === "mes") return date >= startOfMonth(now);
+  if (period === "mes") {
+    const { start, end } = monthRange(now, selectedMonth);
+    return date >= start && date < end;
+  }
   return true;
 };
 
 // Rango del periodo inmediatamente anterior al seleccionado (mismo largo), para
 // poder mostrar "+X% vs periodo anterior" en los KPI economicos.
-const isWithinPreviousPeriod = (value, period, now) => {
+const isWithinPreviousPeriod = (value, period, now, selectedMonth) => {
   const date = new Date(value);
   if (period === "hoy") {
     const yesterday = new Date(now);
@@ -46,7 +62,7 @@ const isWithinPreviousPeriod = (value, period, now) => {
     return date >= prevStart && date < start;
   }
   if (period === "mes") {
-    const start = startOfMonth(now);
+    const { start } = monthRange(now, selectedMonth);
     const prevStart = new Date(start.getFullYear(), start.getMonth() - 1, 1);
     return date >= prevStart && date < start;
   }
@@ -215,9 +231,13 @@ export const computeWeeklyServiceTrend = (records, now = new Date()) => {
   }));
 };
 
-export const computeEconomicStats = (records, period, now = new Date()) => {
-  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
-  const previousScoped = records.filter((r) => isWithinPreviousPeriod(r.fechaServicio, period, now));
+// selectedMonth ({year, month(1-indexed)}): solo aplica con period "mes", para poder
+// mirar un mes puntual en vez de siempre el actual - ver monthRange mas arriba.
+export const computeEconomicStats = (records, period, now = new Date(), selectedMonth = null) => {
+  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now, selectedMonth));
+  const previousScoped = records.filter((r) =>
+    isWithinPreviousPeriod(r.fechaServicio, period, now, selectedMonth)
+  );
 
   const facturacion = scoped.reduce((sum, r) => sum + recordRevenue(r), 0);
   const costos = scoped.reduce((sum, r) => sum + recordCost(r), 0);
@@ -346,8 +366,8 @@ const MAX_CLIENT_SLICES = 4;
 
 // Distribucion de facturacion por cliente en el periodo, para el grafico de
 // torta del dashboard OWNER. Agrupa todo lo que no entra en el top N como "Otros".
-export const computeClientDistribution = (records, period, now = new Date()) => {
-  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now));
+export const computeClientDistribution = (records, period, now = new Date(), selectedMonth = null) => {
+  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now, selectedMonth));
 
   const totalsByClient = new Map();
   scoped.forEach((r) => {
@@ -524,8 +544,9 @@ export const isReperibilidadNoDisponibleHoy = (user, now = new Date()) =>
 // DHL en Roma (a diferencia de Milano) tambien entra en Reperibilita - a proposito
 // no se agrega AB Service ni DHL Milano aca (no hay AB Service en Roma, y sumar DHL
 // Milano inundaria la lista con el historico que nunca tuvo Zona cargada, cambiando
-// el comportamiento de Milano sin que se haya pedido).
-const isDhlRomaRecord = (r) => r.spedizzione === "DHL" && r.extrasPiazzaZona === "ROMA";
+// el comportamiento de Milano sin que se haya pedido). Exportada: el dashboard OWNER
+// ("Piazza + DHL Roma") reusa el mismo criterio en vez de inventar uno propio.
+export const isDhlRomaRecord = (r) => r.spedizzione === "DHL" && r.extrasPiazzaZona === "ROMA";
 
 // Un chofer/vehiculo entra en Reperibilita si es de Extras Piazza (cualquier grupo,
 // igual que siempre) o si es de DHL Y esta en el grupo Roma - mismo criterio que
