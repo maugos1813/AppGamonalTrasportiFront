@@ -12,7 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, GRUPO_OPTIONS } from "../../lib/constants";
-import { computeDriverDocumentAlerts, computeDriverKmRanking } from "../../lib/dashboardStats";
+import { computeDriverDocumentAlerts, computeDriverKmRanking, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
 import { listDocumentsRequest } from "../../lib/documents.api";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
@@ -157,9 +157,10 @@ const DriverKmModal = ({ entry, onClose }) => {
 };
 
 // Top de choferes por KM recorrido este mes (planificado o real, ver
-// computeDriverKmRanking) - misma logica que se usaba antes en el dashboard.
+// computeDriverKmRanking) - misma logica que se usaba antes en el dashboard. Acotado a
+// Piazza + DHL Roma (ver filterToPiazzaYDhlRoma), mismo criterio que el resto de la app.
 const DriverRankingPanel = ({ records }) => {
-  const ranking = records ? computeDriverKmRanking(records, "mes").slice(0, 10) : undefined;
+  const ranking = records ? computeDriverKmRanking(filterToPiazzaYDhlRoma(records), "mes").slice(0, 10) : undefined;
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   return (

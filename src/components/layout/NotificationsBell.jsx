@@ -20,6 +20,22 @@ export const SEVERITY_DOT_CLASSES = {
   reminder: "bg-yellow-500",
 };
 
+// Exportado: DailySummaryPage (pestania Diario) reusa el mismo icono para su propio
+// boton de "eliminar" - misma lista de alertas que este dropdown.
+export const CloseIcon = (props) => (
+  <svg
+    viewBox="0 0 20 20"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    {...props}
+  >
+    <path d="M5 5l10 10M15 5L5 15" />
+  </svg>
+);
+
 const BellIcon = (props) => (
   <svg
     viewBox="0 0 24 24"
@@ -39,7 +55,7 @@ const BellIcon = (props) => (
 // fijo (no cambia con el tema), asi que no puede usar los tokens ink-*/line
 // (pensados para el fondo de la app) o se volveria invisible en tema claro.
 export const NotificationsBell = ({ variant = "default" }) => {
-  const { alerts, loading } = useNotifications();
+  const { alerts, loading, dismiss } = useNotifications();
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const isSidebar = variant === "sidebar";
@@ -97,7 +113,12 @@ export const NotificationsBell = ({ variant = "default" }) => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-20 w-72 rounded-2xl glass-surface p-3 sm:w-80">
+        // bg-background ademas de glass-surface: el fondo "vidrio" (transparencia +
+        // blur) que usa glass-surface se pensado para tarjetas dentro del flujo de la
+        // pagina, no para un panel flotante encima de todo - en tema oscuro quedaba
+        // demasiado transparente y no se leia bien contra lo que hay detras. Mismo
+        // patron que ya usan los modales (EconomicBreakdownModal, etc.).
+        <div className="absolute right-0 top-12 z-20 w-72 rounded-2xl glass-surface bg-background p-3 sm:w-80">
           <span className="block px-1 pb-2 text-[13px] font-medium text-ink-300">
             Notificaciones
           </span>
@@ -112,18 +133,34 @@ export const NotificationsBell = ({ variant = "default" }) => {
             <ul className="flex max-h-80 flex-col gap-2 overflow-y-auto">
               {alerts.map((alert) => {
                 const itemClassName = clsx(
-                  "block rounded-xl border px-3 py-2.5 text-[13px]",
+                  "flex items-start gap-2 rounded-xl border px-3 py-2.5 text-[13px]",
                   SEVERITY_ITEM_CLASSES[alert.severity] ?? SEVERITY_ITEM_CLASSES.warning
                 );
                 return (
-                  <li key={alert.id}>
+                  <li key={alert.id} className={itemClassName}>
                     {alert.link ? (
-                      <Link to={alert.link} onClick={() => setOpen(false)} className={clsx(itemClassName, "hover:brightness-110")}>
+                      <Link to={alert.link} onClick={() => setOpen(false)} className="min-w-0 flex-1 hover:underline">
                         {alert.message}
                       </Link>
                     ) : (
-                      <div className={itemClassName}>{alert.message}</div>
+                      <span className="min-w-0 flex-1">{alert.message}</span>
                     )}
+                    {/* "Eliminar" no borra nada en el backend (la alerta se recalcula
+                        sola) - queda descartada por dispositivo hasta que la misma
+                        situacion empeore (ver isDismissed en NotificationsContext). */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        dismiss(alert);
+                      }}
+                      aria-label="Eliminar notificacion"
+                      title="Eliminar notificacion"
+                      className="shrink-0 rounded-full p-1 opacity-60 transition-opacity hover:bg-current/10 hover:opacity-100"
+                    >
+                      <CloseIcon className="h-3.5 w-3.5" />
+                    </button>
                   </li>
                 );
               })}

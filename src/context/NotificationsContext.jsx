@@ -33,6 +33,38 @@ const SEVERITY_ORDER = { urgent: 0, warning: 1, reminder: 2 };
 const sortBySeverity = (list) =>
   [...list].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity]);
 
+// "Eliminar" una notificacion no borra nada del backend (las alertas se recalculan
+// solas en cada refresh, no son filas propias) - queda guardado en localStorage (por
+// dispositivo/navegador, con la severidad que tenia en ese momento) para no volver a
+// mostrarla. Si la misma alerta (mismo id) reaparece MAS grave que cuando se
+// descarto (ej. paso de "recordatorio" a "urgente"), se vuelve a mostrar igual - no
+// queremos que descartar un aviso temprano termine tapando algo que se puso critico.
+const dismissedStorageKey = (userId) => `gt-dismissed-alerts:${userId}`;
+
+const loadDismissed = (userId) => {
+  if (!userId) return {};
+  try {
+    return JSON.parse(localStorage.getItem(dismissedStorageKey(userId))) ?? {};
+  } catch {
+    return {};
+  }
+};
+
+const saveDismissed = (userId, dismissed) => {
+  if (!userId) return;
+  try {
+    localStorage.setItem(dismissedStorageKey(userId), JSON.stringify(dismissed));
+  } catch {
+    // localStorage lleno o bloqueado (modo privado) - no rompe el resto de la app.
+  }
+};
+
+const isDismissed = (alert, dismissed) => {
+  const dismissedSeverity = dismissed[alert.id];
+  if (dismissedSeverity == null) return false;
+  return SEVERITY_ORDER[alert.severity] >= SEVERITY_ORDER[dismissedSeverity];
+};
+
 // Alertas operativas del chofer (vencimientos, mantenimiento del vehiculo asignado,
 // evidencia faltante).
 const buildChoferAlerts = async () => {
@@ -126,9 +158,25 @@ export const NotificationsProvider = ({ children }) => {
   const { pathname } = useLocation();
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [dismissed, setDismissed] = useState({});
 
   const isChofer = user?.cargo === "CHOFER";
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+
+  // Se recarga cada vez que cambia el usuario (login/logout), no solo al montar -
+  // sin esto, cerrar sesion y entrar con otra cuenta en el mismo navegador seguia
+  // mostrando los descartes del usuario anterior hasta refrescar la pagina entera.
+  useEffect(() => {
+    setDismissed(loadDismissed(user?.id));
+  }, [user?.id]);
+
+  const dismiss = (alert) => {
+    setDismissed((prev) => {
+      const next = { ...prev, [alert.id]: alert.severity };
+      saveDismissed(user?.id, next);
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (!isChofer && !isPrivileged) {
@@ -164,8 +212,12 @@ export const NotificationsProvider = ({ children }) => {
     };
   }, [isChofer, isPrivileged, pathname]);
 
+  const visibleAlerts = alerts.filter((a) => !isDismissed(a, dismissed));
+
   return (
-    <NotificationsContext.Provider value={{ alerts, loading }}>{children}</NotificationsContext.Provider>
+    <NotificationsContext.Provider value={{ alerts: visibleAlerts, loading, dismiss }}>
+      {children}
+    </NotificationsContext.Provider>
   );
 };
 

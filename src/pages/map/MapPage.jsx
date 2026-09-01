@@ -10,7 +10,7 @@ import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { EN_PROCESO_STATUSES } from "../../lib/constants";
-import { computeLocationPermissionAlerts } from "../../lib/dashboardStats";
+import { computeLocationPermissionAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
 import { addMinutes, formatDateTime } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { getRecordLiveEtaRequest, getRecordRequest, listRecordsRequest } from "../../lib/records.api";
@@ -151,7 +151,10 @@ export const MapPage = () => {
         });
       listRecordsRequest()
         .then((data) => {
-          if (!cancelled) setRecords(data);
+          // Acotado a Piazza + DHL Roma (ver filterToPiazzaYDhlRoma) - la lista de
+          // "servicios en curso" no debe mostrar pendientes de DHL Milano/AB Service/
+          // Extras Stefania, mismo criterio que el resto de la app.
+          if (!cancelled) setRecords(filterToPiazzaYDhlRoma(data));
         })
         .catch((err) => {
           if (!cancelled) setError(parseApiError(err).message);

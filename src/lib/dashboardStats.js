@@ -158,6 +158,14 @@ const ECONOMIC_COST_FIELD_LABELS = {
 export const isDhlAbRecord = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
 export const isExtrasStefaniaRecord = (record) => record.spedizzione === "EXTRAS_STEFANIA";
 
+// Registros de las 3 areas que se manejan juntos: Extras Piazza (Milano + Roma) + DHL
+// Roma - ver isDhlRomaRecord mas abajo. Deja afuera DHL Milano, AB Service y Extras
+// Stefania en cualquier pantalla que muestre datos agregados (rankings, resumenes,
+// mapa) - pedido explicito: esas 3 areas son las unicas utiles, en toda la app, no
+// solo en Registros/Dashboard.
+export const filterToPiazzaYDhlRoma = (records) =>
+  records.filter((r) => (!isDhlAbRecord(r) && !isExtrasStefaniaRecord(r)) || isDhlRomaRecord(r));
+
 // Tarifa de referencia para estimar lo facturado (rimborso km estandar).
 const DHL_KM_RATE = 0.43;
 const DHL_KM_MULTIPLIER = 2;

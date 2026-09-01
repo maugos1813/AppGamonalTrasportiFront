@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { SEVERITY_DOT_CLASSES, SEVERITY_ITEM_CLASSES } from "../../components/layout/NotificationsBell";
+import { CloseIcon, SEVERITY_DOT_CLASSES, SEVERITY_ITEM_CLASSES } from "../../components/layout/NotificationsBell";
 import { Alert } from "../../components/ui/Alert";
 import { AsignarServicioFuturoModal } from "../../components/ui/AsignarServicioFuturoModal";
 import { Avatar } from "../../components/ui/Avatar";
@@ -28,6 +28,7 @@ import {
   computeServicePeriodStats,
   computeVehicleStats,
   computeWeeklyServiceTrend,
+  filterToPiazzaYDhlRoma,
   isReperibilidadNoDisponibleHoy,
 } from "../../lib/dashboardStats";
 import { RECORD_STATUS_LABELS } from "../../lib/constants";
@@ -377,7 +378,7 @@ const ProfitLossList = ({ title, items, tone }) => (
 export const DailySummaryPage = () => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  const { alerts, loading } = useNotifications();
+  const { alerts, loading, dismiss } = useNotifications();
   const groups = useMemo(() => groupAlerts(alerts), [alerts]);
   // Filtro de zona del Diario (solo OWNER/ADMIN - el chofer no ve este switch, sus
   // alertas son personales y no llevan grupo). Alertas sin grupo (cumpleanios,
@@ -420,10 +421,13 @@ export const DailySummaryPage = () => {
 
     // General/Semanal/Reperibilita solo necesitan hoy/esta semana - pedir todo el
     // historico (miles de registros, ~2.7MB) para despues filtrar en el navegador era
-    // el cuello de botella real de esta pagina.
+    // el cuello de botella real de esta pagina. Acotado a Piazza + DHL Roma (ver
+    // filterToPiazzaYDhlRoma) desde este unico punto: alcanza a las 3 pestanas que
+    // usan "records" (General/Semanal/Reperibilita ya filtraba por su cuenta, pero
+    // General y Semanal no lo hacian).
     listRecordsRequest({ days: 7 })
       .then((data) => {
-        if (!cancelled) setRecords(data);
+        if (!cancelled) setRecords(filterToPiazzaYDhlRoma(data));
       })
       .catch((err) => {
         if (!cancelled) setWeeklyError(parseApiError(err).message);
@@ -922,7 +926,7 @@ export const DailySummaryPage = () => {
                 <ul className="mt-3 flex flex-col gap-2">
                   {group.items.map((alert) => {
                     const itemClassName = clsx(
-                      "block rounded-xl border px-4 py-3 text-[13px]",
+                      "flex flex-1 items-start gap-2 rounded-xl border px-4 py-3 text-[13px]",
                       SEVERITY_ITEM_CLASSES[alert.severity] ?? SEVERITY_ITEM_CLASSES.warning
                     );
                     return (
@@ -933,13 +937,26 @@ export const DailySummaryPage = () => {
                             SEVERITY_DOT_CLASSES[alert.severity] ?? SEVERITY_DOT_CLASSES.warning
                           )}
                         />
-                        {alert.link ? (
-                          <Link to={alert.link} className={clsx(itemClassName, "flex-1 hover:brightness-110")}>
-                            {alert.message}
-                          </Link>
-                        ) : (
-                          <div className={clsx(itemClassName, "flex-1")}>{alert.message}</div>
-                        )}
+                        <div className={itemClassName}>
+                          {alert.link ? (
+                            <Link to={alert.link} className="min-w-0 flex-1 hover:underline">
+                              {alert.message}
+                            </Link>
+                          ) : (
+                            <span className="min-w-0 flex-1">{alert.message}</span>
+                          )}
+                          {/* "Eliminar" no borra nada en el backend, ver comentario de
+                              isDismissed en NotificationsContext.jsx. */}
+                          <button
+                            type="button"
+                            onClick={() => dismiss(alert)}
+                            aria-label="Eliminar notificacion"
+                            title="Eliminar notificacion"
+                            className="shrink-0 rounded-full p-1 opacity-60 transition-opacity hover:bg-current/10 hover:opacity-100"
+                          >
+                            <CloseIcon className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
                       </li>
                     );
                   })}
