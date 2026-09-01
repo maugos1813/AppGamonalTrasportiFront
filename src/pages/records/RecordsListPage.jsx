@@ -375,9 +375,15 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => {
   );
 };
 
-// El backend ya filtra (en curso, servicios de hoy) y ordena por ETA - solo se renderiza tal cual.
-// scopedLabel: si es un ADMIN de area, el backend ya solo le manda su seccion, asi que
-// el subtitulo no debe prometer "Extras Piazza y DHL - AB Service juntos".
+// El backend ya filtra (en curso, servicios de hoy) y ordena por ETA - solo se
+// renderiza tal cual. Records llega filtrado ademas por seccion/zona (ver el
+// sectionConfig.matchesSpedizzione/matchesZona del caller): el backend acota por
+// area solo a un ADMIN, un OWNER sin restriccion recibia el pendiente de TODAS las
+// secciones/zonas sin importar cual pestana estuviera mirando - se filtra aca
+// tambien para que Pendientes respete la pestana activa igual que el resto de la
+// pagina. scopedLabel: si es un ADMIN de area, el backend ya solo le manda su
+// seccion, asi que el subtitulo no debe prometer "Extras Piazza y DHL - AB Service
+// juntos".
 const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId, scopedLabel }) => {
   return (
     <GlassCard className="flex min-w-0 flex-col !p-4 lg:h-[calc(100dvh-220px)]">
@@ -992,7 +998,9 @@ export const RecordsListPage = ({ section }) => {
           </GlassCard>
 
           <PendingPanel
-            records={pendingRecords}
+            records={pendingRecords?.filter(
+              (r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r)
+            )}
             closeTo={`/records/${section}`}
             scopedLabel={
               scopedSections
