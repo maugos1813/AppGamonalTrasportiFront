@@ -116,38 +116,51 @@ const driverName = (record) =>
 
 const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
 
-// Bloque de texto de una zona para el "Copiar como texto" de Reperibilita - junta
-// servicios/choferes/vehiculos de esa zona seguidos, en vez de 3 listas separadas que
-// mezclan Milano y Roma (ver handleCopyReperibilidad).
+// Bloque de texto de una zona para el "Copiar como texto" de Reperibilita - describe
+// cada servicio/chofer/vehiculo en una oracion natural, como si un coordinador se lo
+// explicara de palabra a otra persona, en vez de filas tecnicas separadas por "|" -
+// pedido explicito: este texto lo termina leyendo el jefe, no alguien mirando la
+// base de datos, y las filas tecnicas eran ilegibles para el.
 const buildZoneBlock = (label, servicios, choferesDisp, vehiculosDisp) => {
-  const lines = [`=== ${label} ===`, "", `Servicios pendientes (${servicios.length}):`];
-  if (servicios.length === 0) lines.push("- Ninguno");
-  servicios.forEach((r) => {
-    const partes = [
-      r.codigo,
-      driverName(r),
-      r.vehicle?.targa ?? "Sin vehiculo",
-      r.client?.nombre ?? "Sin cliente",
-      r.destinazione,
-      RECORD_STATUS_LABELS[r.estado] ?? r.estado,
-      `ETA ${formatDateTime(r.eta)}`,
-    ];
-    if (r.comentarios) partes.push(r.comentarios);
-    lines.push(`- ${partes.join(" | ")}`);
-  });
+  const lines = [label, ""];
 
-  lines.push("", `Choferes disponibles esta noche (${choferesDisp.length}):`);
-  if (choferesDisp.length === 0) lines.push("- Ninguno");
-  choferesDisp.forEach((u) => {
-    const vehiculo = u.vehiculoAsignado
-      ? `${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` - ${u.vehiculoAsignado.modelo}` : ""}`
-      : "sin vehiculo asignado";
-    lines.push(`- ${u.nombre} ${u.apellido} (${vehiculo})`);
-  });
+  if (servicios.length === 0) {
+    lines.push("No hay servicios pendientes por ahora.");
+  } else {
+    lines.push(servicios.length === 1 ? "Hay 1 servicio pendiente:" : `Hay ${servicios.length} servicios pendientes:`);
+    servicios.forEach((r, idx) => {
+      const vehiculo = r.vehicle?.targa ? `con la ${r.vehicle.targa}` : "todavia sin vehiculo asignado";
+      const cliente = r.client?.nombre ? ` para ${r.client.nombre}` : "";
+      const estado = (RECORD_STATUS_LABELS[r.estado] ?? r.estado).toLowerCase();
+      let frase = `${idx + 1}. ${driverName(r)} (${vehiculo}) va a ${r.destinazione}${cliente} - esta ${estado}, llega aprox a las ${formatDateTime(r.eta)}.`;
+      if (r.comentarios) frase += ` Nota: ${r.comentarios}`;
+      lines.push(frase);
+    });
+  }
 
-  lines.push("", `Vehiculos disponibles (${vehiculosDisp.length}):`);
-  if (vehiculosDisp.length === 0) lines.push("- Ninguno");
-  vehiculosDisp.forEach((v) => lines.push(`- ${v.targa}${v.modelo ? ` - ${v.modelo}` : ""}`));
+  lines.push("");
+  if (choferesDisp.length === 0) {
+    lines.push("No hay choferes disponibles esta noche.");
+  } else {
+    const nombres = choferesDisp.map((u) => {
+      const vehiculo = u.vehiculoAsignado
+        ? `con la ${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` (${u.vehiculoAsignado.modelo})` : ""}`
+        : "sin vehiculo asignado todavia";
+      return `${u.nombre} ${u.apellido} (${vehiculo})`;
+    });
+    const plural = choferesDisp.length === 1;
+    lines.push(
+      `Esta noche ${plural ? "esta disponible" : "estan disponibles"} ${choferesDisp.length} chofer${plural ? "" : "es"}: ${nombres.join(", ")}.`
+    );
+  }
+
+  lines.push("");
+  if (vehiculosDisp.length === 0) {
+    lines.push("No hay vehiculos libres.");
+  } else {
+    const nombresVehiculos = vehiculosDisp.map((v) => `${v.targa}${v.modelo ? ` (${v.modelo})` : ""}`);
+    lines.push(`Vehiculos libres: ${nombresVehiculos.join(", ")}.`);
+  }
 
   return lines;
 };
@@ -620,15 +633,22 @@ export const DailySummaryPage = () => {
       );
     }
 
-    lines.push("", `Proximos servicios (${reperibilidad.choferesConServicioFuturo.length}):`);
-    if (reperibilidad.choferesConServicioFuturo.length === 0) lines.push("- Ninguno");
-    reperibilidad.choferesConServicioFuturo.forEach((u) => {
+    const proximos = reperibilidad.choferesConServicioFuturo;
+    lines.push(
+      "",
+      proximos.length === 0
+        ? "Todavia no hay proximos servicios asignados."
+        : proximos.length === 1
+          ? "Ya hay 1 proximo servicio asignado:"
+          : `Ya hay ${proximos.length} proximos servicios asignados:`
+    );
+    proximos.forEach((u) => {
       const vehiculo = u.vehiculoAsignado
-        ? `${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` - ${u.vehiculoAsignado.modelo}` : ""}`
-        : "sin vehiculo asignado";
-      const partes = [`${u.nombre} ${u.apellido}`, formatDate(u.proximoServicioFecha), vehiculo];
-      if (u.proximoServicioNota) partes.push(u.proximoServicioNota);
-      lines.push(`- ${partes.join(" | ")}`);
+        ? `con la ${u.vehiculoAsignado.targa}${u.vehiculoAsignado.modelo ? ` (${u.vehiculoAsignado.modelo})` : ""}`
+        : "sin vehiculo asignado todavia";
+      let frase = `- ${u.nombre} ${u.apellido} tiene un servicio el ${formatDate(u.proximoServicioFecha)}, ${vehiculo}.`;
+      if (u.proximoServicioNota) frase += ` Nota: ${u.proximoServicioNota}`;
+      lines.push(frase);
     });
 
     navigator.clipboard
