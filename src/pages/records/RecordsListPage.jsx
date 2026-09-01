@@ -19,6 +19,7 @@ import {
   RECORD_STATUS_OPTIONS,
   TERMINADOS_STATUSES,
 } from "../../lib/constants";
+import { isDhlRomaRecord } from "../../lib/dashboardStats";
 import { formatDate, formatDateTime, formatTimeRemaining } from "../../lib/format";
 import { scopedRecordsSections } from "../../lib/permissions";
 import {
@@ -691,20 +692,24 @@ export const RecordsListPage = ({ section }) => {
     ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r) && r.pagoRecibido == null)
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
-  // Total de KM del mes, Extras Piazza vs DHL/AB Service vs Extras Stefania - de todo
-  // el mes (no solo la seccion que se esta mirando), para tener una idea general del
-  // volumen sin tener que cambiar de pestana. DHL/AB pesa x2 en los rankings (ver
-  // kmMultiplier en dashboardStats.js), asi que se muestra el crudo y el ponderado por
-  // separado. Extras Stefania pesa x1, igual que Extras Piazza.
+  // Total de KM del mes, Piazza Milano vs Piazza Roma vs DHL Roma - de todo el mes
+  // (no solo la seccion que se esta mirando), para tener una idea general del
+  // volumen sin tener que cambiar de pestana. DHL Milano/AB Service/Extras Stefania
+  // quedan afuera (ver isDhlRomaRecord en dashboardStats.js), mismo criterio que el
+  // resto de Registros desde que se acoto a Piazza + DHL Roma. DHL pesa x2 en los
+  // rankings (ver kmMultiplier en dashboardStats.js), asi que se muestra el crudo y
+  // el ponderado por separado.
   const monthKmTotals = summary?.reduce(
     (acc, r) => {
       const km = r.kilometros ?? r.kilometrosReales ?? 0;
-      if (isDhlAb(r)) acc.dhlAb += km;
-      else if (isExtrasStefania(r)) acc.extrasStefania += km;
-      else acc.extrasPiazza += km;
+      if (isDhlRomaRecord(r)) acc.dhlRoma += km;
+      else if (!isDhlAb(r) && !isExtrasStefania(r)) {
+        if (r.extrasPiazzaZona === "ROMA") acc.piazzaRoma += km;
+        else acc.piazzaMilano += km;
+      }
       return acc;
     },
-    { extrasPiazza: 0, dhlAb: 0, extrasStefania: 0 }
+    { piazzaMilano: 0, piazzaRoma: 0, dhlRoma: 0 }
   );
 
   // Un ADMIN de area no tiene ninguna otra seccion como opcion (backend tampoco le
@@ -876,9 +881,9 @@ export const RecordsListPage = ({ section }) => {
                   </h2>
                   {monthKmTotals && (
                     <p className="text-[11px] normal-case text-ink-400">
-                      Extras Piazza: {fmtKm(monthKmTotals.extrasPiazza)} km · DHL - AB Service:{" "}
-                      {fmtKm(monthKmTotals.dhlAb)} km x2 = {fmtKm(monthKmTotals.dhlAb * 2)} km · Extras Stefania:{" "}
-                      {fmtKm(monthKmTotals.extrasStefania)} km
+                      Piazza Milano: {fmtKm(monthKmTotals.piazzaMilano)} km · Piazza Roma:{" "}
+                      {fmtKm(monthKmTotals.piazzaRoma)} km · DHL Roma: {fmtKm(monthKmTotals.dhlRoma)} km x2 ={" "}
+                      {fmtKm(monthKmTotals.dhlRoma * 2)} km
                     </p>
                   )}
                 </div>
