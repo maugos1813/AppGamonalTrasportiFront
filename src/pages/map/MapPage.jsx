@@ -13,6 +13,7 @@ import { EN_PROCESO_STATUSES } from "../../lib/constants";
 import { computeLocationPermissionAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
 import { addMinutes, formatDateTime } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
+import { startVisibleInterval } from "../../lib/polling";
 import { getRecordLiveEtaRequest, getRecordRequest, listRecordsRequest } from "../../lib/records.api";
 import {
   getDriverRouteHistoryRequest,
@@ -162,10 +163,13 @@ export const MapPage = () => {
     };
 
     load();
-    const intervalId = setInterval(load, REFRESH_INTERVAL_MS);
+    // Pausa sola mientras la pestania no esta visible (ver startVisibleInterval) - una
+    // pestania del Mapa olvidada en segundo plano no tiene por que seguir pidiendo
+    // ubicaciones/registros cada 20s para siempre.
+    const stopPolling = startVisibleInterval(load, REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      stopPolling();
     };
   }, [isPrivileged]);
 
@@ -291,10 +295,10 @@ export const MapPage = () => {
     };
 
     fetchEta();
-    const intervalId = setInterval(fetchEta, REFRESH_INTERVAL_MS);
+    const stopPolling = startVisibleInterval(fetchEta, REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      stopPolling();
     };
   }, [selectedRecordId, section]);
 
@@ -325,10 +329,10 @@ export const MapPage = () => {
     };
 
     fetchEta();
-    const intervalId = setInterval(fetchEta, REFRESH_INTERVAL_MS);
+    const stopPolling = startVisibleInterval(fetchEta, REFRESH_INTERVAL_MS);
     return () => {
       cancelled = true;
-      clearInterval(intervalId);
+      stopPolling();
     };
   }, [openInfoId, section]);
 

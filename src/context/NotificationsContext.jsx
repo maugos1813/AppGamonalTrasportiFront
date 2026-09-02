@@ -15,6 +15,7 @@ import {
 import { listDocumentsRequest } from "../lib/documents.api";
 import { formatDate } from "../lib/format";
 import { cancelIdle, scheduleIdle } from "../lib/idle";
+import { startVisibleInterval } from "../lib/polling";
 import {
   listAppsheetSyncFailuresRequest,
   listPendingRecordsRequest,
@@ -203,12 +204,15 @@ export const NotificationsProvider = ({ children }) => {
     };
 
     const idleId = scheduleIdle(run);
-    const intervalId = isPrivileged ? setInterval(run, OWNER_REFRESH_MS) : null;
+    // Pausa sola mientras la pestania no esta visible (ver startVisibleInterval) - una
+    // pestania olvidada en segundo plano no tiene por que seguir pidiendo esto cada
+    // minuto para siempre (5 pedidos en paralelo cada vez, ver buildOwnerAlerts).
+    const stopPolling = isPrivileged ? startVisibleInterval(run, OWNER_REFRESH_MS) : null;
 
     return () => {
       cancelled = true;
       cancelIdle(idleId);
-      if (intervalId) clearInterval(intervalId);
+      if (stopPolling) stopPolling();
     };
   }, [isChofer, isPrivileged, pathname]);
 
