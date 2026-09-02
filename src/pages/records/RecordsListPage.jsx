@@ -433,6 +433,15 @@ export const RecordsListPage = ({ section }) => {
   const [error, setError] = useState("");
   const [tab, setTab] = useState("en_proceso");
   const [zonaFilter, setZonaFilter] = useState(() => zonaOptions?.[0]?.value ?? null);
+  // El useState de arriba solo corre su inicializador una vez (al montar) - cambiar de
+  // seccion con la pestana (NavLink, no remonta el componente) no lo vuelve a correr,
+  // asi que zonaFilter quedaba pegado al valor de la seccion anterior (ej. "MILANO" de
+  // Extras Piazza al entrar a DHL Roma, que solo tiene "ROMA" como opcion) - la lista
+  // terminaba filtrando por una zona que no tiene sentido en la seccion nueva y
+  // mostraba vacio. Se resetea a mano cada vez que cambia section.
+  useEffect(() => {
+    setZonaFilter(ZONA_OPTIONS_BY_SECTION[section]?.[0]?.value ?? null);
+  }, [section]);
   // Sin switch (Extras Stefania) matchea cualquier zona - no filtra nada.
   const matchesZona = (r) => !zonaOptions || r.extrasPiazzaZona === zonaFilter;
 
