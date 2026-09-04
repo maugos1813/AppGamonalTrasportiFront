@@ -3,18 +3,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { GlassCard } from "../../components/ui/GlassCard";
-import { SegmentedControl } from "../../components/ui/SegmentedControl";
-import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
-import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
+import { useTheme } from "../../context/ThemeContext";
 import { parseApiError } from "../../lib/api";
 import { EN_PROCESO_STATUSES } from "../../lib/constants";
 import { computeLocationPermissionAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
-import { addMinutes, formatDateTime } from "../../lib/format";
+import { addMinutes } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { startVisibleInterval } from "../../lib/polling";
 import { getRecordLiveEtaRequest, getRecordRequest, listRecordsRequest } from "../../lib/records.api";
+import { listVehicleLivePositionsRequest } from "../../lib/vehicles.api";
 import {
   getDriverRouteHistoryRequest,
   getDriverReturnEtaRequest,
@@ -27,18 +26,93 @@ import {
 const GOOGLE_MAPS_LIBRARIES = [];
 
 const MILAN_CENTER = { lat: 45.4642, lng: 9.19 };
-const REFRESH_INTERVAL_MS = 20000;
+// 30s: coincide con lo que la propia Velocity Fleet recomienda como cadencia para el
+// GPS del vehiculo (ver KINESIS_LIVE_MAP_REFRESH_RATE en su doc de Device Positions) -
+// llamar mas seguido que eso no aporta nada, solo consume mas cuota de su API. Se
+// aplica igual a ubicaciones/registros/ETA para no tener 2 cadencias distintas en la
+// misma pagina.
+const REFRESH_INTERVAL_MS = 30000;
+
+// Estilo "Night Mode" estandar de Google Maps - se aplica solo cuando el tema de la
+// app esta en oscuro (ver useTheme), asi el mapa combina con el resto de la UI en vez
+// de quedar siempre con el fondo claro de Google por defecto.
+const NIGHT_MODE_STYLES = [
+  { elementType: "geometry", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.stroke", stylers: [{ color: "#242f3e" }] },
+  { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
+  {
+    featureType: "administrative.locality",
+    elementType: "labels.text.fill",
+    stylers: [{ color: "#d59563" }],
+  },
+  { featureType: "poi", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#263c3f" }] },
+  { featureType: "poi.park", elementType: "labels.text.fill", stylers: [{ color: "#6b9a76" }] },
+  { featureType: "road", elementType: "geometry", stylers: [{ color: "#38414e" }] },
+  { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#212a37" }] },
+  { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+  { featureType: "road.highway", elementType: "geometry", stylers: [{ color: "#746855" }] },
+  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ color: "#1f2835" }] },
+  { featureType: "road.highway", elementType: "labels.text.fill", stylers: [{ color: "#f3d19c" }] },
+  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#2f3948" }] },
+  { featureType: "transit.station", elementType: "labels.text.fill", stylers: [{ color: "#d59563" }] },
+  { featureType: "water", elementType: "geometry", stylers: [{ color: "#17263c" }] },
+  { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
+  { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
+];
 const STATIC_ROUTE_COLOR = "#3987e5";
 const LIVE_ROUTE_COLOR = "#22c55e";
 const HISTORY_ROUTE_COLOR = "#a855f7";
 const DESTINATION_COLOR = "#f59e0b";
-const ROUTE_START_COLOR = "#22c55e";
-const ROUTE_END_COLOR = "#ef4444";
 // Chofer con ubicacion fresca pero sin servicio "en camino" ahora mismo (volviendo de
 // una entrega o esperando el proximo): mismo gris que el estado "En suspenso" en el
 // resto de la app, para diferenciarlo del pin rojo por defecto de los que si reparten.
 const IDLE_DRIVER_COLOR = "#6b7280";
 const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
+
+// Colores del pin para un vehiculo con GPS de Velocity Fleet, segun movimiento/motor -
+// pedido explicito: verde en movimiento, naranja parado con motor encendido, rojo
+// parado y apagado. Umbral chico (no exactamente 0) para no marcar "en movimiento" un
+// vehiculo parado por el ruido normal de un GPS quieto.
+const VEHICLE_MOVING_SPEED_THRESHOLD = 1;
+const VEHICLE_STATUS_COLOR = {
+  moving: "#22c55e",
+  idlingOn: "#f59e0b",
+  idlingOff: "#ef4444",
+};
+const isVehicleMoving = (vehiculoGps) =>
+  vehiculoGps.speed != null && vehiculoGps.speed > VEHICLE_MOVING_SPEED_THRESHOLD;
+
+const vehicleStatusColor = (vehiculoGps) => {
+  if (isVehicleMoving(vehiculoGps)) return VEHICLE_STATUS_COLOR.moving;
+  return vehiculoGps.ignition ? VEHICLE_STATUS_COLOR.idlingOn : VEHICLE_STATUS_COLOR.idlingOff;
+};
+
+// En movimiento y con rumbo (direction) conocido: flecha rotada senalando hacia donde
+// va, mas realista que un circulo. Parado, o en movimiento sin rumbo (direction viene
+// null en algunos dispositivos), se mantiene el circulo de siempre.
+const vehicleIcon = (vehiculoGps) => {
+  const moving = isVehicleMoving(vehiculoGps);
+  if (moving && vehiculoGps.direction != null) {
+    return {
+      path: window.google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+      scale: 5,
+      rotation: vehiculoGps.direction,
+      fillColor: VEHICLE_STATUS_COLOR.moving,
+      fillOpacity: 0.9,
+      strokeColor: "#ffffff",
+      strokeWeight: 2,
+    };
+  }
+  return {
+    path: window.google.maps.SymbolPath.CIRCLE,
+    scale: 8,
+    fillColor: vehicleStatusColor(vehiculoGps),
+    fillOpacity: 0.9,
+    strokeColor: "#ffffff",
+    strokeWeight: 2,
+  };
+};
 
 // Perimetros oficiales de Area B y Area C (Comune di Milano, portal GIS
 // gisportal.comune.milano.it - capas "Confine Area B" y "Confine Area C").
@@ -48,12 +122,6 @@ const AREA_C_COLOR = "#ef4444";
 const AREA_B_COLOR = "#a855f7";
 const AREA_C_PATH = MILANO_ZONES.areaC;
 const AREA_B_PATHS = MILANO_ZONES.areaB;
-
-const SECTION_OPTIONS = [
-  { value: "pendientes", label: "Pendientes" },
-  { value: "choferes", label: "Choferes" },
-  { value: "ruta-chofer", label: "Ruta chofer" },
-];
 
 const minutesAgo = (dateString) => {
   const diffMs = Date.now() - new Date(dateString).getTime();
@@ -85,6 +153,7 @@ const PencilIcon = (props) => (
 
 export const MapPage = () => {
   const { user } = useAuth();
+  const { theme } = useTheme();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
 
   const { isLoaded, loadError } = useJsApiLoader({
@@ -104,19 +173,15 @@ export const MapPage = () => {
   const [showAreaB, setShowAreaB] = useState(true);
   const [showRutaReal, setShowRutaReal] = useState(false);
   const [overlayGpsPoints, setOverlayGpsPoints] = useState(null);
-  const [section, setSection] = useState("pendientes");
 
   const [locations, setLocations] = useState(null);
+  // GPS del vehiculo (Velocity Fleet) - solo trae los vehiculos que tienen el
+  // dispositivo instalado. Ver enrichedLocations mas abajo: reemplaza la posicion del
+  // celular del chofer por esta cuando esta disponible para su vehiculo asignado.
+  const [vehiclePositions, setVehiclePositions] = useState(null);
   const [records, setRecords] = useState(null);
   const [selectedRecordId, setSelectedRecordId] = useState(null);
-  // "Ruta chofer": elige un chofer (todos, no solo los que estan compartiendo
-  // ubicacion ahora) y un dia puntual, y dibuja los puntos GPS guardados ese dia
-  // (ver LocationPing en el backend) como una linea - no depende de que el chofer
-  // este activo ahora mismo, es historial.
   const [allDrivers, setAllDrivers] = useState(null);
-  const [rutaChoferId, setRutaChoferId] = useState("");
-  const [rutaChoferDate, setRutaChoferDate] = useState(() => toLocalDateInputValue(new Date()));
-  const [rutaChoferPoints, setRutaChoferPoints] = useState(null);
   // ETA en vivo del servicio seleccionado en la lista (ruta + linea en el mapa) y del
   // marcador que tiene el InfoWindow abierto (puede ser el mismo servicio u otro, o el
   // regreso de un chofer libre). Se piden a demanda -ver los 2 useEffect mas abajo-, no
@@ -132,11 +197,6 @@ export const MapPage = () => {
   // undefined = todavia no se pidio nada, null = se pidio pero no hay ETA disponible.
   const [openMarkerEta, setOpenMarkerEta] = useState(undefined);
   const [error, setError] = useState("");
-
-  const changeSection = (value) => {
-    setSection(value);
-    setSelectedRecordId(null);
-  };
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -160,6 +220,15 @@ export const MapPage = () => {
         .catch((err) => {
           if (!cancelled) setError(parseApiError(err).message);
         });
+      // Silencioso: el backend ya devuelve [] si Velocity Fleet no esta configurado o
+      // no responde (ver velocityFleet.service.js) - no tiene sentido mostrar el error
+      // banner de la pagina por una mejora best-effort, el mapa sigue andando igual con
+      // la ubicacion del celular del chofer.
+      listVehicleLivePositionsRequest()
+        .then((data) => {
+          if (!cancelled) setVehiclePositions(data);
+        })
+        .catch(() => {});
     };
 
     load();
@@ -191,31 +260,6 @@ export const MapPage = () => {
     };
   }, [isPrivileged]);
 
-  // Historial de puntos GPS del chofer/dia elegidos - se pide de nuevo cada vez que
-  // cambia cualquiera de los dos, y solo mientras la seccion "Ruta chofer" esta activa.
-  useEffect(() => {
-    if (section !== "ruta-chofer" || !rutaChoferId || !rutaChoferDate) {
-      setRutaChoferPoints(null);
-      return;
-    }
-    let cancelled = false;
-    setRutaChoferPoints(null);
-    const [year, month, day] = rutaChoferDate.split("-").map(Number);
-    getDriverRouteHistoryRequest(rutaChoferId, year, month, day)
-      .then((data) => {
-        if (!cancelled) setRutaChoferPoints(data);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          setError(parseApiError(err).message);
-          setRutaChoferPoints([]);
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [section, rutaChoferId, rutaChoferDate]);
-
   // Solo ayer/hoy/manana (hora local de quien mira el mapa) - "records" trae todo el
   // historico sin acotar por fecha, y un servicio viejo que quedo pendiente sin
   // cerrarse (o uno cargado para dentro de varios dias) no tiene que ensuciar esta
@@ -239,23 +283,128 @@ export const MapPage = () => {
     )
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
-  // Vista "Choferes": una fila por chofer (no por servicio - un chofer con varias
-  // entregas compactadas aparece varias veces en "locations", todas con la misma
-  // posicion), solo para listar y centrar el mapa. Sin rutas ni ETA.
-  const uniqueDrivers = useMemo(() => {
-    const byId = new Map();
-    (locations ?? []).forEach((loc) => {
-      const existing = byId.get(loc.id);
-      if (!existing) {
-        byId.set(loc.id, { ...loc, serviciosCount: loc.servicio ? 1 : 0 });
-      } else if (loc.servicio) {
-        existing.serviciosCount += 1;
-      }
+  const normalizeTarga = (targa) => targa?.replace(/\s+/g, "").toUpperCase() ?? "";
+
+  // Vehiculo asignado (targa) de cada chofer, para cruzar con vehiclePositions -
+  // viene de allDrivers (lista completa), no de "locations", que no trae ese dato.
+  const driverVehicleTarga = useMemo(() => {
+    const map = new Map();
+    (allDrivers ?? []).forEach((d) => {
+      if (d.vehiculoAsignado?.targa) map.set(d.id, d.vehiculoAsignado.targa);
     });
-    return Array.from(byId.values()).sort((a, b) =>
-      `${a.nombre} ${a.apellido}`.localeCompare(`${b.nombre} ${b.apellido}`)
-    );
-  }, [locations]);
+    return map;
+  }, [allDrivers]);
+
+  const vehiclePositionByTarga = useMemo(() => {
+    const map = new Map();
+    (vehiclePositions ?? []).forEach((p) => map.set(normalizeTarga(p.targa), p));
+    return map;
+  }, [vehiclePositions]);
+
+  // Reemplaza la posicion del celular del chofer por la del GPS de su vehiculo
+  // asignado (Velocity Fleet) cuando esa unidad lo tiene instalado - pedido
+  // explicito: mas preciso, viene del vehiculo y no del telefono. Los vehiculos sin
+  // ese GPS (no todos lo tienen todavia) siguen mostrando la ubicacion del celular,
+  // sin excepcion - nunca se cae el pin por no tener el dispositivo instalado.
+  //
+  // Ademas: un vehiculo con GPS de Velocity Fleet tiene que aparecer aunque el
+  // celular del chofer NO este compartiendo ubicacion en este momento (celular
+  // apagado, permiso denegado, o simplemente todavia no arranco a compartir) - sin
+  // esto, un vehiculo con GPS real quedaba sin pin solo porque no habia una entrada
+  // de "locations" (celular) previa a la cual reemplazarle la posicion.
+  const enrichedLocations = useMemo(() => {
+    if (!locations) return locations;
+
+    const driverIdsWithPhoneLocation = new Set(locations.map((loc) => loc.id));
+    // Targas ya usadas (por un chofer con celular o sin el, mas abajo) - lo que quede
+    // sin marcar al final son vehiculos con GPS que hoy no tienen a nadie asignado,
+    // y aun asi tienen que verse: el pedido es ver los vehiculos, no solo los que
+    // tienen chofer puesto en este momento.
+    const usedTargas = new Set();
+
+    const merged = locations.map((loc) => {
+      const targa = driverVehicleTarga.get(loc.id);
+      const normTarga = targa ? normalizeTarga(targa) : null;
+      const vehiclePosition = normTarga ? vehiclePositionByTarga.get(normTarga) : undefined;
+      if (!vehiclePosition) return loc;
+      usedTargas.add(normTarga);
+      return {
+        ...loc,
+        lat: vehiclePosition.lat,
+        lng: vehiclePosition.lng,
+        actualizada: vehiclePosition.updatedAt ?? loc.actualizada,
+        vehiculoGps: {
+          targa,
+          speed: vehiclePosition.speed,
+          speedUnit: vehiclePosition.speedUnit,
+          ignition: vehiclePosition.ignition,
+          direction: vehiclePosition.direction,
+        },
+      };
+    });
+
+    (allDrivers ?? []).forEach((d) => {
+      if (driverIdsWithPhoneLocation.has(d.id)) return; // ya cubierto arriba
+      const targa = d.vehiculoAsignado?.targa;
+      const normTarga = targa ? normalizeTarga(targa) : null;
+      if (!normTarga || usedTargas.has(normTarga)) return;
+      const vehiclePosition = vehiclePositionByTarga.get(normTarga);
+      if (!vehiclePosition) return;
+      usedTargas.add(normTarga);
+
+      // El servicio activo del chofer (si tiene) no viene con el GPS del vehiculo -
+      // se busca en "records" para que el pin/lista se comporten igual que uno con
+      // ubicacion de celular (icono, aparecer en Pendientes, etc.).
+      const servicio =
+        (records ?? []).find((r) => r.driver?.id === d.id && EN_PROCESO_STATUSES.includes(r.estado)) ?? null;
+
+      merged.push({
+        id: d.id,
+        nombre: d.nombre,
+        apellido: d.apellido,
+        lat: vehiclePosition.lat,
+        lng: vehiclePosition.lng,
+        actualizada: vehiclePosition.updatedAt,
+        servicio,
+        vehiculoGps: {
+          targa,
+          speed: vehiclePosition.speed,
+          speedUnit: vehiclePosition.speedUnit,
+          ignition: vehiclePosition.ignition,
+          direction: vehiclePosition.direction,
+        },
+      });
+    });
+
+    // Vehiculos con GPS que no tienen chofer asignado ahora mismo (o cuyo chofer
+    // asignado no matcheo arriba por algun motivo) - se muestran igual, solo con la
+    // targa como "nombre" (no hay chofer que mostrar).
+    (vehiclePositions ?? []).forEach((vp) => {
+      const normTarga = normalizeTarga(vp.targa);
+      if (usedTargas.has(normTarga)) return;
+      usedTargas.add(normTarga);
+
+      merged.push({
+        id: `vehiculo-${normTarga}`,
+        nombre: vp.targa,
+        apellido: "",
+        lat: vp.lat,
+        lng: vp.lng,
+        actualizada: vp.updatedAt,
+        servicio: null,
+        vehiculoGps: {
+          targa: vp.targa,
+          speed: vp.speed,
+          speedUnit: vp.speedUnit,
+          ignition: vp.ignition,
+          direction: vp.direction,
+        },
+        sinChofer: true,
+      });
+    });
+
+    return merged;
+  }, [locations, allDrivers, records, vehiclePositions, driverVehicleTarga, vehiclePositionByTarga]);
 
   // Auditoria del mapa: choferes que no van a aparecer arriba (o que se van a "caer" del
   // mapa apenas salgan a repartir) porque el celular reporto el permiso de ubicacion en
@@ -267,18 +416,11 @@ export const MapPage = () => {
     [allDrivers, records]
   );
 
-  const focusDriver = (loc) => {
-    const markerId = loc.servicio?.id ?? `idle-${loc.id}`;
-    setOpenInfoId(markerId);
-    map?.panTo({ lat: loc.lat, lng: loc.lng });
-    map?.setZoom(15);
-  };
-
   // ETA en vivo del servicio elegido en la lista: se pide solo mientras ese servicio
   // sigue seleccionado, y se repite cada 20s para mantenerlo al dia - apenas se cambia
-  // de seleccion o de seccion, se corta (no sigue pidiendo de fondo).
+  // de seleccion, se corta (no sigue pidiendo de fondo).
   useEffect(() => {
-    if (section !== "pendientes" || !selectedRecordId) {
+    if (!selectedRecordId) {
       setSelectedLiveEta(null);
       return;
     }
@@ -300,14 +442,14 @@ export const MapPage = () => {
       cancelled = true;
       stopPolling();
     };
-  }, [selectedRecordId, section]);
+  }, [selectedRecordId]);
 
   // Mismo patron para el marcador que tiene el InfoWindow abierto en el mapa (puede
   // ser un servicio en camino o un chofer libre volviendo a la base) - solo se pide
   // mientras ese InfoWindow sigue abierto. undefined = todavia no llego la primera
   // respuesta ("Calculando..."), null = ya se pidio pero no hay ETA disponible.
   useEffect(() => {
-    if (section !== "pendientes" || !openInfoId || openInfoId === "destination") {
+    if (!openInfoId || openInfoId === "destination") {
       setOpenMarkerEta(undefined);
       return;
     }
@@ -334,7 +476,7 @@ export const MapPage = () => {
       cancelled = true;
       stopPolling();
     };
-  }, [openInfoId, section]);
+  }, [openInfoId]);
 
   // Detalle completo del servicio seleccionado (stops + poligono de ruta): se pide
   // una sola vez al seleccionar, no se re-poll-ea (a diferencia de la ETA en vivo,
@@ -360,12 +502,12 @@ export const MapPage = () => {
   }, [selectedRecordId]);
 
   // Recorrido real (GPS) superpuesto al planificado, solo si el checkbox esta activo -
-  // se pide para el chofer y el dia (fechaServicio) del servicio seleccionado, mismo
-  // endpoint que ya usa "Ruta chofer" (findLocationPingsByDriverAndRange en el backend).
-  // Se apaga (null) al destildar el checkbox, deseleccionar el servicio, o cambiar de
-  // seccion - asi no queda una linea vieja dibujada de un servicio que ya no se mira.
+  // se pide para el chofer y el dia (fechaServicio) del servicio seleccionado
+  // (findLocationPingsByDriverAndRange en el backend). Se apaga (null) al destildar el
+  // checkbox o deseleccionar el servicio - asi no queda una linea vieja dibujada de un
+  // servicio que ya no se mira.
   useEffect(() => {
-    if (!showRutaReal || section !== "pendientes" || !selectedRecordDetail) {
+    if (!showRutaReal || !selectedRecordDetail) {
       setOverlayGpsPoints(null);
       return;
     }
@@ -385,7 +527,7 @@ export const MapPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [showRutaReal, section, selectedRecordDetail]);
+  }, [showRutaReal, selectedRecordDetail]);
 
   // Solo "Pendientes" selecciona un registro (ver mas abajo): ETA en vivo si el chofer
   // ya esta en camino, si no el planificado como fallback mientras todavia no sale.
@@ -399,18 +541,10 @@ export const MapPage = () => {
   // la ultima, para poder seguir el recorrido parada por parada en el mapa.
   const selectedStops = selectedRecordDetail?.stops ?? [];
 
-  // "Ruta chofer": los puntos GPS guardados ese dia, tal cual (no es una ruta
-  // calculada/ruteada como la de un servicio, es el historial real punto a punto).
-  const rutaChoferPositions = useMemo(
-    () => rutaChoferPoints?.map((p) => ({ lat: p.lat, lng: p.lng })),
-    [rutaChoferPoints]
-  );
-
-  // La linea que se dibuja depende de la seccion activa: el recorrido de un servicio
-  // pendiente (Pendientes) o el historial de un chofer en un dia puntual (Ruta chofer).
-  const activeRoutePositions = section === "ruta-chofer" ? rutaChoferPositions : selectedRoutePositions;
-  const activeRouteColor =
-    section === "ruta-chofer" ? HISTORY_ROUTE_COLOR : selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR;
+  // La linea que se dibuja es siempre el recorrido del servicio pendiente seleccionado
+  // (planificado, o en vivo si el chofer ya salio).
+  const activeRoutePositions = selectedRoutePositions;
+  const activeRouteColor = selectedLiveEta ? LIVE_ROUTE_COLOR : STATIC_ROUTE_COLOR;
 
   // Recorrido real (GPS) del servicio de Pendientes seleccionado, superpuesto a
   // activeRoutePositions (la ruta planificada/en vivo) - segunda linea independiente,
@@ -487,18 +621,26 @@ export const MapPage = () => {
     overlayGpsPositions?.forEach((point) => bounds.extend(point));
     map.fitBounds(bounds, 40);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, selectedRecordId, rutaChoferId, rutaChoferDate, overlayGpsPositions]);
+  }, [map, selectedRecordId, overlayGpsPositions]);
+
+  // Centra el mapa en el primer chofer/vehiculo con ubicacion, pero UNA sola vez (la
+  // primera vez que hay datos) - antes se recalculaba en cada refresco de
+  // "locations"/"vehiclePositions" (cada 20s), y GoogleMap volvia a centrar el mapa
+  // ahi solo -en Roma, si el primero de la lista quedaba ahi- peleandose con que el
+  // usuario estuviera explorando otra parte del mapa a mano. Pedido explicito: no
+  // reiniciar mas la vista sola.
+  const hasAutoCenteredOnDriversRef = useRef(false);
+  const [driversAutoCenter, setDriversAutoCenter] = useState(null);
+  useEffect(() => {
+    if (hasAutoCenteredOnDriversRef.current) return;
+    if (!enrichedLocations?.length) return;
+    setDriversAutoCenter({ lat: enrichedLocations[0].lat, lng: enrichedLocations[0].lng });
+    hasAutoCenteredOnDriversRef.current = true;
+  }, [enrichedLocations]);
 
   if (!isPrivileged) return <Navigate to="/" replace />;
 
-  const showsDriverLocations = section === "pendientes" || section === "choferes";
-
-  const center =
-    section === "ruta-chofer" && rutaChoferPositions?.length
-      ? rutaChoferPositions[0]
-      : showsDriverLocations && locations && locations.length > 0
-        ? { lat: locations[0].lat, lng: locations[0].lng }
-        : MILAN_CENTER;
+  const center = driversAutoCenter ?? MILAN_CENTER;
 
   return (
     <div className="flex flex-col gap-4">
@@ -506,21 +648,43 @@ export const MapPage = () => {
         <div>
           <h1 className="text-[24px] font-semibold text-ink-50">Mapa</h1>
           <p className="mt-1 text-[14px] text-ink-300">
-            {section === "pendientes"
-              ? "Choferes compartiendo ubicacion ahora mismo: repartiendo o disponibles."
-              : section === "ruta-chofer"
-                ? "Recorrido real (GPS) de un chofer en un dia puntual."
-                : "Ubicacion actual de todos los choferes, sin rutas ni ETA."}
+            Choferes y vehiculos con ubicacion en vivo, mas los servicios pendientes.
           </p>
         </div>
-        <SegmentedControl options={SECTION_OPTIONS} value={section} onChange={changeSection} />
       </div>
+
+      {/* Solo tiene sentido si hay al menos un vehiculo con GPS de Velocity Fleet en
+          pantalla - sin eso, ningun pin usa estos colores todavia. */}
+      {enrichedLocations?.some((loc) => loc.vehiculoGps) && (
+        <div className="flex flex-wrap items-center gap-4 text-[12px] text-ink-300">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: VEHICLE_STATUS_COLOR.moving }}
+            />
+            En movimiento
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: VEHICLE_STATUS_COLOR.idlingOn }}
+            />
+            Parado, motor encendido
+          </span>
+          <span className="flex items-center gap-1.5">
+            <span
+              className="h-2.5 w-2.5 rounded-full"
+              style={{ backgroundColor: VEHICLE_STATUS_COLOR.idlingOff }}
+            />
+            Parado, motor apagado
+          </span>
+        </div>
+      )}
 
       <Alert>{error || (loadError ? "No se pudo cargar Google Maps." : "")}</Alert>
 
       {/* Auditoria de GPS: estos choferes no van a aparecer en el mapa de arriba (o se
-          van a "caer" apenas salgan a repartir) aunque tengan un servicio activo -
-          visible aca sea cual sea la seccion elegida, no solo en "Pendientes"/"Choferes". */}
+          van a "caer" apenas salgan a repartir) aunque tengan un servicio activo. */}
       {locationPermissionAlerts.length > 0 && (
         <GlassCard className="border border-status-rischedulato/25 bg-status-rischedulato/5 !p-4">
           <h2 className="text-[14px] font-semibold text-ink-50">
@@ -549,113 +713,17 @@ export const MapPage = () => {
         </GlassCard>
       )}
 
-      {showsDriverLocations && locations?.length === 0 && (
-        <GlassCard className="text-center text-[14px] text-ink-300">
-          Ningun chofer esta compartiendo su ubicacion en este momento.
-        </GlassCard>
-      )}
-
       {/* En desktop (lg+) queda lista a la izquierda y mapa a la derecha, a la
           espera de que se elija un servicio pendiente; en mobile se apilan
           (lista primero, despues el mapa). */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-[380px_1fr] lg:items-start">
         <GlassCard className="lg:h-[calc(100dvh-220px)] lg:overflow-y-auto">
-          {section === "choferes" ? (
-            <>
-              <h2 className="text-[17px] font-medium text-ink-50">Choferes</h2>
-              <p className="mt-1 text-[13px] text-ink-300">
-                Solo ubicacion, sin rutas ni ETA. Toca un chofer para centrarlo en el mapa.
-              </p>
-
-              {uniqueDrivers.length === 0 && (
-                <p className="mt-4 text-[14px] text-ink-300">
-                  Ningun chofer esta compartiendo su ubicacion en este momento.
-                </p>
-              )}
-
-              <ul className="mt-4 flex flex-col gap-2">
-                {uniqueDrivers.map((loc) => (
-                  <li key={loc.id}>
-                    <button
-                      type="button"
-                      onClick={() => focusDriver(loc)}
-                      className="flex w-full flex-col items-start gap-1 rounded-xl glass-surface-sm px-4 py-3 text-left text-[14px] text-ink-200 transition-colors hover:bg-line/10"
-                    >
-                      <span className="font-medium text-ink-50">
-                        {loc.nombre} {loc.apellido}
-                      </span>
-                      <span className="text-[13px] text-ink-300">
-                        {loc.serviciosCount > 0
-                          ? `En camino (${loc.serviciosCount} ${loc.serviciosCount === 1 ? "servicio" : "servicios"})`
-                          : "Disponible"}
-                        {" - "}
-                        actualizado hace {minutesAgo(loc.actualizada)} min
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </>
-          ) : section === "ruta-chofer" ? (
-            <>
-              <h2 className="text-[17px] font-medium text-ink-50">Ruta chofer</h2>
-              <p className="mt-1 text-[13px] text-ink-300">
-                Elegi un chofer y un dia para ver su recorrido real (GPS), no el planificado.
-              </p>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 border-t border-line/10 pt-4">
-                <Select
-                  id="ruta-chofer-select"
-                  label="Chofer"
-                  options={[
-                    { value: "", label: "Elegi un chofer..." },
-                    ...(allDrivers ?? []).map((d) => ({ value: d.id, label: `${d.nombre} ${d.apellido}` })),
-                  ]}
-                  value={rutaChoferId}
-                  onChange={(e) => setRutaChoferId(e.target.value)}
-                />
-                <TextField
-                  id="ruta-chofer-fecha"
-                  label="Fecha"
-                  type="date"
-                  value={rutaChoferDate}
-                  onChange={(e) => setRutaChoferDate(e.target.value)}
-                />
-              </div>
-
-              {!rutaChoferId && (
-                <p className="mt-4 text-[14px] text-ink-300">Elegi un chofer para ver su recorrido.</p>
-              )}
-              {rutaChoferId && rutaChoferPoints === null && (
-                <div className="mt-4 flex justify-center py-6">
-                  <Spinner className="h-5 w-5 border-line/20 border-t-line" />
-                </div>
-              )}
-              {rutaChoferId && rutaChoferPoints?.length === 0 && (
-                <p className="mt-4 text-[14px] text-ink-300">
-                  No hay puntos GPS guardados para ese chofer ese dia.
-                </p>
-              )}
-              {rutaChoferPoints?.length > 0 && (
-                <div className="mt-4 rounded-xl glass-surface-sm px-4 py-3 text-[13px] text-ink-200">
-                  <p>
-                    <strong>{rutaChoferPoints.length}</strong> puntos registrados
-                  </p>
-                  <p className="mt-1 text-ink-300">Primero: {formatDateTime(rutaChoferPoints[0].recordedAt)}</p>
-                  <p className="text-ink-300">
-                    Ultimo: {formatDateTime(rutaChoferPoints[rutaChoferPoints.length - 1].recordedAt)}
-                  </p>
-                </div>
-              )}
-            </>
-          ) : (
-            <>
-              <h2 className="text-[17px] font-medium text-ink-50">Pronostico de llegada</h2>
-              <p className="mt-1 text-[13px] text-ink-300">
-                Servicios pendientes. Si el chofer ya esta en camino, se muestra el tiempo en vivo desde su
-                ubicacion actual; si todavia no salio, se muestra el estimado planificado. Toca uno para ver
-                la ruta en el mapa.
-              </p>
+          <h2 className="text-[17px] font-medium text-ink-50">Pronostico de llegada</h2>
+          <p className="mt-1 text-[13px] text-ink-300">
+            Servicios pendientes. Si el chofer ya esta en camino, se muestra el tiempo en vivo desde su
+            ubicacion actual; si todavia no salio, se muestra el estimado planificado. Toca uno para ver
+            la ruta en el mapa.
+          </p>
 
           {pendingRecords.length === 0 && (
             <p className="mt-4 text-[14px] text-ink-300">No hay servicios pendientes.</p>
@@ -716,8 +784,6 @@ export const MapPage = () => {
               );
             })}
           </ul>
-            </>
-          )}
         </GlassCard>
 
         <div className="glass-surface relative overflow-hidden rounded-3xl">
@@ -743,7 +809,7 @@ export const MapPage = () => {
                 <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AREA_B_COLOR }} />
                 Area B
               </label>
-              {section === "pendientes" && selectedRecordId && (
+              {selectedRecordId && (
                 <label className="flex cursor-pointer items-center gap-2 border-t border-line/10 pt-1.5">
                   <input
                     type="checkbox"
@@ -758,15 +824,13 @@ export const MapPage = () => {
                   Recorrido real (GPS)
                 </label>
               )}
-              {showsDriverLocations && (
-                <div className="flex items-center gap-2 border-t border-line/10 pt-1.5">
-                  <span
-                    className="inline-block h-2.5 w-2.5 rounded-full"
-                    style={{ backgroundColor: IDLE_DRIVER_COLOR }}
-                  />
-                  Chofer disponible
-                </div>
-              )}
+              <div className="flex items-center gap-2 border-t border-line/10 pt-1.5">
+                <span
+                  className="inline-block h-2.5 w-2.5 rounded-full"
+                  style={{ backgroundColor: IDLE_DRIVER_COLOR }}
+                />
+                Chofer disponible
+              </div>
             </div>
           )}
           <div className="h-[calc(100dvh-300px)] min-h-[420px] w-full sm:h-[calc(100dvh-260px)] lg:h-[calc(100dvh-220px)]">
@@ -781,7 +845,11 @@ export const MapPage = () => {
                 zoom={12}
                 onLoad={setMap}
                 onUnmount={() => setMap(null)}
-                options={{ streetViewControl: false, mapTypeControl: false }}
+                options={{
+                  streetViewControl: false,
+                  mapTypeControl: false,
+                  styles: theme === "dark" ? NIGHT_MODE_STYLES : undefined,
+                }}
               >
                 {showAreaC && (
                   <Polygon
@@ -811,7 +879,7 @@ export const MapPage = () => {
                   />
                 )}
 
-                {showsDriverLocations && locations?.map((loc) => {
+                {enrichedLocations?.map((loc) => {
                   // key/estado por loc.servicio.id cuando hay servicio (un mismo chofer
                   // puede tener varias entradas si tiene mas de un servicio "en camino"
                   // a la vez, viajes compactados, todas con el mismo loc.id); si esta
@@ -823,16 +891,18 @@ export const MapPage = () => {
                       position={{ lat: loc.lat, lng: loc.lng }}
                       onClick={() => setOpenInfoId(markerId)}
                       icon={
-                        loc.servicio
-                          ? undefined
-                          : {
-                              path: window.google.maps.SymbolPath.CIRCLE,
-                              scale: 8,
-                              fillColor: IDLE_DRIVER_COLOR,
-                              fillOpacity: 0.9,
-                              strokeColor: "#ffffff",
-                              strokeWeight: 2,
-                            }
+                        loc.vehiculoGps
+                          ? vehicleIcon(loc.vehiculoGps)
+                          : loc.servicio
+                            ? undefined
+                            : {
+                                path: window.google.maps.SymbolPath.CIRCLE,
+                                scale: 8,
+                                fillColor: IDLE_DRIVER_COLOR,
+                                fillOpacity: 0.9,
+                                strokeColor: "#ffffff",
+                                strokeWeight: 2,
+                              }
                       }
                     >
                       {openInfoId === markerId && (
@@ -842,13 +912,23 @@ export const MapPage = () => {
                               {loc.nombre} {loc.apellido}
                             </strong>
                             <br />
+                            {loc.vehiculoGps && (
+                              <>
+                                GPS del vehiculo {loc.vehiculoGps.targa}
+                                {loc.vehiculoGps.speed != null
+                                  ? ` - ${Math.round(loc.vehiculoGps.speed)} ${loc.vehiculoGps.speedUnit ?? ""}`
+                                  : ""}
+                                {loc.vehiculoGps.ignition === false ? " (motor apagado)" : ""}
+                                <br />
+                              </>
+                            )}
                             {loc.servicio ? (
                               <>
                                 {loc.servicio.codigo} - {loc.servicio.destinazione}
                                 <br />
                                 Actualizado hace {minutesAgo(loc.actualizada)} min
                                 <br />
-                                {section !== "pendientes" ? null : openMarkerEta === undefined ? (
+                                {openMarkerEta === undefined ? (
                                   "Calculando ETA en vivo..."
                                 ) : openMarkerEta ? (
                                   <>
@@ -859,13 +939,19 @@ export const MapPage = () => {
                                   "ETA en vivo no disponible"
                                 )}
                               </>
+                            ) : loc.sinChofer ? (
+                              <>
+                                Sin chofer asignado
+                                <br />
+                                Actualizado hace {minutesAgo(loc.actualizada)} min
+                              </>
                             ) : (
                               <>
                                 Sin servicio activo - disponible
                                 <br />
                                 Actualizado hace {minutesAgo(loc.actualizada)} min
                                 <br />
-                                {section !== "pendientes" ? null : openMarkerEta === undefined ? (
+                                {openMarkerEta === undefined ? (
                                   "Calculando tiempo de regreso..."
                                 ) : openMarkerEta ? (
                                   <>
@@ -913,51 +999,6 @@ export const MapPage = () => {
                     </Marker>
                   );
                 })}
-
-                {rutaChoferPositions?.length > 0 && (
-                  <>
-                    <Marker
-                      position={rutaChoferPositions[0]}
-                      onClick={() => setOpenInfoId("ruta-inicio")}
-                      icon={{
-                        path: window.google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: ROUTE_START_COLOR,
-                        fillOpacity: 0.9,
-                        strokeColor: "#ffffff",
-                        strokeWeight: 2,
-                      }}
-                    >
-                      {openInfoId === "ruta-inicio" && (
-                        <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
-                          <div className="text-[13px]">
-                            Inicio: {formatDateTime(rutaChoferPoints[0].recordedAt)}
-                          </div>
-                        </InfoWindow>
-                      )}
-                    </Marker>
-                    <Marker
-                      position={rutaChoferPositions[rutaChoferPositions.length - 1]}
-                      onClick={() => setOpenInfoId("ruta-fin")}
-                      icon={{
-                        path: window.google.maps.SymbolPath.CIRCLE,
-                        scale: 8,
-                        fillColor: ROUTE_END_COLOR,
-                        fillOpacity: 0.9,
-                        strokeColor: "#ffffff",
-                        strokeWeight: 2,
-                      }}
-                    >
-                      {openInfoId === "ruta-fin" && (
-                        <InfoWindow onCloseClick={() => setOpenInfoId(null)}>
-                          <div className="text-[13px]">
-                            Ultimo punto: {formatDateTime(rutaChoferPoints[rutaChoferPoints.length - 1].recordedAt)}
-                          </div>
-                        </InfoWindow>
-                      )}
-                    </Marker>
-                  </>
-                )}
               </GoogleMap>
             )}
           </div>
