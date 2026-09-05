@@ -10,6 +10,30 @@ export const listVehiclesRequest = () =>
 export const listVehicleLivePositionsRequest = () =>
   api.get("/vehiculos/live-positions").then((res) => res.data.data.positions);
 
+// ETA a un destino escrito a mano (buscador de targa del Mapa) - origen es la
+// posicion que ya se esta mostrando en el marcador (GPS del vehiculo o del celular
+// del chofer), destino es texto libre (direccion o ciudad), se geocodifica del lado
+// del backend (mismo geocoder que ya usan los registros).
+export const getEtaToDestinationRequest = (origenLat, origenLng, destino) =>
+  api
+    .post("/vehiculos/eta-a-destino", { origenLat, origenLng, destino })
+    .then((res) => res.data.data.eta);
+
+// Seccion "Area C" del Mapa (pestanias Pagado/No pagado) - todas las entradas, el
+// front separa por "pagado".
+export const listAreaCEntriesRequest = () =>
+  api.get("/vehiculos/area-c-entries").then((res) => res.data.data.entries);
+
+// Solo las que siguen sin pagar - para la campanita de notificaciones (ver
+// computeAreaCAlerts en dashboardStats.js).
+export const listUnpaidAreaCEntriesRequest = () =>
+  api.get("/vehiculos/area-c-entries/unpaid").then((res) => res.data.data.entries);
+
+// Marca (o desmarca) una entrada de Area C como pagada, con opcionalmente una foto
+// del comprobante (formData: "pagado" + opcional "comprobante").
+export const updateAreaCEntryRequest = (id, formData) =>
+  api.patch(`/vehiculos/area-c-entries/${id}`, formData).then((res) => res.data.data.entry);
+
 export const getVehicleRequest = (id) =>
   api.get(`/vehiculos/${id}`).then((res) => res.data.data.vehicle);
 

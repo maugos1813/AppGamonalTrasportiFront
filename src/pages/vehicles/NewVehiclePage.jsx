@@ -20,6 +20,7 @@ const INITIAL_FORM = {
   estado: "DISPONIBLE",
   poliza: "",
   rTecnica: "",
+  autorizadoAreaC: false,
 };
 
 const FILE_FIELDS = [
@@ -158,6 +159,16 @@ export const NewVehiclePage = () => {
               error={fieldErrors.rTecnica?.[0]}
             />
           </div>
+
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-[13px] text-ink-200">
+            <input
+              type="checkbox"
+              checked={form.autorizadoAreaC}
+              onChange={(e) => setField("autorizadoAreaC", e.target.checked)}
+              className="h-3.5 w-3.5 accent-accent-500"
+            />
+            Autorizado para circular en Area C (permiso ZTL de Milano)
+          </label>
 
           <div className="border-t border-line/10 pt-5">
             <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">

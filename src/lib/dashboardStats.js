@@ -1,5 +1,5 @@
 import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS, getTagliandoStatus } from "./constants";
-import { formatDate } from "./format";
+import { formatDate, formatDateTime } from "./format";
 
 const isSameDay = (a, b) => {
   const dateA = new Date(a);
@@ -746,6 +746,22 @@ export const computeVehicleMaintenanceAlerts = (vehicles) =>
     .map(getVehicleMaintenanceAlert)
     .filter(Boolean)
     .sort((a, b) => (a.severity === "urgent" ? -1 : b.severity === "urgent" ? 1 : 0));
+
+// Vehiculo sin autorizadoAreaC detectado adentro del Area C (ver AreaCEntry en el
+// backend - se registra solo al consultar la posicion en vivo, ver
+// checkAreaCEntries en vehicle.service.js). Urgente: en Milano hay que pagar el Area C
+// el mismo dia o el siguiente, no despues.
+// entries: ya vienen sin pagar (ver listUnpaidAreaCEntriesRequest) - dismissible:
+// false a proposito, esta alerta no se "oculta" a mano, se resuelve marcando pagado en
+// la seccion Area C del Mapa (ahi desaparece sola, ver NotificationsBell.jsx).
+export const computeAreaCAlerts = (entries) =>
+  entries.map((entry) => ({
+    id: `area-c-${entry.id}`,
+    severity: "urgent",
+    message: `${entry.targa} entro al Area C el ${formatDateTime(entry.enteredAt)} sin autorizacion - pagalo antes de que venza el plazo.`,
+    link: "/mapa",
+    dismissible: false,
+  }));
 
 // Choferes activos cuyo celular reporto que el permiso de ubicacion en segundo plano
 // no esta en "Permitir todo el tiempo" (ver useLocationSharing). Urgente si en este

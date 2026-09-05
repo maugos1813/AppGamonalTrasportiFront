@@ -147,20 +147,25 @@ export const NotificationsBell = ({ variant = "default" }) => {
                     )}
                     {/* "Eliminar" no borra nada en el backend (la alerta se recalcula
                         sola) - queda descartada por dispositivo hasta que la misma
-                        situacion empeore (ver isDismissed en NotificationsContext). */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        dismiss(alert);
-                      }}
-                      aria-label="Eliminar notificacion"
-                      title="Eliminar notificacion"
-                      className="shrink-0 rounded-full p-1 opacity-60 transition-opacity hover:bg-current/10 hover:opacity-100"
-                    >
-                      <CloseIcon className="h-3.5 w-3.5" />
-                    </button>
+                        situacion empeore (ver isDismissed en NotificationsContext).
+                        dismissible === false (ej. Area C): no tiene sentido "ocultarla"
+                        a mano, tiene que resolverse de verdad (marcar pagado en la
+                        seccion Area C del Mapa) para que deje de aparecer. */}
+                    {alert.dismissible !== false && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          dismiss(alert);
+                        }}
+                        aria-label="Eliminar notificacion"
+                        title="Eliminar notificacion"
+                        className="shrink-0 rounded-full p-1 opacity-60 transition-opacity hover:bg-current/10 hover:opacity-100"
+                      >
+                        <CloseIcon className="h-3.5 w-3.5" />
+                      </button>
+                    )}
                   </li>
                 );
               })}

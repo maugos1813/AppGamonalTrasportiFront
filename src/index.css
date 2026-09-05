@@ -281,6 +281,18 @@
   }
 }
 
+/* InfoWindow de Google Maps (seccion Mapa): la burbuja propia de Google siempre viene
+   con fondo claro fijo, no seguia el tema oscuro de la app - el texto de adentro, en
+   cambio, si heredaba el color casi blanco del tema oscuro (ver --ink-*), quedando
+   ilegible (texto casi blanco sobre fondo blanco). Se fuerza fondo y texto oscuro fijos
+   independientes del tema, como una tarjeta clara siempre - mismo criterio que usa
+   Google Maps por defecto en cualquier sitio. */
+.gm-style .gm-style-iw-c,
+.gm-style .gm-style-iw-d {
+  background-color: #ffffff;
+  color: #1f2937;
+}
+
 /* Nav deslizable de mobile (MobileNavDrawer), entra desde la izquierda. */
 @utility animate-slide-in-left {
   animation: slide-in-left 0.25s ease-out;

@@ -946,16 +946,20 @@ export const DailySummaryPage = () => {
                             <span className="min-w-0 flex-1">{alert.message}</span>
                           )}
                           {/* "Eliminar" no borra nada en el backend, ver comentario de
-                              isDismissed en NotificationsContext.jsx. */}
-                          <button
-                            type="button"
-                            onClick={() => dismiss(alert)}
-                            aria-label="Eliminar notificacion"
-                            title="Eliminar notificacion"
-                            className="shrink-0 rounded-full p-1 opacity-60 transition-opacity hover:bg-current/10 hover:opacity-100"
-                          >
-                            <CloseIcon className="h-3.5 w-3.5" />
-                          </button>
+                              isDismissed en NotificationsContext.jsx. dismissible ===
+                              false (ej. Area C): se resuelve marcando pagado en el
+                              Mapa, no ocultandola a mano - ver NotificationsBell.jsx. */}
+                          {alert.dismissible !== false && (
+                            <button
+                              type="button"
+                              onClick={() => dismiss(alert)}
+                              aria-label="Eliminar notificacion"
+                              title="Eliminar notificacion"
+                              className="shrink-0 rounded-full p-1 opacity-60 transition-opacity hover:bg-current/10 hover:opacity-100"
+                            >
+                              <CloseIcon className="h-3.5 w-3.5" />
+                            </button>
+                          )}
                         </div>
                       </li>
                     );

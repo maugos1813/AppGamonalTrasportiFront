@@ -32,6 +32,7 @@ const toFormState = (vehicle) => ({
   estado: vehicle.estado ?? "",
   poliza: toDateInputValue(vehicle.poliza),
   rTecnica: toDateInputValue(vehicle.rTecnica),
+  autorizadoAreaC: vehicle.autorizadoAreaC ?? false,
 });
 
 // Muestra el valor si esta cargado, o un placeholder atenuado si falta completarlo.
@@ -335,6 +336,11 @@ export const VehicleDetailPage = () => {
           <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <VehicleStat label="Area" value={areaLabel(vehicle.area)} />
             <VehicleStat label="Grupo" value={vehicle.grupo ? grupoLabel(vehicle.grupo) : null} />
+            <VehicleStat
+              label="Area C (ZTL Milano)"
+              value={vehicle.autorizadoAreaC ? "Autorizado" : "No autorizado"}
+              tone={vehicle.autorizadoAreaC ? "green" : "amber"}
+            />
           </div>
         ) : (
           <form className="mt-8 flex flex-col gap-5" onSubmit={handleSave}>
@@ -385,6 +391,16 @@ export const VehicleDetailPage = () => {
                 error={fieldErrors.estado?.[0]}
               />
             </div>
+
+            <label className="flex w-fit cursor-pointer items-center gap-2 text-[13px] text-ink-200">
+              <input
+                type="checkbox"
+                checked={form.autorizadoAreaC}
+                onChange={(e) => setField("autorizadoAreaC", e.target.checked)}
+                className="h-3.5 w-3.5 accent-accent-500"
+              />
+              Autorizado para circular en Area C (permiso ZTL de Milano)
+            </label>
 
             <div className="border-t border-line/10 pt-5">
               <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">

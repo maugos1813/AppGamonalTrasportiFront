@@ -3,6 +3,7 @@ import { useLocation } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import {
   computeAppsheetSyncAlerts,
+  computeAreaCAlerts,
   computeBirthdayAlerts,
   computeCurrentService,
   computeDriverDocumentAlerts,
@@ -23,7 +24,12 @@ import {
   listRecordsRequest,
 } from "../lib/records.api";
 import { listUsersRequest } from "../lib/users.api";
-import { getVehicleRequest, listVehiclesRequest } from "../lib/vehicles.api";
+import {
+  getVehicleRequest,
+  listUnpaidAreaCEntriesRequest,
+  listVehicleLivePositionsRequest,
+  listVehiclesRequest,
+} from "../lib/vehicles.api";
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 // Las alertas OWNER/ADMIN dependen de tiempos concretos (ETA a 45min, vencimientos
@@ -129,12 +135,19 @@ const buildChoferAlerts = async () => {
 // tardaran en cargar. computeLocationPermissionAlerts solo necesita saber que chofer
 // esta "en camino" ahora mismo, asi que le alcanza con los pendientes de hoy.
 const buildOwnerAlerts = async () => {
-  const [pendingRecords, users, vehicles, documents, syncFailures] = await Promise.all([
+  const [pendingRecords, users, vehicles, documents, syncFailures, areaCEntries] = await Promise.all([
     listPendingRecordsRequest(),
     listUsersRequest(),
     listVehiclesRequest(),
     listDocumentsRequest(),
     listAppsheetSyncFailuresRequest(),
+    listUnpaidAreaCEntriesRequest(),
+    // Se pide (y se descarta el resultado) solo para que el backend corra la deteccion
+    // de Area C como efecto de esta misma consulta (ver checkAreaCEntries en
+    // vehicle.service.js) - asi corre cada 60s mientras cualquier pantalla de la app
+    // este abierta, no solo el Mapa. El resultado real de la alerta viene de
+    // listUnpaidAreaCEntriesRequest, de arriba.
+    listVehicleLivePositionsRequest().catch(() => null),
   ]);
 
   return sortBySeverity([
@@ -144,6 +157,7 @@ const buildOwnerAlerts = async () => {
     ...computeVehicleMaintenanceAlerts(vehicles),
     ...computeBirthdayAlerts(users),
     ...computeAppsheetSyncAlerts(syncFailures),
+    ...computeAreaCAlerts(areaCEntries),
   ]);
 };
 
