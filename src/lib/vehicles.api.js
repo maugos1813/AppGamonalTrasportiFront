@@ -39,6 +39,12 @@ export const updateAreaCEntryRequest = (id, formData) =>
 export const listSpeedingEventsRequest = () =>
   api.get("/vehiculos/speeding-events").then((res) => res.data.data.events);
 
+// Importa a demanda (boton "Importar de Velocity Fleet" en Vehiculos) las targas que
+// reporte el GPS y que todavia no tengan ficha en la app - se crean con area "Sin
+// asignar" para revisar despues.
+export const syncVehiclesFromVelocityFleetRequest = () =>
+  api.post("/vehiculos/sync-from-velocity-fleet").then((res) => res.data.data);
+
 export const getVehicleRequest = (id) =>
   api.get(`/vehiculos/${id}`).then((res) => res.data.data.vehicle);
 

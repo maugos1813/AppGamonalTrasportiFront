@@ -20,7 +20,7 @@ import {
 import { computeFleetKmUsage, computeVehicleDocumentAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
 import { formatDate } from "../../lib/format";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
-import { listVehiclesRequest } from "../../lib/vehicles.api";
+import { listVehiclesRequest, syncVehiclesFromVelocityFleetRequest } from "../../lib/vehicles.api";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 
@@ -312,12 +312,14 @@ export const VehiclesPage = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  const { version: vehiclesVersion } = useDataRefresh("vehicles");
+  const { version: vehiclesVersion, refresh: refreshVehicles } = useDataRefresh("vehicles");
   const { version: recordsVersion } = useDataRefresh("records");
 
   const [vehicles, setVehicles] = useState(null);
   const [monthlyRecords, setMonthlyRecords] = useState(null);
   const [error, setError] = useState("");
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -341,6 +343,30 @@ export const VehiclesPage = () => {
 
   const unassignedVehicles = vehicles?.filter((v) => !v.grupo) ?? [];
 
+  // Importa a demanda las targas que Velocity Fleet reporte y todavia no tengan
+  // ficha (se crean con area "Sin asignar" para revisar despues) - solo OWNER, mismo
+  // criterio que el backend.
+  const handleSyncFromVelocity = async () => {
+    setSyncing(true);
+    setError("");
+    setSyncMessage("");
+    try {
+      const result = await syncVehiclesFromVelocityFleetRequest();
+      setSyncMessage(
+        result.createdCount === 0
+          ? "No hay targas nuevas para importar."
+          : `Se importaron ${result.createdCount} vehiculo(s): ${result.created
+              .map((v) => v.targa)
+              .join(", ")}. Revisa su area/modelo en la ficha de cada uno.`
+      );
+      refreshVehicles();
+    } catch (err) {
+      setError(parseApiError(err).message);
+    } finally {
+      setSyncing(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -348,10 +374,24 @@ export const VehiclesPage = () => {
           <h1 className="text-[24px] font-semibold text-ink-50">Vehiculos</h1>
           <p className="mt-1 text-[14px] text-ink-300">Flota de Gamonal Trasporti.</p>
         </div>
-        <Link to="/vehiculos/new" state={{ backgroundLocation: location }}>
-          <Button className="w-auto px-5">Nuevo vehiculo</Button>
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {user?.cargo === "OWNER" && (
+            <Button
+              variant="ghost"
+              className="w-auto px-5"
+              onClick={handleSyncFromVelocity}
+              loading={syncing}
+            >
+              Importar de Velocity Fleet
+            </Button>
+          )}
+          <Link to="/vehiculos/new" state={{ backgroundLocation: location }}>
+            <Button className="w-auto px-5">Nuevo vehiculo</Button>
+          </Link>
+        </div>
       </div>
+
+      {syncMessage && <Alert variant="success">{syncMessage}</Alert>}
 
       <Alert>{error}</Alert>
 

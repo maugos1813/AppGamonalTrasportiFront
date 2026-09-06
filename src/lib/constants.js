@@ -8,6 +8,12 @@ export const AREA_OPTIONS = [
   { value: "FARMACIA", label: "Farmacia" },
 ];
 
+// Solo para Vehiculo (no para el area de un chofer/usuario) - "Sin asignar" es el
+// area con la que se crean los vehiculos importados automaticamente desde Velocity
+// Fleet (ver "Importar de Velocity Fleet" en VehiclesPage), para que se note que
+// faltan revisar a mano.
+export const VEHICLE_AREA_OPTIONS = [...AREA_OPTIONS, { value: "SIN_ASIGNAR", label: "Sin asignar" }];
+
 // Seccion(es) de Registros/Control economico a las que queda acotado un ADMIN "de
 // area" (ver lib/permissions.js) - lista, no un solo valor, por si a futuro un area
 // vuelve a cubrir mas de una seccion. Un area sin entrada aca (ej. FARMACIA) no tiene

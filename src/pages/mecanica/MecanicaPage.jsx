@@ -11,7 +11,7 @@ import { Spinner } from "../../components/ui/Spinner";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, TAGLIANDO_INTERVALO_KM, getTagliandoStatus } from "../../lib/constants";
+import { TAGLIANDO_INTERVALO_KM, VEHICLE_AREA_OPTIONS, getTagliandoStatus } from "../../lib/constants";
 import { formatDateTime } from "../../lib/format";
 import {
   deleteVehicleMantenimientoRequest,
@@ -22,7 +22,7 @@ import {
 
 const AREA_FILTER_OPTIONS = [
   { value: "ALL", label: "Todas" },
-  ...AREA_OPTIONS.map((opt) => ({
+  ...VEHICLE_AREA_OPTIONS.map((opt) => ({
     value: opt.value,
     label: opt.value === "DHL" ? "DHL - AB Service" : opt.label,
   })),

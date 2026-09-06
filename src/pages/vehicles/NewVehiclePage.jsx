@@ -9,7 +9,7 @@ import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, GRUPO_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
+import { GRUPO_OPTIONS, VEHICLE_AREA_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
 import { createVehicleRequest } from "../../lib/vehicles.api";
 
 const INITIAL_FORM = {
@@ -119,7 +119,7 @@ export const NewVehiclePage = () => {
               id="area"
               label="Area"
               placeholder="Escribe para buscar un area"
-              options={AREA_OPTIONS}
+              options={VEHICLE_AREA_OPTIONS}
               value={form.area}
               onChange={(v) => setField("area", v)}
               error={fieldErrors.area?.[0]}

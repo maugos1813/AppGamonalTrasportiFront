@@ -13,7 +13,7 @@ import { VehicleStatusBadge } from "../../components/ui/VehicleStatusBadge";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, GRUPO_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
+import { GRUPO_OPTIONS, VEHICLE_AREA_OPTIONS, VEHICLE_STATUS_OPTIONS } from "../../lib/constants";
 import { formatDate, toDateInputValue } from "../../lib/format";
 import {
   deleteVehicleRequest,
@@ -21,7 +21,7 @@ import {
   updateVehicleRequest,
 } from "../../lib/vehicles.api";
 
-const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
+const areaLabel = (value) => VEHICLE_AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 const grupoLabel = (value) => GRUPO_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 
 const toFormState = (vehicle) => ({
@@ -367,7 +367,7 @@ export const VehicleDetailPage = () => {
                 id="area"
                 label="Area"
                 placeholder="Escribe para buscar un area"
-                options={AREA_OPTIONS}
+                options={VEHICLE_AREA_OPTIONS}
                 value={form.area}
                 onChange={(v) => setField("area", v)}
                 error={fieldErrors.area?.[0]}

@@ -30,6 +30,9 @@ const NewDriverPage = lazy(() =>
   import("./pages/drivers/NewDriverPage").then((m) => ({ default: m.NewDriverPage })),
 );
 const MapPage = lazy(() => import("./pages/map/MapPage").then((m) => ({ default: m.MapPage })));
+const ControlFlotaPage = lazy(() =>
+  import("./pages/control-flota/ControlFlotaPage").then((m) => ({ default: m.ControlFlotaPage })),
+);
 const MecanicaPage = lazy(() => import("./pages/mecanica/MecanicaPage").then((m) => ({ default: m.MecanicaPage })));
 const DailySummaryPage = lazy(() =>
   import("./pages/notifications/DailySummaryPage").then((m) => ({ default: m.DailySummaryPage })),
@@ -122,6 +125,7 @@ function App() {
               <Route path="/vehiculos/new" element={<NewVehiclePage />} />
               <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
               <Route path="/mapa" element={<MapPage />} />
+              <Route path="/control-flota" element={<ControlFlotaPage />} />
               <Route path="/mecanica" element={<MecanicaPage />} />
             </Route>
           </Route>
