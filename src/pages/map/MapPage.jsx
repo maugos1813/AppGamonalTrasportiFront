@@ -676,7 +676,7 @@ export const MapPage = () => {
 
       <div className="glass-surface relative overflow-hidden rounded-3xl">
         {isLoaded && (
-          <div className="glass-surface-sm absolute right-3 top-3 z-10 flex flex-col gap-1.5 rounded-xl px-3 py-2 text-[12px] text-ink-200">
+          <div className="glass-surface-sm absolute left-3 top-3 z-10 flex flex-col gap-1.5 rounded-xl px-3 py-2 text-[12px] text-ink-200">
             <label className="flex cursor-pointer items-center gap-2">
               <input
                 type="checkbox"
@@ -697,13 +697,6 @@ export const MapPage = () => {
               <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AREA_B_COLOR }} />
               Area B
             </label>
-            <div className="flex items-center gap-2 border-t border-line/10 pt-1.5">
-              <span
-                className="inline-block h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: IDLE_DRIVER_COLOR }}
-              />
-              Chofer disponible
-            </div>
           </div>
         )}
         <div className="h-[calc(100dvh-300px)] min-h-[420px] w-full sm:h-[calc(100dvh-260px)] lg:h-[calc(100dvh-220px)]">

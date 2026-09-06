@@ -1,6 +1,7 @@
 import clsx from "clsx";
 import { useEffect } from "react";
 import { NavLink } from "react-router-dom";
+import logo from "../../assets/logo.png";
 
 const SunIcon = (props) => (
   <svg
@@ -75,9 +76,7 @@ export const MobileNavDrawer = ({ open, onClose, items, theme, onToggleTheme, on
       <div className="relative z-10 flex h-dvh w-72 max-w-[80vw] animate-slide-in-left flex-col justify-between border-r border-sidebar-border bg-sidebar px-4 py-6">
         <div>
           <div className="flex items-center gap-3 px-2">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-yellow">
-              <span className="text-sm font-bold text-brand-navy">GT</span>
-            </div>
+            <img src={logo} alt="Gamonal Trasporti" className="h-10 w-10 shrink-0 rounded-xl" />
             <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Trasporti</span>
           </div>
 

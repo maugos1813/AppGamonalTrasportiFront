@@ -31,6 +31,13 @@ export const reportLocationPermissionRequest = (denegado) =>
 export const updateMyReperibilidadRequest = (noDisponible) =>
   api.patch("/users/me/reperibilidad", { noDisponible }).then((res) => res.data.data.user);
 
+// Notificaciones push (Area C, exceso de velocidad) - ver usePushNotifications.js.
+export const registerPushTokenRequest = (token, platform) =>
+  api.post("/users/me/push-token", { token, platform });
+
+export const unregisterPushTokenRequest = (token) =>
+  api.delete("/users/me/push-token", { data: { token } });
+
 export const listDriverLocationsRequest = () =>
   api.get("/users/ubicaciones").then((res) => res.data.data.ubicaciones);
 

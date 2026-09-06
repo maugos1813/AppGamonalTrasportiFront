@@ -1,10 +1,12 @@
 import clsx from "clsx";
 import { useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
+import logo from "../../assets/logo.png";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationsProvider } from "../../context/NotificationsContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
+import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { MobileNavDrawer } from "./MobileNavDrawer";
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -262,6 +264,7 @@ export const AppShell = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useLocationSharing();
+  usePushNotifications();
 
   return (
     <NotificationsProvider>
@@ -288,9 +291,7 @@ export const AppShell = () => {
         <aside className="hidden sm:sticky sm:top-0 sm:flex sm:h-dvh sm:w-60 sm:shrink-0 sm:flex-col sm:justify-between sm:border-r sm:border-sidebar-border sm:bg-sidebar sm:px-4 sm:py-6">
           <div>
             <Link to="/" className="flex items-center gap-3 px-2">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-yellow">
-                <span className="text-sm font-bold text-brand-navy">GT</span>
-              </div>
+              <img src={logo} alt="Gamonal Trasporti" className="h-10 w-10 shrink-0 rounded-xl" />
               <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Trasporti</span>
             </Link>
 
@@ -356,9 +357,7 @@ export const AppShell = () => {
               title="Abrir menu"
               className="flex items-center gap-3"
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-yellow">
-                <span className="text-sm font-bold text-brand-navy">GT</span>
-              </div>
+              <img src={logo} alt="Gamonal Trasporti" className="h-10 w-10 shrink-0 rounded-xl" />
             </button>
 
             <div className="flex items-center gap-2">

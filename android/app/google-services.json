@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "34291446440",
+    "project_id": "gamonaltrasportiapp-88a56",
+    "storage_bucket": "gamonaltrasportiapp-88a56.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:34291446440:android:923cb951201fe9efe7889d",
+        "android_client_info": {
+          "package_name": "com.gamonaltrasporti.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBJGzUuvXjMgmb10NwTJWMIRNW1khh2ll4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

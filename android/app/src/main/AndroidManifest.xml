@@ -33,6 +33,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Notificaciones push (Area C, exceso de velocidad) - icono por defecto cuando
+        la notificacion no trae uno propio, ver usePushNotifications.js. Tiene que ser
+        una silueta blanca sobre transparente (ic_stat_notify, generada del logo) - un
+        icono a color como ic_launcher se veria como un cuadrado blanco solido, Android
+        no admite color en el icono de la barra de estado desde la version 5. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
     </application>
 
     <!-- Permissions -->
@@ -41,4 +50,8 @@
     <!-- Ubicacion en segundo plano: el chofer debe otorgar "Permitir todo el tiempo"
     para que el tracking siga funcionando con la app minimizada o la pantalla bloqueada. -->
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Notificaciones push - obligatorio declararlo desde Android 13 (API 33), el
+    permiso en si se pide en tiempo de ejecucion (ver PushNotifications.requestPermissions
+    en usePushNotifications.js). -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>
