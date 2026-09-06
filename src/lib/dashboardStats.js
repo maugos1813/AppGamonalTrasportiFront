@@ -763,6 +763,17 @@ export const computeAreaCAlerts = (entries) =>
     dismissible: false,
   }));
 
+// Exceso de velocidad (SPEEDING_THRESHOLD_KMH en el backend, ver
+// checkSpeedingEvents) - a diferencia de Area C, es un aviso comun (dismissible: true
+// por defecto, se puede descartar con la X normal de la campanita).
+export const computeSpeedingAlerts = (events) =>
+  events.map((event) => ({
+    id: `speeding-${event.id}`,
+    severity: "urgent",
+    message: `${event.targa} supero los ${Math.round(event.speedKmh)} km/h el ${formatDateTime(event.occurredAt)}.`,
+    link: "/mapa",
+  }));
+
 // Choferes activos cuyo celular reporto que el permiso de ubicacion en segundo plano
 // no esta en "Permitir todo el tiempo" (ver useLocationSharing). Urgente si en este
 // momento tienen un servicio "en camino" (no se los puede rastrear ahora mismo),

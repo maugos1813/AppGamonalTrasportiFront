@@ -34,6 +34,11 @@ export const listUnpaidAreaCEntriesRequest = () =>
 export const updateAreaCEntryRequest = (id, formData) =>
   api.patch(`/vehiculos/area-c-entries/${id}`, formData).then((res) => res.data.data.entry);
 
+// Excesos de velocidad (SPEEDING_THRESHOLD_KMH en el backend) - para la campanita de
+// notificaciones (ver computeSpeedingAlerts en dashboardStats.js).
+export const listSpeedingEventsRequest = () =>
+  api.get("/vehiculos/speeding-events").then((res) => res.data.data.events);
+
 export const getVehicleRequest = (id) =>
   api.get(`/vehiculos/${id}`).then((res) => res.data.data.vehicle);
 

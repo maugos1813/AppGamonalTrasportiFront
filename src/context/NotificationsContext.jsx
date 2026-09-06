@@ -9,6 +9,7 @@ import {
   computeDriverDocumentAlerts,
   computeLocationPermissionAlerts,
   computeOverdueServices,
+  computeSpeedingAlerts,
   computeVehicleDocumentAlerts,
   computeVehicleMaintenanceAlerts,
   getVehicleMaintenanceAlert,
@@ -26,6 +27,7 @@ import {
 import { listUsersRequest } from "../lib/users.api";
 import {
   getVehicleRequest,
+  listSpeedingEventsRequest,
   listUnpaidAreaCEntriesRequest,
   listVehicleLivePositionsRequest,
   listVehiclesRequest,
@@ -135,20 +137,22 @@ const buildChoferAlerts = async () => {
 // tardaran en cargar. computeLocationPermissionAlerts solo necesita saber que chofer
 // esta "en camino" ahora mismo, asi que le alcanza con los pendientes de hoy.
 const buildOwnerAlerts = async () => {
-  const [pendingRecords, users, vehicles, documents, syncFailures, areaCEntries] = await Promise.all([
-    listPendingRecordsRequest(),
-    listUsersRequest(),
-    listVehiclesRequest(),
-    listDocumentsRequest(),
-    listAppsheetSyncFailuresRequest(),
-    listUnpaidAreaCEntriesRequest(),
-    // Se pide (y se descarta el resultado) solo para que el backend corra la deteccion
-    // de Area C como efecto de esta misma consulta (ver checkAreaCEntries en
-    // vehicle.service.js) - asi corre cada 60s mientras cualquier pantalla de la app
-    // este abierta, no solo el Mapa. El resultado real de la alerta viene de
-    // listUnpaidAreaCEntriesRequest, de arriba.
-    listVehicleLivePositionsRequest().catch(() => null),
-  ]);
+  const [pendingRecords, users, vehicles, documents, syncFailures, areaCEntries, speedingEvents] =
+    await Promise.all([
+      listPendingRecordsRequest(),
+      listUsersRequest(),
+      listVehiclesRequest(),
+      listDocumentsRequest(),
+      listAppsheetSyncFailuresRequest(),
+      listUnpaidAreaCEntriesRequest(),
+      listSpeedingEventsRequest(),
+      // Se pide (y se descarta el resultado) solo para que el backend corra la
+      // deteccion de Area C/exceso de velocidad como efecto de esta misma consulta
+      // (ver checkAreaCEntries/checkSpeedingEvents en vehicle.service.js) - asi corre
+      // cada 60s mientras cualquier pantalla de la app este abierta, no solo el Mapa.
+      // El resultado real de las alertas viene de las requests de arriba.
+      listVehicleLivePositionsRequest().catch(() => null),
+    ]);
 
   return sortBySeverity([
     ...computeLocationPermissionAlerts(users, pendingRecords),
@@ -158,6 +162,7 @@ const buildOwnerAlerts = async () => {
     ...computeBirthdayAlerts(users),
     ...computeAppsheetSyncAlerts(syncFailures),
     ...computeAreaCAlerts(areaCEntries),
+    ...computeSpeedingAlerts(speedingEvents),
   ]);
 };
 
