@@ -1,4 +1,12 @@
-import { GoogleMap, InfoWindow, Marker, Polygon, Polyline, useJsApiLoader } from "@react-google-maps/api";
+import {
+  GoogleMap,
+  InfoWindow,
+  Marker,
+  OverlayView,
+  Polygon,
+  Polyline,
+  useJsApiLoader,
+} from "@react-google-maps/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
 import { AreaCEntryRow } from "../../components/AreaCEntryRow";
@@ -62,6 +70,16 @@ const NIGHT_MODE_STYLES = [
   { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#515c6d" }] },
   { featureType: "water", elementType: "labels.text.stroke", stylers: [{ color: "#17263c" }] },
 ];
+
+// Oculta los pines de comercios de Google (gasolineras, bares, etc.) - se aplica en
+// los dos temas: sin esto, el mapa de una flota terminaba lleno de pines ajenos (cada
+// uno con su propio icono/letra) mezclados con los de los vehiculos, dificil de
+// distinguir a simple vista.
+const HIDE_POI_STYLES = [
+  { featureType: "poi", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "poi", elementType: "geometry", stylers: [{ visibility: "off" }] },
+];
+
 // Chofer con ubicacion fresca pero sin servicio "en camino" ahora mismo (volviendo de
 // una entrega o esperando el proximo): mismo gris que el estado "En suspenso" en el
 // resto de la app, para diferenciarlo del pin rojo por defecto de los que si reparten.
@@ -693,7 +711,7 @@ export const MapPage = () => {
               options={{
                 streetViewControl: false,
                 mapTypeControl: false,
-                styles: theme === "dark" ? NIGHT_MODE_STYLES : undefined,
+                styles: theme === "dark" ? [...NIGHT_MODE_STYLES, ...HIDE_POI_STYLES] : HIDE_POI_STYLES,
               }}
             >
               {showAreaC && (
@@ -743,6 +761,35 @@ export const MapPage = () => {
                   />
                 </>
               )}
+
+              {/* Targa siempre visible arriba del punto (prendido, apagado o en
+                  movimiento) - para saber que vehiculo es cada uno sin tener que
+                  clickear el marcador uno por uno. Solo para los que tienen GPS de
+                  vehiculo (no para un chofer sin vehiculo asignado, ahi no hay targa
+                  que mostrar). Mismo click que el marcador: abre su InfoWindow. */}
+              {enrichedLocations
+                ?.filter((loc) => loc.vehiculoGps)
+                .map((loc) => {
+                  const markerId = loc.servicio?.id ?? `idle-${loc.id}`;
+                  return (
+                    <OverlayView
+                      key={`label-${markerId}`}
+                      position={{ lat: loc.lat, lng: loc.lng }}
+                      mapPaneName={OverlayView.OVERLAY_MOUSE_TARGET}
+                      getPixelPositionOffset={(width, height) => ({ x: -width / 2, y: -height - 20 })}
+                    >
+                      {/* Colores fijos, sin clases de tema (ink, dark) - se ve como
+                          una tarjeta clara siempre, independiente del tema de la app,
+                          para que se lea bien sobre cualquier fondo del mapa. */}
+                      <div
+                        onClick={() => setOpenInfoId(markerId)}
+                        className="w-fit cursor-pointer whitespace-nowrap rounded-md border border-gray-300 bg-white px-2 py-1 text-[12px] font-bold text-gray-900 shadow-md"
+                      >
+                        {loc.vehiculoGps.targa}
+                      </div>
+                    </OverlayView>
+                  );
+                })}
 
               {enrichedLocations?.map((loc) => {
                 // key/estado por loc.servicio.id cuando hay servicio (un mismo chofer
