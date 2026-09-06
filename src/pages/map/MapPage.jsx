@@ -441,8 +441,18 @@ export const MapPage = () => {
       return;
     }
 
-    setOpenMarkerEta(undefined);
     const isIdleDriver = openInfoId.startsWith("idle-");
+    // Un vehiculo sin chofer asignado (ver sinChofer/vehiculoPositions mas arriba) usa
+    // "vehiculo-{targa}" como id, no un id de usuario real - no hay "chofer volviendo a
+    // la base" que calcular ahi. Antes esto igual disparaba getDriverReturnEtaRequest
+    // con ese id sintetico, que el backend rechazaba con 400 cada vez que se abria ese
+    // InfoWindow.
+    if (isIdleDriver && openInfoId.slice("idle-".length).startsWith("vehiculo-")) {
+      setOpenMarkerEta(null);
+      return;
+    }
+
+    setOpenMarkerEta(undefined);
     let cancelled = false;
     const fetchEta = () => {
       const request = isIdleDriver
