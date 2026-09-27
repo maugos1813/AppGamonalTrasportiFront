@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { AUTH_LOGOUT_EVENT, parseApiError } from "../lib/api";
-import { loginRequest, meRequest, registerRequest } from "../lib/auth.api";
+import { loginRequest, meRequest, registerRequest, ssoLoginRequest } from "../lib/auth.api";
 import { clearToken, getToken, setToken } from "../lib/token";
 
 const AuthContext = createContext(null);
@@ -26,7 +26,30 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    hydrate();
+    // Llegó desde el portal de OneSystec con un ticket de un solo uso
+    // (?sso=...): lo cambiamos por una sesión real acá, sin pedir password.
+    const params = new URLSearchParams(window.location.search);
+    const ticket = params.get("sso");
+    if (!ticket) {
+      hydrate();
+      return;
+    }
+
+    (async () => {
+      try {
+        const { user: ssoUser, accessToken } = await ssoLoginRequest(ticket);
+        setToken(accessToken);
+        setUser(ssoUser);
+      } catch {
+        clearToken();
+        setUser(null);
+      } finally {
+        params.delete("sso");
+        const rest = params.toString();
+        window.history.replaceState({}, "", window.location.pathname + (rest ? `?${rest}` : ""));
+        setInitializing(false);
+      }
+    })();
   }, [hydrate]);
 
   useEffect(() => {
