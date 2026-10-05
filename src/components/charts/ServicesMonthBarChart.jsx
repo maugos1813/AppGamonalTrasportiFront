@@ -37,7 +37,7 @@ export const ServicesMonthBarChart = ({ data }) => {
         <Tooltip content={<BarTooltip />} cursor={{ fill: cursorColor }} />
         <Bar dataKey="servicios" radius={[5, 5, 0, 0]} isAnimationActive={false}>
           {data.map((entry) => (
-            <Cell key={entry.month} fill={entry.isCurrent ? "#3b82f6" : "#3b5b9d"} fillOpacity={entry.isCurrent ? 1 : 0.7} />
+            <Cell key={entry.month} fill={entry.isCurrent ? "#22d3ee" : "#2f8dff"} fillOpacity={entry.isCurrent ? 1 : 0.8} />
           ))}
         </Bar>
       </BarChart>

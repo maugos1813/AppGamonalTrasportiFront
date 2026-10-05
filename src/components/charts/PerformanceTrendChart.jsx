@@ -3,7 +3,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { formatCurrency } from "../../lib/format";
 import { useChartAxisColors } from "./useChartAxisColors";
 
-export const PERFORMANCE_COLORS = { km: "#94a3b8", facturacion: "#3b82f6" };
+export const PERFORMANCE_COLORS = { km: "#22d3ee", facturacion: "#2f8dff" };
 
 const compact = (value) => (Math.abs(value) >= 1000 ? `${Math.round(value / 1000)}k` : `${value}`);
 
@@ -38,11 +38,11 @@ export const PerformanceTrendChart = ({ data }) => {
       <ComposedChart data={data} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
         <defs>
           <linearGradient id="perfKmFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={PERFORMANCE_COLORS.km} stopOpacity={0.28} />
+            <stop offset="5%" stopColor={PERFORMANCE_COLORS.km} stopOpacity={0.35} />
             <stop offset="95%" stopColor={PERFORMANCE_COLORS.km} stopOpacity={0} />
           </linearGradient>
           <linearGradient id="perfRevenueFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={PERFORMANCE_COLORS.facturacion} stopOpacity={0.22} />
+            <stop offset="5%" stopColor={PERFORMANCE_COLORS.facturacion} stopOpacity={0.3} />
             <stop offset="95%" stopColor={PERFORMANCE_COLORS.facturacion} stopOpacity={0} />
           </linearGradient>
         </defs>
@@ -78,7 +78,7 @@ export const PerformanceTrendChart = ({ data }) => {
           dataKey="km"
           name="Kilómetros"
           stroke={PERFORMANCE_COLORS.km}
-          strokeWidth={2}
+          strokeWidth={2.5}
           fill="url(#perfKmFill)"
         />
         <Area
@@ -88,7 +88,7 @@ export const PerformanceTrendChart = ({ data }) => {
           dataKey="facturacion"
           name="Facturación"
           stroke={PERFORMANCE_COLORS.facturacion}
-          strokeWidth={2}
+          strokeWidth={2.5}
           fill="url(#perfRevenueFill)"
         />
       </ComposedChart>

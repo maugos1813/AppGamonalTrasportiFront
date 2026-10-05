@@ -90,10 +90,10 @@ const KpiTile = ({ icon: Icon, value, label, detail, tone = "neutral" }) => (
     <span
       className={clsx(
         "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-        tone === "success" && "bg-success-500/10 text-success-500",
-        tone === "warning" && "bg-warning-500/10 text-warning-500",
-        tone === "danger" && "bg-danger-500/10 text-danger-500",
-        tone === "neutral" && "bg-line/5 text-ink-300"
+        tone === "success" && "bg-success-500/15 text-success-500 ring-1 ring-success-500/30",
+        tone === "warning" && "bg-warning-500/15 text-warning-500 ring-1 ring-warning-500/30",
+        tone === "danger" && "bg-danger-500/15 text-danger-500 ring-1 ring-danger-500/30",
+        tone === "neutral" && "bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/30"
       )}
     >
       <Icon className="h-5 w-5" />

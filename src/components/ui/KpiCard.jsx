@@ -3,7 +3,7 @@ import { useId } from "react";
 import { ArrowDownIcon, ArrowUpIcon } from "./icons";
 
 // Mini-linea de tendencia (SVG puro, sin recharts: la dibujan 4 tarjetas a la vez).
-const Sparkline = ({ series }) => {
+const Sparkline = ({ series, color }) => {
   const gradientId = useId();
   if (!series || series.length < 2) return null;
 
@@ -22,16 +22,16 @@ const Sparkline = ({ series }) => {
     <svg viewBox={`0 0 ${width} ${height}`} className="hidden h-9 w-20 shrink-0 sm:block" aria-hidden="true">
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+          <stop offset="0%" stopColor={color} stopOpacity="0.4" />
+          <stop offset="100%" stopColor={color} stopOpacity="0" />
         </linearGradient>
       </defs>
       <polygon points={`0,${height} ${line} ${width},${height}`} fill={`url(#${gradientId})`} />
       <polyline
         points={line}
         fill="none"
-        stroke="#3b82f6"
-        strokeWidth="1.6"
+        stroke={color}
+        strokeWidth="2"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -41,13 +41,16 @@ const Sparkline = ({ series }) => {
 
 // Tarjeta de indicador: icono, etiqueta, valor grande, variacion vs periodo anterior
 // y mini-linea de fondo. deltaPct null = sin base de comparacion.
-export const KpiCard = ({ icon: Icon, label, value, deltaPct, deltaLabel, series, className }) => {
+export const KpiCard = ({ icon: Icon, label, value, deltaPct, deltaLabel, series, className, color = "#2f8dff" }) => {
   const positive = deltaPct != null && deltaPct >= 0;
 
   return (
     <div className={clsx("glass-surface flex flex-col gap-3 rounded-2xl p-4 sm:p-5", className)}>
       <div className="flex items-center gap-3">
-        <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full sm:flex bg-line/5 text-ink-300 ring-1 ring-line/10">
+        <span
+          className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full sm:flex"
+          style={{ color, backgroundColor: `${color}26`, boxShadow: `inset 0 0 0 1px ${color}40` }}
+        >
           <Icon className="h-5 w-5" />
         </span>
         <span className="text-[13px] font-medium text-ink-200 sm:text-[14px]">{label}</span>
@@ -73,7 +76,7 @@ export const KpiCard = ({ icon: Icon, label, value, deltaPct, deltaLabel, series
         ) : (
           <span className="text-[12px] text-ink-400">Sin periodo anterior</span>
         )}
-        <Sparkline series={series} />
+        <Sparkline series={series} color={color} />
       </div>
     </div>
   );

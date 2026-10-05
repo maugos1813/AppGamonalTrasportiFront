@@ -106,13 +106,16 @@ const MonthPicker = ({ value, onChange }) => (
 );
 
 // Tarjeta de seccion del dashboard: encabezado con icono + titulo + subtitulo.
-const Panel = ({ icon: Icon, title, subtitle, aside, children, className }) => (
+const Panel = ({ icon: Icon, title, subtitle, aside, children, className, tint = "#2f8dff" }) => (
   <section className={clsx("glass-surface rounded-2xl p-5 sm:p-6", className)}>
     {(title || aside) && (
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           {Icon && (
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-line/5 text-ink-300 ring-1 ring-line/10">
+            <span
+              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full"
+              style={{ color: tint, backgroundColor: `${tint}26`, boxShadow: `inset 0 0 0 1px ${tint}40` }}
+            >
               <Icon className="h-5 w-5" />
             </span>
           )}
@@ -341,6 +344,7 @@ export const OwnerDashboardPage = () => {
         <KpiCard
           icon={ClipboardListIcon}
           label="Servicios"
+          color="#2f8dff"
           value={kpis.servicios.value.toLocaleString("es-AR")}
           deltaPct={kpis.servicios.deltaPct}
           deltaLabel={deltaLabel}
@@ -349,6 +353,7 @@ export const OwnerDashboardPage = () => {
         <KpiCard
           icon={RouteIcon}
           label="Kilómetros"
+          color="#22d3ee"
           value={`${Math.round(kpis.km.value).toLocaleString("es-AR")} km`}
           deltaPct={kpis.km.deltaPct}
           deltaLabel={deltaLabel}
@@ -357,6 +362,7 @@ export const OwnerDashboardPage = () => {
         <KpiCard
           icon={UsersIcon}
           label="Clientes atendidos"
+          color="#a78bfa"
           value={kpis.clientes.value.toLocaleString("es-AR")}
           deltaPct={kpis.clientes.deltaPct}
           deltaLabel={deltaLabel}
@@ -365,6 +371,7 @@ export const OwnerDashboardPage = () => {
         <KpiCard
           icon={TruckIcon}
           label="Vehículos en uso"
+          color="#ffa826"
           value={kpis.vehiculos.value.toLocaleString("es-AR")}
           deltaPct={kpis.vehiculos.deltaPct}
           deltaLabel={deltaLabel}
@@ -462,16 +469,17 @@ export const OwnerDashboardPage = () => {
           kilometros y facturacion mes a mes. */}
       <Panel
         icon={TrendIcon}
+        tint="#2f8dff"
         title="Tendencia de rendimiento"
         subtitle={`Evolución de la operación mes a mes en ${year}`}
         aside={
           <div className="flex items-center gap-4 text-[12px] text-ink-300">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#94a3b8]" />
+              <span className="h-2 w-2 rounded-full bg-[#22d3ee]" />
               Kilómetros
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
+              <span className="h-2 w-2 rounded-full bg-[#2f8dff]" />
               Facturación
             </span>
           </div>
@@ -487,6 +495,7 @@ export const OwnerDashboardPage = () => {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Panel
           icon={TruckIcon}
+          tint="#22d3ee"
           title="Kilómetros por vehículo"
           subtitle={`Rendimiento individual de la flota - ${
             period === "mes" ? `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}` : periodLabel
@@ -533,6 +542,7 @@ export const OwnerDashboardPage = () => {
 
         <Panel
           icon={BarsIcon}
+          tint="#a78bfa"
           title="Servicios por mes"
           subtitle={`Cantidad de servicios realizados en ${year}`}
           aside={

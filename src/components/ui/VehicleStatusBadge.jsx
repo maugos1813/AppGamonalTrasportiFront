@@ -4,9 +4,9 @@ import { VEHICLE_STATUS_LABELS } from "../../lib/constants";
 // Verde = disponible (estado correcto), naranja = atencion (mantenimiento), rojo =
 // problema real (fuera de servicio) - el color solo significa estado.
 const STATUS_STYLES = {
-  DISPONIBLE: { dot: "bg-success-500", pill: "bg-success-500/10 text-success-500" },
-  EN_MANTENIMIENTO: { dot: "bg-warning-500", pill: "bg-warning-500/10 text-warning-500" },
-  FUERA_DE_SERVICIO: { dot: "bg-danger-500", pill: "bg-danger-500/10 text-danger-500" },
+  DISPONIBLE: { dot: "bg-success-500", pill: "bg-success-500/15 text-success-500" },
+  EN_MANTENIMIENTO: { dot: "bg-warning-500", pill: "bg-warning-500/15 text-warning-500" },
+  FUERA_DE_SERVICIO: { dot: "bg-danger-500", pill: "bg-danger-500/15 text-danger-500" },
 };
 
 export const VehicleStatusBadge = ({ status, className }) => {
