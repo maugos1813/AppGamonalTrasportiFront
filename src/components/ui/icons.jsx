@@ -47,3 +47,93 @@ export const ArrowRightIcon = (props) => (
     <path d="M5 12h14M13 6l6 6-6 6" />
   </Svg>
 );
+
+export const SearchIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="11" cy="11" r="6.5" />
+    <path d="m20 20-4-4" />
+  </Svg>
+);
+
+export const CalendarIcon = (props) => (
+  <Svg {...props}>
+    <rect x="3.5" y="5" width="17" height="15" rx="2.5" />
+    <path d="M3.5 10h17M8 3v4M16 3v4" />
+  </Svg>
+);
+
+export const ChevronDownIcon = (props) => (
+  <Svg {...props}>
+    <path d="m6 9 6 6 6-6" />
+  </Svg>
+);
+
+export const ChevronLeftIcon = (props) => (
+  <Svg {...props}>
+    <path d="m15 6-6 6 6 6" />
+  </Svg>
+);
+
+export const ChevronRightIcon = (props) => (
+  <Svg {...props}>
+    <path d="m9 6 6 6-6 6" />
+  </Svg>
+);
+
+export const ArrowUpIcon = (props) => (
+  <Svg {...props}>
+    <path d="M12 19V5M6 11l6-6 6 6" />
+  </Svg>
+);
+
+export const ArrowDownIcon = (props) => (
+  <Svg {...props}>
+    <path d="M12 5v14M6 13l6 6 6-6" />
+  </Svg>
+);
+
+export const ClipboardListIcon = (props) => (
+  <Svg {...props}>
+    <rect x="5" y="4" width="14" height="17" rx="2.5" />
+    <path d="M9 4.5h6M9 10h6M9 14h6M9 18h3" />
+  </Svg>
+);
+
+export const RouteIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="6" cy="18" r="2" />
+    <circle cx="18" cy="6" r="2" />
+    <path d="M8 18h7a3.5 3.5 0 0 0 0-7H9a3.5 3.5 0 0 1 0-7h7" />
+  </Svg>
+);
+
+export const UsersIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="9" cy="8" r="3.2" />
+    <path d="M2.5 20c0-3.4 3-5 6.5-5s6.5 1.6 6.5 5" />
+    <circle cx="17.5" cy="9" r="2.5" />
+    <path d="M15.8 20c.1-2.6 1.6-4.2 3.7-4.6" />
+  </Svg>
+);
+
+export const TruckIcon = (props) => (
+  <Svg {...props}>
+    <path d="M2 7h11v9H2z" />
+    <path d="M13 10h4l3.5 3.5V16h-7.5" />
+    <circle cx="6.5" cy="18" r="1.8" />
+    <circle cx="17" cy="18" r="1.8" />
+  </Svg>
+);
+
+export const TrendIcon = (props) => (
+  <Svg {...props}>
+    <path d="m3 17 6-6 4 4 8-8" />
+    <path d="M15 7h6v6" />
+  </Svg>
+);
+
+export const BarsIcon = (props) => (
+  <Svg {...props}>
+    <path d="M5 20V10M12 20V4M19 20v-7" />
+  </Svg>
+);

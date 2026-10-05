@@ -56,7 +56,7 @@ export const RegisterPage = () => {
       footer={
         <>
           Ya tienes cuenta?{" "}
-          <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
+          <Link to="/login" className="font-medium text-brand-green hover:text-brand-green-light">
             Inicia sesion
           </Link>
         </>

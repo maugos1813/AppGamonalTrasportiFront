@@ -76,8 +76,10 @@ export const MobileNavDrawer = ({ open, onClose, items, theme, onToggleTheme, on
       <div className="relative z-10 flex h-dvh w-72 max-w-[80vw] animate-slide-in-left flex-col justify-between border-r border-sidebar-border bg-sidebar px-4 py-6">
         <div>
           <div className="flex items-center gap-3 px-2">
-            <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-xl" />
-            <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Driver</span>
+            <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-full" />
+            <span className="text-[16px] font-semibold text-sidebar-foreground">
+              Gamonal <span className="text-brand-green">Driver</span>
+            </span>
           </div>
 
           <nav className="mt-8 flex flex-col gap-1">
@@ -90,8 +92,8 @@ export const MobileNavDrawer = ({ open, onClose, items, theme, onToggleTheme, on
                   clsx(
                     "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors",
                     isActive
-                      ? "bg-sidebar-active font-semibold text-sidebar-active-foreground"
-                      : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                      ? "bg-sidebar-accent font-semibold text-white"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                   )
                 }
               >

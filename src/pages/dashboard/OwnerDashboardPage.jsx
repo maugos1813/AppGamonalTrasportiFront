@@ -4,7 +4,20 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
-import { GlassCard } from "../../components/ui/GlassCard";
+import { KpiCard } from "../../components/ui/KpiCard";
+import {
+  BarsIcon,
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  ClipboardListIcon,
+  RouteIcon,
+  TrendIcon,
+  TruckIcon,
+  UsersIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
+} from "../../components/ui/icons";
 import { PageLoader } from "../../components/ui/PageLoader";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
@@ -15,8 +28,11 @@ import { CHART_COLORS } from "../../lib/constants";
 import {
   computeClientDistribution,
   computeEconomicStats,
+  computeFleetKmTable,
   computeMonthlyKmTrend,
   computeMonthlyRevenueTrend,
+  computeMonthlyServicesTrend,
+  computePeriodKpis,
   isDhlAbRecord,
   isDhlRomaRecord,
   isExtrasStefaniaRecord,
@@ -30,8 +46,8 @@ import { listRecordsRequest } from "../../lib/records.api";
 // terminar de parsear recharts antes de mostrar cualquier cosa.
 const ClientDistributionChart = lazy(() => import("../../components/charts/ClientDistributionChart"));
 const EconomicsChart = lazy(() => import("../../components/charts/EconomicsChart"));
-const KmTrendChart = lazy(() => import("../../components/charts/KmTrendChart"));
-const RevenueTrendChart = lazy(() => import("../../components/charts/RevenueTrendChart"));
+const PerformanceTrendChart = lazy(() => import("../../components/charts/PerformanceTrendChart"));
+const ServicesMonthBarChart = lazy(() => import("../../components/charts/ServicesMonthBarChart"));
 
 const ChartFallback = () => (
   <div className="flex h-full items-center justify-center">
@@ -58,6 +74,76 @@ const shiftMonth = ({ year, month }, delta) => {
   const d = new Date(year, month - 1 + delta, 1);
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 };
+const MONTH_NAMES = [
+  "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+  "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
+];
+
+// Selector de mes del encabezado (reemplaza la barra "Mes anterior / Mes siguiente").
+const MonthPicker = ({ value, onChange }) => (
+  <div className="glass-surface-sm flex items-center gap-1 rounded-xl px-1.5 py-1">
+    <button
+      type="button"
+      aria-label="Mes anterior"
+      onClick={() => onChange(shiftMonth(value, -1))}
+      className="rounded-lg p-1.5 text-ink-300 transition-colors hover:bg-line/10 hover:text-ink-50"
+    >
+      <ChevronLeftIcon className="h-4 w-4" />
+    </button>
+    <span className="flex min-w-[9.5rem] items-center justify-center gap-2 px-1 text-[14px] font-medium text-ink-50">
+      <CalendarIcon className="h-4 w-4 text-ink-300" />
+      {MONTH_NAMES[value.month - 1]} {value.year}
+    </span>
+    <button
+      type="button"
+      aria-label="Mes siguiente"
+      onClick={() => onChange(shiftMonth(value, 1))}
+      className="rounded-lg p-1.5 text-ink-300 transition-colors hover:bg-line/10 hover:text-ink-50"
+    >
+      <ChevronRightIcon className="h-4 w-4" />
+    </button>
+  </div>
+);
+
+// Tarjeta de seccion del dashboard: encabezado con icono + titulo + subtitulo.
+const Panel = ({ icon: Icon, title, subtitle, aside, children, className }) => (
+  <section className={clsx("glass-surface rounded-2xl p-5 sm:p-6", className)}>
+    {(title || aside) && (
+      <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/20">
+              <Icon className="h-5 w-5" />
+            </span>
+          )}
+          <div>
+            <h3 className="text-[16px] font-semibold text-ink-50">{title}</h3>
+            {subtitle && <p className="text-[13px] text-ink-400">{subtitle}</p>}
+          </div>
+        </div>
+        {aside}
+      </header>
+    )}
+    {children}
+  </section>
+);
+
+const Delta = ({ pct }) =>
+  pct == null ? (
+    <span className="text-ink-400">—</span>
+  ) : (
+    <span
+      className={clsx(
+        "inline-flex items-center gap-0.5 font-semibold",
+        pct >= 0 ? "text-success-500" : "text-danger-500"
+      )}
+    >
+      {pct >= 0 ? <ArrowUpIcon className="h-3.5 w-3.5" /> : <ArrowDownIcon className="h-3.5 w-3.5" />}
+      {pct >= 0 ? "+" : ""}
+      {pct.toFixed(0)}%
+    </span>
+  );
+
 const monthLabel = (year, month) =>
   new Date(year, month - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" }).toUpperCase();
 
@@ -196,6 +282,26 @@ export const OwnerDashboardPage = () => {
     [loaded, scopedRecords]
   );
 
+  const kpis = useMemo(
+    () => (loaded ? computePeriodKpis(scopedRecords, period, new Date(), selectedMonth) : null),
+    [loaded, scopedRecords, period, selectedMonth]
+  );
+  const fleetKmTable = useMemo(
+    () => (loaded ? computeFleetKmTable(scopedRecords, period, new Date(), selectedMonth) : null),
+    [loaded, scopedRecords, period, selectedMonth]
+  );
+  const servicesTrend = useMemo(
+    () => (loaded ? computeMonthlyServicesTrend(scopedRecords) : null),
+    [loaded, scopedRecords]
+  );
+  const performanceData = useMemo(
+    () =>
+      monthlyKmTrend && monthlyTrend
+        ? monthlyKmTrend.map((m, i) => ({ month: m.month, km: m.km, facturacion: monthlyTrend[i].facturacion }))
+        : null,
+    [monthlyKmTrend, monthlyTrend]
+  );
+
   const sectionHeading = `Piazza + DHL Roma - ${MIS_AREAS_VISTA_LABELS[misAreasVista]}`;
   // Para el sublabel de los modales de desglose (Facturacion/Costos/Ganancia): con
   // "Mes" se ve el mes puntual elegido (ej. "MARZO 2026"), no la palabra generica "Mes".
@@ -206,57 +312,75 @@ export const OwnerDashboardPage = () => {
 
   if (!loaded) return <PageLoader />;
 
+  const year = new Date().getFullYear();
+  const deltaLabel = PERIOD_DELTA_LABEL[period];
+  const totalServiciosAnio = servicesTrend.reduce((sum, m) => sum + m.servicios, 0);
+
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Encabezado: saludo a la izquierda, mes + periodo a la derecha. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-semibold text-ink-50">Hola, {user?.nombre}</h1>
-          <p className="mt-1 text-[14px] text-ink-300">Vision general del negocio.</p>
+          <h1 className="text-[28px] font-semibold tracking-tight text-ink-50">Hola, {user?.nombre}</h1>
+          <p className="mt-1 text-[14px] text-ink-300">Aquí tienes un resumen del rendimiento de tu negocio.</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          {period === "mes" && <MonthPicker value={selectedMonth} onChange={setSelectedMonth} />}
+          <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
         </div>
       </div>
 
-      {/* Control economico: bloques de alto natural, en orden de prioridad (resumen ->
-          tendencia -> comparativas -> detalle) - se ve todo desplegado en la pagina,
-          sin pelear con una caja chica. */}
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[20px] font-semibold text-ink-50">
-            Control economico <span className="text-ink-400">- {sectionHeading}</span>
-          </h2>
-          <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
-        </div>
-
-        {/* Solo con "Mes": elegir un mes puntual en vez de siempre el actual (mismo
-            patron que el acordeon de Registros - shiftMonth/monthLabel arriba). */}
-        {period === "mes" && (
-          <div className="flex items-center justify-between gap-2 rounded-xl glass-surface-sm px-4 py-2.5">
-            <button
-              type="button"
-              onClick={() => setSelectedMonth((m) => shiftMonth(m, -1))}
-              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-            >
-              &larr; Mes anterior
-            </button>
-            <h3 className="text-[13px] font-semibold uppercase tracking-wide text-ink-100">
-              {monthLabel(selectedMonth.year, selectedMonth.month)}
-            </h3>
-            <button
-              type="button"
-              onClick={() => setSelectedMonth((m) => shiftMonth(m, 1))}
-              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-            >
-              Mes siguiente &rarr;
-            </button>
-          </div>
-        )}
-
-        {/* General/Piazza Milano/Piazza Roma/DHL Roma - ver MIS_AREAS_VISTA_OPTIONS
-            mas arriba. */}
+      {/* General/Piazza Milano/Piazza Roma/DHL Roma - ver MIS_AREAS_VISTA_OPTIONS. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="text-[13px] font-medium text-ink-400">Vista</span>
         <SegmentedControl options={MIS_AREAS_VISTA_OPTIONS} value={misAreasVista} onChange={setMisAreasVista} />
+      </div>
 
-        {/* Anillos de progreso: cada uno cuenta algo distinto (no son 3 veces la
-            misma metrica) - facturacion vs el periodo anterior, costos como % de lo
-            facturado, y margen de ganancia sobre lo facturado. */}
+      {/* Indicadores del periodo, con variacion contra el periodo anterior. */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+        <KpiCard
+          icon={ClipboardListIcon}
+          label="Servicios"
+          value={kpis.servicios.value.toLocaleString("es-AR")}
+          deltaPct={kpis.servicios.deltaPct}
+          deltaLabel={deltaLabel}
+          series={kpis.servicios.series}
+        />
+        <KpiCard
+          icon={RouteIcon}
+          label="Kilómetros"
+          value={`${Math.round(kpis.km.value).toLocaleString("es-AR")} km`}
+          deltaPct={kpis.km.deltaPct}
+          deltaLabel={deltaLabel}
+          series={kpis.km.series}
+        />
+        <KpiCard
+          icon={UsersIcon}
+          label="Clientes atendidos"
+          value={kpis.clientes.value.toLocaleString("es-AR")}
+          deltaPct={kpis.clientes.deltaPct}
+          deltaLabel={deltaLabel}
+          series={kpis.clientes.series}
+        />
+        <KpiCard
+          icon={TruckIcon}
+          label="Vehículos en uso"
+          value={kpis.vehiculos.value.toLocaleString("es-AR")}
+          deltaPct={kpis.vehiculos.deltaPct}
+          deltaLabel={deltaLabel}
+          series={kpis.vehiculos.series}
+        />
+      </div>
+
+      {/* Control economico: se mantiene tal cual - anillos de progreso con su
+          desglose al tocar cada uno. Cada anillo cuenta algo distinto (no son 3 veces
+          la misma metrica): facturacion vs el periodo anterior, costos como % de lo
+          facturado, y margen de ganancia sobre lo facturado. */}
+      <div className="flex flex-col gap-3">
+        <h2 className="text-[18px] font-semibold text-ink-50">
+          Control económico <span className="text-ink-400">- {sectionHeading}</span>
+        </h2>
+
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <ProgressRing
             label="Facturacion"
@@ -301,105 +425,168 @@ export const OwnerDashboardPage = () => {
             color={economicStats.ganancia >= 0 ? CHART_COLORS.gananciaPositiva : CHART_COLORS.gananciaNegativa}
           />
         </div>
-
-        {openBreakdown === "facturacion" && (
-          <EconomicBreakdownModal
-            title="Facturacion"
-            sublabel={`${sectionHeading} - ${periodLabel}`}
-            rows={economicStats.facturacionBreakdown}
-            total={economicStats.facturacion}
-            onClose={() => setOpenBreakdown(null)}
-          />
-        )}
-        {openBreakdown === "costos" && (
-          <EconomicBreakdownModal
-            title="Costos operativos"
-            sublabel={`${sectionHeading} - ${periodLabel}`}
-            rows={economicStats.costosBreakdown}
-            total={economicStats.costos}
-            onClose={() => setOpenBreakdown(null)}
-          />
-        )}
-        {openBreakdown === "ganancia" && (
-          <EconomicBreakdownModal
-            title="Ganancia estimada"
-            sublabel={`${sectionHeading} - ${periodLabel}`}
-            rows={[
-              { label: "Facturacion", monto: economicStats.facturacion },
-              { label: "Costos operativos", monto: -economicStats.costos },
-            ]}
-            total={economicStats.ganancia}
-            onClose={() => setOpenBreakdown(null)}
-          />
-        )}
-
-        {/* Tendencia mes a mes del anio en curso (facturacion + ganancia). Siempre
-            anual, no depende del selector Hoy/Semana/Mes de arriba. */}
-        <GlassCard>
-          <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">
-            Tendencia {new Date().getFullYear()}
-          </h3>
-          <div className="mt-3 h-[240px]">
-            <Suspense fallback={<ChartFallback />}>
-              <RevenueTrendChart data={monthlyTrend} />
-            </Suspense>
-          </div>
-        </GlassCard>
-
-        {/* Mismo formato que el grafico de arriba, pero de km recorridos (no de
-            dinero) - color propio (CHART_COLORS.km) para diferenciarlo de un
-            vistazo. */}
-        <GlassCard>
-          <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">
-            Kilometros {new Date().getFullYear()}
-          </h3>
-          <div className="mt-3 h-[240px]">
-            <Suspense fallback={<ChartFallback />}>
-              <KmTrendChart data={monthlyKmTrend} />
-            </Suspense>
-          </div>
-        </GlassCard>
-
-        <GlassCard>
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div>
-              <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-                Facturacion vs costos
-              </h3>
-              <div className="h-[220px]">
-                <Suspense fallback={<ChartFallback />}>
-                  <EconomicsChart
-                    facturacion={economicStats.facturacion}
-                    costos={economicStats.costos}
-                    ganancia={economicStats.ganancia}
-                  />
-                </Suspense>
-              </div>
-            </div>
-            <div>
-              <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-                Distribucion por cliente
-              </h3>
-              <div className="h-[220px]">
-                <Suspense fallback={<ChartFallback />}>
-                  <ClientDistributionChart data={clientDistribution} />
-                </Suspense>
-              </div>
-            </div>
-          </div>
-        </GlassCard>
-
-        <GlassCard>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <RankedList
-              title="Servicios mas rentables"
-              items={economicStats.masRentables}
-              tone="green"
-            />
-            <RankedList title="Servicios con perdidas" items={economicStats.conPerdidas} tone="red" />
-          </div>
-        </GlassCard>
       </div>
+
+      {openBreakdown === "facturacion" && (
+        <EconomicBreakdownModal
+          title="Facturacion"
+          sublabel={`${sectionHeading} - ${periodLabel}`}
+          rows={economicStats.facturacionBreakdown}
+          total={economicStats.facturacion}
+          onClose={() => setOpenBreakdown(null)}
+        />
+      )}
+      {openBreakdown === "costos" && (
+        <EconomicBreakdownModal
+          title="Costos operativos"
+          sublabel={`${sectionHeading} - ${periodLabel}`}
+          rows={economicStats.costosBreakdown}
+          total={economicStats.costos}
+          onClose={() => setOpenBreakdown(null)}
+        />
+      )}
+      {openBreakdown === "ganancia" && (
+        <EconomicBreakdownModal
+          title="Ganancia estimada"
+          sublabel={`${sectionHeading} - ${periodLabel}`}
+          rows={[
+            { label: "Facturacion", monto: economicStats.facturacion },
+            { label: "Costos operativos", monto: -economicStats.costos },
+          ]}
+          total={economicStats.ganancia}
+          onClose={() => setOpenBreakdown(null)}
+        />
+      )}
+
+      {/* Tendencia del anio en curso (siempre anual, no depende de Hoy/Semana/Mes):
+          kilometros y facturacion mes a mes. */}
+      <Panel
+        icon={TrendIcon}
+        title="Tendencia de rendimiento"
+        subtitle={`Evolución de la operación mes a mes en ${year}`}
+        aside={
+          <div className="flex items-center gap-4 text-[12px] text-ink-300">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
+              Kilómetros
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-[#34d399]" />
+              Facturación
+            </span>
+          </div>
+        }
+      >
+        <div className="h-[300px]">
+          <Suspense fallback={<ChartFallback />}>
+            <PerformanceTrendChart data={performanceData} />
+          </Suspense>
+        </div>
+      </Panel>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Panel
+          icon={TruckIcon}
+          title="Kilómetros por vehículo"
+          subtitle={`Rendimiento individual de la flota - ${
+            period === "mes" ? `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}` : periodLabel
+          }`}
+        >
+          {fleetKmTable.length === 0 ? (
+            <p className="py-6 text-center text-[13px] text-ink-400">
+              Sin servicios con vehículo en este periodo.
+            </p>
+          ) : (
+            <table className="w-full text-[13px]">
+              <thead>
+                <tr className="border-b border-line/10 text-left text-ink-400">
+                  <th className="pb-2 font-medium">Vehículo</th>
+                  <th className="pb-2 text-right font-medium">Kilómetros</th>
+                  <th className="pb-2 text-right font-medium">Var. periodo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fleetKmTable.map((row) => (
+                  <tr key={row.id} className="border-b border-line/10 last:border-0">
+                    <td className="py-3">
+                      <Link
+                        to={`/vehiculos/${row.id}`}
+                        className="flex items-center gap-2.5 text-ink-50 hover:text-accent-400"
+                      >
+                        <TruckIcon className="h-4 w-4 shrink-0 text-ink-400" />
+                        <span className="font-medium">{row.targa}</span>
+                        {row.modelo && <span className="hidden truncate text-ink-400 sm:inline">{row.modelo}</span>}
+                      </Link>
+                    </td>
+                    <td className="py-3 text-right text-ink-100">
+                      {Math.round(row.km).toLocaleString("es-AR")} km
+                    </td>
+                    <td className="py-3 text-right">
+                      <Delta pct={row.deltaPct} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Panel>
+
+        <Panel
+          icon={BarsIcon}
+          title="Servicios por mes"
+          subtitle={`Cantidad de servicios realizados en ${year}`}
+          aside={
+            <div className="text-right">
+              <div className="text-[20px] font-semibold leading-none text-ink-50">
+                {totalServiciosAnio.toLocaleString("es-AR")}
+              </div>
+              <div className="mt-1 text-[12px] text-ink-400">en el año</div>
+            </div>
+          }
+        >
+          <div className="h-[240px]">
+            <Suspense fallback={<ChartFallback />}>
+              <ServicesMonthBarChart data={servicesTrend} />
+            </Suspense>
+          </div>
+        </Panel>
+      </div>
+
+      <Panel>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          <div>
+            <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+              Facturación vs costos
+            </h3>
+            <div className="h-[220px]">
+              <Suspense fallback={<ChartFallback />}>
+                <EconomicsChart
+                  facturacion={economicStats.facturacion}
+                  costos={economicStats.costos}
+                  ganancia={economicStats.ganancia}
+                />
+              </Suspense>
+            </div>
+          </div>
+          <div>
+            <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
+              Distribución por cliente
+            </h3>
+            <div className="h-[220px]">
+              <Suspense fallback={<ChartFallback />}>
+                <ClientDistributionChart data={clientDistribution} />
+              </Suspense>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <RankedList title="Servicios más rentables" items={economicStats.masRentables} tone="green" />
+          <RankedList title="Servicios con pérdidas" items={economicStats.conPerdidas} tone="red" />
+        </div>
+      </Panel>
     </div>
   );
 };

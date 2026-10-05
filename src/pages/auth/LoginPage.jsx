@@ -46,7 +46,7 @@ export const LoginPage = () => {
       footer={
         <>
           ¿No tienes cuenta?{" "}
-          <Link to="/register" className="font-medium text-accent-400 hover:text-accent-300">
+          <Link to="/register" className="font-medium text-brand-green hover:text-brand-green-light">
             Crea una
           </Link>
         </>
@@ -88,7 +88,7 @@ export const LoginPage = () => {
           <div className="mt-2 text-right">
             <Link
               to="/forgot-password"
-              className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+              className="text-[13px] font-medium text-brand-green hover:text-brand-green-light"
             >
               ¿Olvidaste tu contraseña?
             </Link>

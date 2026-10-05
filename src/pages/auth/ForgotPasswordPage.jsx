@@ -34,7 +34,7 @@ export const ForgotPasswordPage = () => {
       subtitle="Te enviaremos un enlace para restablecer tu contrasena"
       footer={
         <>
-          <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
+          <Link to="/login" className="font-medium text-brand-green hover:text-brand-green-light">
             Volver a iniciar sesion
           </Link>
         </>

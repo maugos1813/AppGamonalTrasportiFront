@@ -825,3 +825,108 @@ export const computeBirthdayAlerts = (users, now = new Date()) =>
       link: user.cargo === "CHOFER" ? `/choferes/${user.id}` : undefined,
       date: next,
     }));
+
+
+// ---------------------------------------------------------------------------
+// Indicadores del dashboard OWNER (tarjetas, tabla por vehiculo, barras mensuales)
+// ---------------------------------------------------------------------------
+
+const isActiveRecord = (r) => r.estado !== "ANNULLATO";
+const realKm = (r) => r.kilometrosReales ?? r.kilometros ?? 0;
+const uniqueCount = (list, pick) => new Set(list.map(pick).filter(Boolean)).size;
+
+const KPI_METRICS = {
+  servicios: (list) => list.length,
+  km: (list) => list.reduce((sum, r) => sum + realKm(r), 0),
+  clientes: (list) => uniqueCount(list, (r) => r.client?.id ?? r.clientId ?? r.client?.nombre),
+  vehiculos: (list) => uniqueCount(list, (r) => r.vehicle?.id ?? r.vehicleId),
+};
+
+// Serie mensual (ene..mes en curso del anio calendario) de una metrica, para la
+// mini-linea de cada tarjeta. Se queda con los ultimos `points` meses.
+const monthlyMetricSeries = (records, metric, now, points = 7) => {
+  const year = now.getFullYear();
+  const buckets = Array.from({ length: 12 }, () => []);
+  records.forEach((r) => {
+    if (!isActiveRecord(r)) return;
+    const date = new Date(r.fechaServicio);
+    if (date.getFullYear() === year) buckets[date.getMonth()].push(r);
+  });
+  const upToNow = buckets.slice(0, now.getMonth() + 1).map(metric);
+  return upToNow.slice(-points);
+};
+
+// Servicios / km / clientes / vehiculos del periodo elegido, con variacion contra el
+// periodo anterior y una mini-serie mensual para la linea de fondo de cada tarjeta.
+export const computePeriodKpis = (records, period, now = new Date(), selectedMonth = null) => {
+  const current = records.filter(
+    (r) => isActiveRecord(r) && isWithinPeriod(r.fechaServicio, period, now, selectedMonth)
+  );
+  const previous = records.filter(
+    (r) => isActiveRecord(r) && isWithinPreviousPeriod(r.fechaServicio, period, now, selectedMonth)
+  );
+
+  return Object.fromEntries(
+    Object.entries(KPI_METRICS).map(([key, metric]) => {
+      const value = metric(current);
+      return [
+        key,
+        {
+          value,
+          deltaPct: percentChange(value, metric(previous)),
+          series: monthlyMetricSeries(records, metric, now),
+        },
+      ];
+    })
+  );
+};
+
+// Km por vehiculo en el periodo, con variacion contra el periodo anterior (tabla
+// "Kilometros por vehiculo"). Usa el km real si ya se cargo, si no el planificado.
+export const computeFleetKmTable = (records, period, now = new Date(), selectedMonth = null, limit = 5) => {
+  const group = (list) => {
+    const totals = new Map();
+    list.forEach((r) => {
+      if (!r.vehicle?.id) return;
+      const entry = totals.get(r.vehicle.id) ?? {
+        id: r.vehicle.id,
+        targa: r.vehicle.targa,
+        modelo: r.vehicle.modelo,
+        km: 0,
+      };
+      entry.km += realKm(r);
+      totals.set(r.vehicle.id, entry);
+    });
+    return totals;
+  };
+
+  const current = group(
+    records.filter((r) => isActiveRecord(r) && isWithinPeriod(r.fechaServicio, period, now, selectedMonth))
+  );
+  const previous = group(
+    records.filter(
+      (r) => isActiveRecord(r) && isWithinPreviousPeriod(r.fechaServicio, period, now, selectedMonth)
+    )
+  );
+
+  return Array.from(current.values())
+    .sort((a, b) => b.km - a.km)
+    .slice(0, limit)
+    .map((row) => ({ ...row, deltaPct: percentChange(row.km, previous.get(row.id)?.km ?? 0) }));
+};
+
+// Servicios por mes del anio en curso (Ene-Dic), para el grafico de barras.
+export const computeMonthlyServicesTrend = (records, now = new Date()) => {
+  const year = now.getFullYear();
+  const buckets = MONTH_LABELS.map((month, index) => ({
+    month,
+    servicios: 0,
+    isCurrent: index === now.getMonth(),
+  }));
+  records.forEach((r) => {
+    if (!isActiveRecord(r)) return;
+    const date = new Date(r.fechaServicio);
+    if (date.getFullYear() === year) buckets[date.getMonth()].servicios += 1;
+  });
+  return buckets;
+};

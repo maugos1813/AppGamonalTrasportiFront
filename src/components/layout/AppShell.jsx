@@ -1,12 +1,15 @@
 import clsx from "clsx";
 import { useState } from "react";
-import { Link, NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
+import { CARGO_LABELS } from "../../lib/constants";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationsProvider } from "../../context/NotificationsContext";
 import { useTheme } from "../../context/ThemeContext";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
+import { Avatar } from "../ui/Avatar";
+import { ChevronDownIcon, SearchIcon } from "../ui/icons";
 import { MobileNavDrawer } from "./MobileNavDrawer";
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -218,10 +221,10 @@ const SidebarNavTab = ({ to, label, icon: Icon }) => (
     end={to === "/"}
     className={({ isActive }) =>
       clsx(
-        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors",
+        "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors",
         isActive
-          ? "bg-sidebar-active font-semibold text-sidebar-active-foreground"
-          : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+          ? "bg-sidebar-accent font-semibold text-white before:absolute before:inset-y-2 before:-left-4 before:w-[3px] before:rounded-r-full before:bg-brand-green"
+          : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
       )
     }
   >
@@ -262,6 +265,18 @@ export const AppShell = () => {
   const { theme, toggleTheme } = useTheme();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const navigate = useNavigate();
+
+  // El buscador de la barra superior reutiliza el de Registros (codigo/cliente/chofer):
+  // lleva a /records?q=... con el texto ya cargado.
+  const handleSearch = (e) => {
+    e.preventDefault();
+    const query = searchText.trim();
+    if (query.length < 2) return;
+    navigate(`/records?q=${encodeURIComponent(query)}`);
+    setSearchText("");
+  };
 
   useLocationSharing();
   usePushNotifications();
@@ -269,18 +284,41 @@ export const AppShell = () => {
   return (
     <NotificationsProvider>
     <div className="relative min-h-dvh w-full bg-background">
-      <div className="pointer-events-none fixed inset-0">
-        <div className="hidden dark:block absolute -top-1/3 left-1/2 h-[70vh] w-[70vh] -translate-x-1/2 rounded-full bg-accent-500/20 blur-[140px]" />
-        <div className="hidden dark:block absolute bottom-[-20%] right-[-10%] h-[55vh] w-[55vh] rounded-full bg-cyan-400/10 blur-[140px]" />
-      </div>
-
       {/* Topbar fija de desktop para OWNER/ADMIN: ocupa todo el ancho a la derecha del
           sidebar, siempre arriba de todo (z-40, por encima incluso de los paneles
           deslizantes de formularios en z-30) para que nada la tape nunca. Ademas de la
           campanita, es donde va cualquier otro boton global que se agregue a futuro. */}
       {isPrivileged && (
-        <header className="fixed left-0 right-0 top-0 z-40 hidden h-16 items-center justify-end gap-2 border-b border-line/10 bg-background px-6 sm:left-60 sm:flex">
-          <NotificationsBell />
+        <header className="fixed left-0 right-0 top-0 z-40 hidden h-16 items-center justify-between gap-4 border-b border-line/10 bg-background px-6 sm:left-60 sm:flex">
+          <form onSubmit={handleSearch} role="search" className="relative w-full max-w-md">
+            <SearchIcon className="pointer-events-none absolute left-4 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-ink-400" />
+            <input
+              type="search"
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              placeholder="Buscar servicio, cliente o chofer..."
+              aria-label="Buscar servicio, cliente o chofer"
+              className="glass-input w-full rounded-xl py-2.5 pl-11 pr-4 text-[14px] text-ink-50"
+            />
+          </form>
+
+          <div className="flex items-center gap-3">
+            <NotificationsBell />
+            <Link
+              to="/profile"
+              className="flex items-center gap-3 rounded-xl py-1 pl-1 pr-2 transition-colors hover:bg-line/10"
+              title="Ver mi perfil"
+            >
+              <Avatar user={user} className="h-10 w-10 text-[13px]" />
+              <span className="hidden text-left leading-tight lg:block">
+                <span className="block text-[13px] font-semibold text-ink-50">
+                  {user?.nombre} {user?.apellido}
+                </span>
+                <span className="block text-[12px] text-ink-400">{CARGO_LABELS[user?.cargo] ?? ""}</span>
+              </span>
+              <ChevronDownIcon className="hidden h-4 w-4 text-ink-400 lg:block" />
+            </Link>
+          </div>
         </header>
       )}
 
@@ -291,8 +329,10 @@ export const AppShell = () => {
         <aside className="hidden sm:sticky sm:top-0 sm:flex sm:h-dvh sm:w-60 sm:shrink-0 sm:flex-col sm:justify-between sm:border-r sm:border-sidebar-border sm:bg-sidebar sm:px-4 sm:py-6">
           <div>
             <Link to="/" className="flex items-center gap-3 px-2">
-              <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-xl" />
-              <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Driver</span>
+              <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-full" />
+              <span className="text-[16px] font-semibold text-sidebar-foreground">
+                Gamonal <span className="text-brand-green">Driver</span>
+              </span>
             </Link>
 
             <nav className="mt-8 flex flex-col gap-1">
@@ -314,10 +354,10 @@ export const AppShell = () => {
               to="/profile"
               className={({ isActive }) =>
                 clsx(
-                  "flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors",
+                  "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors",
                   isActive
-                    ? "bg-sidebar-active font-semibold text-sidebar-active-foreground"
-                    : "text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    ? "bg-sidebar-accent font-semibold text-white before:absolute before:inset-y-2 before:-left-4 before:w-[3px] before:rounded-r-full before:bg-brand-green"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 )
               }
             >

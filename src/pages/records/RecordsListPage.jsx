@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Navigate, useLocation } from "react-router-dom";
+import { Link, NavLink, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
@@ -499,7 +499,9 @@ export const RecordsListPage = ({ section }) => {
 
   // Buscador (codigo/cliente/chofer/destino): reemplaza el acordeon de la izquierda
   // mientras hay una busqueda activa. null = sin busqueda, [] = sin resultados.
-  const [searchQuery, setSearchQuery] = useState("");
+  // Precarga con ?q= (buscador de la barra superior del AppShell).
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "");
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
 
