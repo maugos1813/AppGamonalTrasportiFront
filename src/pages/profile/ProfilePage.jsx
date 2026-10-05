@@ -11,6 +11,7 @@ import { StatCard } from "../../components/ui/StatCard";
 import { StatusBadge } from "../../components/ui/StatusBadge";
 import { Switch } from "../../components/ui/Switch";
 import { useAuth } from "../../context/AuthContext";
+import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, CARGO_LABELS } from "../../lib/constants";
 import {
@@ -321,7 +322,7 @@ export const ProfilePage = () => {
           <StatCard label="Miembro desde" value={formatDate(user?.createdAt)} />
         </div>
 
-        {isChofer && (
+        {PHONE_GPS_ENABLED && isChofer && (
           <div className="mt-6 border-t border-line/10 pt-6">
             <Alert>{locationError}</Alert>
 

@@ -20,6 +20,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { parseApiError } from "../../lib/api";
 import { EN_PROCESO_STATUSES } from "../../lib/constants";
 import { computeLocationPermissionAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
+import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { addMinutes } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { startVisibleInterval } from "../../lib/polling";
@@ -245,13 +246,19 @@ export const MapPage = () => {
 
     let cancelled = false;
     const load = () => {
-      listDriverLocationsRequest()
-        .then((data) => {
-          if (!cancelled) setLocations(data);
-        })
-        .catch((err) => {
-          if (!cancelled) setError(parseApiError(err).message);
-        });
+      // GPS del celular apagado (ver lib/features.js): no se piden ubicaciones de
+      // celulares (una request menos cada 30s); el mapa sale solo del GPS del vehiculo.
+      if (PHONE_GPS_ENABLED) {
+        listDriverLocationsRequest()
+          .then((data) => {
+            if (!cancelled) setLocations(data);
+          })
+          .catch((err) => {
+            if (!cancelled) setError(parseApiError(err).message);
+          });
+      } else {
+        setLocations([]);
+      }
       listRecordsRequest()
         .then((data) => {
           // Acotado a Piazza + DHL Roma (ver filterToPiazzaYDhlRoma) - la lista de
@@ -488,7 +495,7 @@ export const MapPage = () => {
   // diario, mostrada aca porque es exactamente donde importa notarla: junto a quienes SI
   // se estan viendo ahora mismo.
   const locationPermissionAlerts = useMemo(
-    () => computeLocationPermissionAlerts(allDrivers ?? [], records ?? []),
+    () => (PHONE_GPS_ENABLED ? computeLocationPermissionAlerts(allDrivers ?? [], records ?? []) : []),
     [allDrivers, records]
   );
 
@@ -596,7 +603,9 @@ export const MapPage = () => {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-[28px] font-semibold tracking-tight text-ink-50">Mapa</h1>
-          <p className="mt-1 text-[14px] text-ink-300">Choferes y vehículos con ubicación en vivo.</p>
+          <p className="mt-1 text-[14px] text-ink-300">
+            {PHONE_GPS_ENABLED ? "Choferes y vehículos con ubicación en vivo." : "Vehículos con ubicación en vivo (GPS del vehículo)."}
+          </p>
         </div>
         <MapSectionTabs />
       </div>
@@ -668,7 +677,7 @@ export const MapPage = () => {
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { key: "todos", label: "Todos", color: null },
-                    ...["moving", "idlingOn", "idlingOff", "noGps"].map((key) => ({
+                    ...["moving", "idlingOn", "idlingOff", ...(PHONE_GPS_ENABLED ? ["noGps"] : [])].map((key) => ({
                       key,
                       label: STATUS_META[key].chip,
                       color: STATUS_META[key].color,

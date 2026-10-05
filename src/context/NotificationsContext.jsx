@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
+import { PHONE_GPS_ENABLED } from "../lib/features";
 import { useAuth } from "./AuthContext";
 import {
   computeAppsheetSyncAlerts,
@@ -155,7 +156,7 @@ const buildOwnerAlerts = async () => {
     ]);
 
   return sortBySeverity([
-    ...computeLocationPermissionAlerts(users, pendingRecords),
+    ...(PHONE_GPS_ENABLED ? computeLocationPermissionAlerts(users, pendingRecords) : []),
     ...computeDriverDocumentAlerts(documents, users),
     ...computeVehicleDocumentAlerts(vehicles),
     ...computeVehicleMaintenanceAlerts(vehicles),

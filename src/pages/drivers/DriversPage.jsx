@@ -13,6 +13,7 @@ import {
   MapPinIcon,
   SearchIcon,
   TruckIcon,
+  UserCheckIcon,
   UsersIcon,
 } from "../../components/ui/icons";
 import { PageLoader } from "../../components/ui/PageLoader";
@@ -27,8 +28,14 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, CARGO_LABELS, GRUPO_LABELS, GRUPO_OPTIONS } from "../../lib/constants";
-import { computeDriverDocumentAlerts, computeDriverKmRanking, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
+import {
+  computeDriverDocumentAlerts,
+  computeDriverKmRanking,
+  filterToPiazzaYDhlRoma,
+  isReperibilidadNoDisponibleHoy,
+} from "../../lib/dashboardStats";
 import { listDocumentsRequest } from "../../lib/documents.api";
+import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
@@ -77,7 +84,7 @@ const PhoneIcon = ({ className }) => (
 const DriverAvatar = ({ driver, className }) => (
   <div className="relative shrink-0">
     <Avatar user={driver} className={className} />
-    {driver.compartirUbicacion && isActive(driver) && (
+    {PHONE_GPS_ENABLED && driver.compartirUbicacion && isActive(driver) && (
       <span
         title="Compartiendo ubicación"
         className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success-500 ring-2 ring-[var(--glass-surface-bg)]"
@@ -165,7 +172,7 @@ const GroupSection = ({ title, members }) => (
 // Vista de tabla
 // ---------------------------------------------------------------------------
 
-const DriverTable = ({ drivers, kmByDriver }) => {
+const DriverTable = ({ drivers, kmByDriver, onServiceIds }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const open = (id) => navigate(`/choferes/${id}`, { state: { backgroundLocation: location } });
@@ -231,7 +238,15 @@ const DriverTable = ({ drivers, kmByDriver }) => {
                   {km ? fmtKm(km) : "—"}
                 </td>
                 <td className="py-3 pl-2 pr-4">
-                  <DriverStatusBadge driver={driver} />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <DriverStatusBadge driver={driver} />
+                    {onServiceIds?.has(driver.id) && (
+                      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-accent-500/15 px-2.5 py-1 text-[12px] font-medium text-accent-400">
+                        <span className="h-1.5 w-1.5 rounded-full bg-accent-400" />
+                        En servicio
+                      </span>
+                    )}
+                  </div>
                 </td>
               </tr>
             );
@@ -264,7 +279,7 @@ const AttentionPanel = ({ drivers, documents }) => {
         }))
       : null;
 
-    const permisos = drivers
+    const permisos = (PHONE_GPS_ENABLED ? drivers : [])
       .filter((d) => d.cargo === "CHOFER" && isActive(d) && d.ubicacionPermisoDenegado)
       .map((d) => ({
         key: `permiso-${d.id}`,
@@ -577,7 +592,17 @@ export const DriversPage = () => {
   const hasFilters = Boolean(query.trim() || centro || area || estado);
   const total = drivers?.length ?? 0;
   const activos = drivers?.filter(isActive).length ?? 0;
-  const compartiendo = drivers?.filter((d) => isActive(d) && d.compartirUbicacion).length ?? 0;
+  // Disponibilidad hoy: choferes activos que no estan en un servicio en camino ahora ni se
+  // marcaron "no disponible" para hoy (reperibilidad) - quienes pueden tomar el proximo pedido.
+  const onServiceIds = monthlyRecords
+    ? new Set(monthlyRecords.filter((r) => r.estado === "IN_CONSEGNA" && r.driver?.id).map((r) => r.driver.id))
+    : null;
+  const choferesActivos = drivers?.filter((d) => d.cargo === "CHOFER" && isActive(d)) ?? [];
+  const enServicio = onServiceIds ? choferesActivos.filter((d) => onServiceIds.has(d.id)).length : 0;
+  const noDisponibles = choferesActivos.filter((d) => isReperibilidadNoDisponibleHoy(d)).length;
+  const disponibles = onServiceIds
+    ? choferesActivos.filter((d) => !onServiceIds.has(d.id) && !isReperibilidadNoDisponibleHoy(d)).length
+    : null;
   const docAlerts = drivers && documents ? computeDriverDocumentAlerts(documents, drivers).length : null;
   const pct = (n) => (total > 0 ? `${Math.round((n / total) * 100)}% del equipo` : "");
 
@@ -614,10 +639,14 @@ export const DriversPage = () => {
               <StatTile icon={UsersIcon} value={total} label="Total del equipo" />
               <StatTile icon={CheckCircleIcon} tone="success" value={activos} label="Activos" detail={pct(activos)} />
               <StatTile
-                icon={MapPinIcon}
-                value={compartiendo}
-                label="Compartiendo ubicación"
-                detail={activos > 0 ? `de ${activos} activos` : ""}
+                icon={UserCheckIcon}
+                value={disponibles ?? "…"}
+                label="Choferes disponibles hoy"
+                detail={
+                  disponibles === null
+                    ? ""
+                    : `${enServicio} en servicio · ${noDisponibles} no disponible${noDisponibles === 1 ? "" : "s"}`
+                }
               />
               <StatTile
                 icon={AlertTriangleIcon}
@@ -683,7 +712,7 @@ export const DriversPage = () => {
                 Ningún chofer coincide con los filtros.
               </GlassCard>
             ) : view === "tabla" ? (
-              <DriverTable drivers={pageItems} kmByDriver={kmByDriver} />
+              <DriverTable drivers={pageItems} kmByDriver={kmByDriver} onServiceIds={onServiceIds} />
             ) : (
               <div className="flex flex-col gap-7">
                 {groups.map((g) => (

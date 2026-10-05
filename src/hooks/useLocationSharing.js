@@ -1,6 +1,7 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { PHONE_GPS_ENABLED } from "../lib/features";
 import { cancelIdle, scheduleIdle } from "../lib/idle";
 import { reportLocationPermissionRequest, updateMyLocationRequest } from "../lib/users.api";
 
@@ -32,7 +33,8 @@ export const useLocationSharing = () => {
   const { user, setUser } = useAuth();
 
   useEffect(() => {
-    if (user?.cargo !== "CHOFER") return;
+    // GPS del celular apagado (ver lib/features.js): no se pide permiso ni se envia nada.
+    if (!PHONE_GPS_ENABLED || user?.cargo !== "CHOFER") return;
 
     let cancelled = false;
     let watcherId = null;

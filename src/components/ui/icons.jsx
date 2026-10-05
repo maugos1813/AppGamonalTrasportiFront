@@ -172,3 +172,11 @@ export const MapPinIcon = (props) => (
     <circle cx="12" cy="9.5" r="2.3" />
   </Svg>
 );
+
+export const UserCheckIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="9" cy="8" r="3.4" />
+    <path d="M2.5 20c0-3.5 3-5.2 6.5-5.2 1.6 0 3 .3 4.1.9" />
+    <path d="m15.5 17.5 2 2 4-4.2" />
+  </Svg>
+);
