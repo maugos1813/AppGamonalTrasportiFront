@@ -132,11 +132,13 @@ export const RECORD_STATUS_CHART_COLOR = {
 };
 
 export const CHART_COLORS = {
-  facturacion: "#0d9488",
-  costos: "#7c3aed",
-  gananciaPositiva: "#16a34a",
-  gananciaNegativa: "#dc2626",
-  km: "#2563eb",
+  // Dinero en azul (informacion neutral), costos en gris azulado, ganancia en verde
+  // (resultado positivo) o rojo (perdida real) - el verde/rojo solo significan estado.
+  facturacion: "#3b82f6",
+  costos: "#94a3b8",
+  gananciaPositiva: "#34d399",
+  gananciaNegativa: "#f87171",
+  km: "#94a3b8",
 };
 
 export const VEHICLE_STATUS_OPTIONS = [

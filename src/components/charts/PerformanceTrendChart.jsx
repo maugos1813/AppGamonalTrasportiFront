@@ -3,7 +3,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { formatCurrency } from "../../lib/format";
 import { useChartAxisColors } from "./useChartAxisColors";
 
-export const PERFORMANCE_COLORS = { km: "#3b82f6", facturacion: "#34d399" };
+export const PERFORMANCE_COLORS = { km: "#94a3b8", facturacion: "#3b82f6" };
 
 const compact = (value) => (Math.abs(value) >= 1000 ? `${Math.round(value / 1000)}k` : `${value}`);
 

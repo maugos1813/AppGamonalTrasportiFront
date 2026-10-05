@@ -47,7 +47,7 @@ export const KpiCard = ({ icon: Icon, label, value, deltaPct, deltaLabel, series
   return (
     <div className={clsx("glass-surface flex flex-col gap-3 rounded-2xl p-4 sm:p-5", className)}>
       <div className="flex items-center gap-3">
-        <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full sm:flex bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/20">
+        <span className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full sm:flex bg-line/5 text-ink-300 ring-1 ring-line/10">
           <Icon className="h-5 w-5" />
         </span>
         <span className="text-[13px] font-medium text-ink-200 sm:text-[14px]">{label}</span>

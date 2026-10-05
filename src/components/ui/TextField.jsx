@@ -32,7 +32,7 @@ export const TextField = forwardRef(
         )}
         {Icon ? (
           <div className="relative">
-            <Icon className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ink-400" />
+            <Icon className="pointer-events-none absolute left-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-ink-400" />
             {input}
           </div>
         ) : (

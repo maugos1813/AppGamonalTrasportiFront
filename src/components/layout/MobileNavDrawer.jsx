@@ -124,7 +124,7 @@ export const MobileNavDrawer = ({ open, onClose, items, theme, onToggleTheme, on
             className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
           >
             <LogoutIcon className="h-5 w-5 shrink-0" />
-            Cerrar sesion
+            Cerrar sesión
           </button>
         </div>
       </div>

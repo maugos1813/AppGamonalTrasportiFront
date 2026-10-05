@@ -33,7 +33,7 @@ export const EconomicsChart = ({ facturacion, costos, ganancia }) => {
           cursor={{ fill: cursorColor }}
           content={<ChartTooltip formatValue={formatCurrency} />}
         />
-        <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48}>
+        <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={48} isAnimationActive={false}>
           {data.map((entry) => (
             <Cell key={entry.key} fill={entry.color} />
           ))}

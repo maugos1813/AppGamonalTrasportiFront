@@ -112,7 +112,7 @@ const Panel = ({ icon: Icon, title, subtitle, aside, children, className }) => (
       <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-center gap-3">
           {Icon && (
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/20">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-line/5 text-ink-300 ring-1 ring-line/10">
               <Icon className="h-5 w-5" />
             </span>
           )}
@@ -467,11 +467,11 @@ export const OwnerDashboardPage = () => {
         aside={
           <div className="flex items-center gap-4 text-[12px] text-ink-300">
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
+              <span className="h-2 w-2 rounded-full bg-[#94a3b8]" />
               Kilómetros
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="h-2 w-2 rounded-full bg-[#34d399]" />
+              <span className="h-2 w-2 rounded-full bg-[#3b82f6]" />
               Facturación
             </span>
           </div>

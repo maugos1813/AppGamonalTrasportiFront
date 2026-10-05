@@ -1,8 +1,9 @@
 import clsx from "clsx";
 import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { CARGO_LABELS } from "../../lib/constants";
+import { setVehicleSearch, useVehicleSearch } from "../../lib/vehicleSearchStore";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationsProvider } from "../../context/NotificationsContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -257,7 +258,7 @@ const BottomNavTab = ({ to, label, icon: Icon }) => (
 const DRAWER_NAV_ITEMS = [
   { to: "/mapa", label: "Mapa", icon: MapPinIcon },
   { to: "/control-flota", label: "Control de Flota", icon: ShieldIcon },
-  { to: "/mecanica", label: "Mecanica", icon: WrenchIcon },
+  { to: "/mecanica", label: "Mecánica", icon: WrenchIcon },
 ];
 
 export const AppShell = () => {
@@ -267,11 +268,22 @@ export const AppShell = () => {
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
+  const vehicleSearch = useVehicleSearch();
 
-  // El buscador de la barra superior reutiliza el de Registros (codigo/cliente/chofer):
-  // lleva a /records?q=... con el texto ya cargado.
+  // Buscador contextual: dentro de Vehiculos filtra la flota en vivo (comparte el texto
+  // con la barra de esa pagina); en el resto de la app reutiliza el buscador de
+  // Registros (codigo/cliente/chofer) y lleva a /records?q=... con el texto cargado.
+  const onVehicles = location.pathname === "/vehiculos";
+  const searchValue = onVehicles ? vehicleSearch : searchText;
+  const handleSearchChange = (e) => {
+    const value = e.target.value;
+    if (onVehicles) setVehicleSearch(value);
+    else setSearchText(value);
+  };
   const handleSearch = (e) => {
     e.preventDefault();
+    if (onVehicles) return;
     const query = searchText.trim();
     if (query.length < 2) return;
     navigate(`/records?q=${encodeURIComponent(query)}`);
@@ -294,10 +306,14 @@ export const AppShell = () => {
             <SearchIcon className="pointer-events-none absolute left-4 top-1/2 z-10 h-[18px] w-[18px] -translate-y-1/2 text-ink-400" />
             <input
               type="search"
-              value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              placeholder="Buscar servicio, cliente o chofer..."
-              aria-label="Buscar servicio, cliente o chofer"
+              value={searchValue}
+              onChange={handleSearchChange}
+              placeholder={
+                onVehicles
+                  ? "Buscar vehículo, matrícula, conductor o centro..."
+                  : "Buscar servicio, cliente o chofer..."
+              }
+              aria-label={onVehicles ? "Buscar vehículo" : "Buscar servicio, cliente o chofer"}
               className="glass-input w-full rounded-xl py-2.5 pl-11 pr-4 text-[14px] text-ink-50"
             />
           </form>
@@ -340,12 +356,12 @@ export const AppShell = () => {
               <SidebarNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
               <SidebarNavTab to="/records" label="Registros" icon={ListIcon} />
               {isPrivileged && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
-              {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
+              {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
               {isPrivileged && <SidebarNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
               {isPrivileged && (
                 <SidebarNavTab to="/control-flota" label="Control de Flota" icon={ShieldIcon} />
               )}
-              {isPrivileged && <SidebarNavTab to="/mecanica" label="Mecanica" icon={WrenchIcon} />}
+              {isPrivileged && <SidebarNavTab to="/mecanica" label="Mecánica" icon={WrenchIcon} />}
             </nav>
           </div>
 
@@ -383,7 +399,7 @@ export const AppShell = () => {
               className="flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[14px] font-medium text-sidebar-foreground/75 transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
             >
               <LogoutIcon className="h-5 w-5 shrink-0" />
-              Cerrar sesion
+              Cerrar sesión
             </button>
           </div>
         </aside>
@@ -437,7 +453,7 @@ export const AppShell = () => {
         <BottomNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
         <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
         {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
-        {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehiculos" icon={TruckIcon} />}
+        {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
       </nav>
 
       <MobileNavDrawer

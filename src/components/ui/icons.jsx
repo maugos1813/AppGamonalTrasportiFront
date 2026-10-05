@@ -137,3 +137,38 @@ export const BarsIcon = (props) => (
     <path d="M5 20V10M12 20V4M19 20v-7" />
   </Svg>
 );
+
+export const CheckCircleIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+  </Svg>
+);
+
+export const AlertTriangleIcon = (props) => (
+  <Svg {...props}>
+    <path d="M12 4 2.8 19.5h18.4L12 4Z" />
+    <path d="M12 10v4.5M12 17.2v.01" />
+  </Svg>
+);
+
+export const AlertCircleIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7.5v5.5M12 16.2v.01" />
+  </Svg>
+);
+
+export const BellIcon = (props) => (
+  <Svg {...props}>
+    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+    <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+  </Svg>
+);
+
+export const MapPinIcon = (props) => (
+  <Svg {...props}>
+    <path d="M12 21s-7-6.1-7-11.5A7 7 0 0 1 19 9.5C19 14.9 12 21 12 21z" />
+    <circle cx="12" cy="9.5" r="2.3" />
+  </Svg>
+);
