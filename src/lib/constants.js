@@ -26,7 +26,7 @@ export const ADMIN_AREA_RECORDS_SECTION = {
 };
 
 export const CARGO_LABELS = {
-  OWNER: "Socio",
+  OWNER: "Admin",
   ADMIN: "Responsable",
   CHOFER: "Chofer",
 };

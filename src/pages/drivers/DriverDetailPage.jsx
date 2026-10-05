@@ -544,8 +544,8 @@ export const DriverDetailPage = () => {
                   {user.cargo === "OWNER" && (
                     <Switch
                       id="cargo-owner"
-                      label="Socio"
-                      description="Acceso total, incluida la asignacion de otros socios."
+                      label="Admin"
+                      description="Acceso total, incluida la asignacion de otros administradores."
                       checked={form.cargo === "OWNER"}
                       onChange={(checked) => setField("cargo", checked ? "OWNER" : "ADMIN")}
                     />
