@@ -66,8 +66,8 @@
   /* Estados de envio/vehiculo: colores solidos fijos (mismo criterio que el
      style pack: un badge de fondo solido no necesita variante por tema). */
   --color-status-consegnato: #16a34a;
-  --color-status-annullato: #dc2626;
-  --color-status-rischedulato: #ea580c;
+  --color-status-annullato: #e5173a;
+  --color-status-rischedulato: #f2640c;
   --color-status-in-corso: #2563eb;
   --color-status-pendiente: #6b7280;
   --color-status-ritirato: #0d9488;
@@ -113,9 +113,9 @@
   --accent-400: #1d6fe0;
   --accent-300: #4f8fe8;
 
-  --danger-500: #dc2626;
+  --danger-500: #e11d2e;
   --success-500: #16a34a;
-  --warning-500: #d97706;
+  --warning-500: #e8590c;
 
   --chart-1: #e4643a;
   --chart-2: #3c9c93;
@@ -170,14 +170,14 @@
   --accent-400: #5aa7ff;
   --accent-300: #8cc2ff;
 
-  --danger-500: #ff5468;
+  --danger-500: #ff3b57;
   --success-500: #22e093;
-  --warning-500: #ffa826;
+  --warning-500: #ff8a1a;
 
   --chart-1: #2f8dff;
   --chart-2: #22d3ee;
   --chart-3: #a78bfa;
-  --chart-4: #ffa826;
+  --chart-4: #ff8a1a;
   --chart-5: #64748b;
 
   --shadow-glass-tokens:

@@ -138,7 +138,7 @@ export const CHART_COLORS = {
   facturacion: "#2f8dff",
   costos: "#a78bfa",
   gananciaPositiva: "#22e093",
-  gananciaNegativa: "#ff5468",
+  gananciaNegativa: "#ff3b57",
   km: "#22d3ee",
 };
 

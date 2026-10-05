@@ -5,8 +5,8 @@ import { VEHICLE_STATUS_LABELS } from "../../lib/constants";
 // problema real (fuera de servicio) - el color solo significa estado.
 const STATUS_STYLES = {
   DISPONIBLE: { dot: "bg-success-500", pill: "bg-success-500/15 text-success-500" },
-  EN_MANTENIMIENTO: { dot: "bg-warning-500", pill: "bg-warning-500/15 text-warning-500" },
-  FUERA_DE_SERVICIO: { dot: "bg-danger-500", pill: "bg-danger-500/15 text-danger-500" },
+  EN_MANTENIMIENTO: { dot: "bg-warning-500 shadow-[0_0_6px_var(--warning-500)]", pill: "bg-warning-500/20 text-warning-500 ring-1 ring-warning-500/40" },
+  FUERA_DE_SERVICIO: { dot: "bg-danger-500 shadow-[0_0_6px_var(--danger-500)]", pill: "bg-danger-500/20 text-danger-500 ring-1 ring-danger-500/40" },
 };
 
 export const VehicleStatusBadge = ({ status, className }) => {

@@ -64,3 +64,8 @@ export const listVehicleMantenimientosRequest = (id) =>
 
 export const deleteVehicleMantenimientoRequest = (vehicleId, mantenimientoId) =>
   api.delete(`/vehiculos/${vehicleId}/mantenimiento/${mantenimientoId}`);
+
+// Elimina una entrada de Area C que no queremos guardar (Mapa > Area C, siempre despues
+// de confirmar en un modal). El backend borra tambien el comprobante.
+export const deleteAreaCEntryRequest = (id) =>
+  api.delete(`/vehiculos/area-c-entries/${id}`).then((res) => res.data.data);

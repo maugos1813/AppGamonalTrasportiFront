@@ -16,7 +16,8 @@ export const PanelShell = ({ icon: Icon, title, aside, children, className }) =>
   </section>
 );
 
-const TONE_DOT = { danger: "bg-danger-500", warning: "bg-warning-500" };
+const TONE_DOT = { danger: "bg-danger-500 shadow-[0_0_8px_var(--danger-500)]", warning: "bg-warning-500 shadow-[0_0_8px_var(--warning-500)]" };
+const TONE_BAR = { danger: "border-l-danger-500", warning: "border-l-warning-500" };
 
 // Grupo de avisos dentro de "Atencion requerida": titulo con contador y una fila por
 // aviso (tone: danger/warning; to/state: a donde lleva; title/detail: texto).
@@ -33,7 +34,10 @@ export const AttentionGroup = ({ title, items }) =>
             <Link
               to={item.to}
               state={item.state}
-              className="flex items-center gap-2.5 rounded-xl border border-line/[0.07] px-3 py-2.5 text-[13px] transition-colors hover:bg-line/[0.05]"
+              className={clsx(
+                "flex items-center gap-2.5 rounded-xl border border-l-[3px] border-line/[0.07] px-3 py-2.5 text-[13px] transition-colors hover:bg-line/[0.05]",
+                TONE_BAR[item.tone]
+              )}
             >
               <span className={clsx("h-2 w-2 shrink-0 rounded-full", TONE_DOT[item.tone])} />
               <span className="min-w-0 flex-1">

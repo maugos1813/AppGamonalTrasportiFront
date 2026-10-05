@@ -9,7 +9,7 @@ export const useChartAxisColors = (theme) =>
 // Espejo de --chart-1..5 de index.css, mas un tono neutro para "Otros" en
 // graficos categoricos (torta/dona).
 const CHART_PALETTE = {
-  dark: ["#2f8dff", "#22d3ee", "#a78bfa", "#ffa826", "#64748b"],
+  dark: ["#2f8dff", "#22d3ee", "#a78bfa", "#ff8a1a", "#64748b"],
   light: ["#e4643a", "#3c9c93", "#2b4a6b", "#e4b93f", "#e8a23d"],
 };
 const OTROS_COLOR = { dark: "#8ea3c9", light: "#7d8494" };

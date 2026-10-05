@@ -9,10 +9,10 @@ import {
 } from "@react-google-maps/api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, Navigate } from "react-router-dom";
-import { AreaCEntryRow } from "../../components/AreaCEntryRow";
+import { MapSectionTabs } from "../../components/layout/MapSectionTabs";
 import { Alert } from "../../components/ui/Alert";
 import { GlassCard } from "../../components/ui/GlassCard";
-import { SegmentedControl } from "../../components/ui/SegmentedControl";
+import { ChevronLeftIcon, SearchIcon, TruckIcon } from "../../components/ui/icons";
 import { Spinner } from "../../components/ui/Spinner";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
@@ -24,11 +24,7 @@ import { addMinutes } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { startVisibleInterval } from "../../lib/polling";
 import { getRecordLiveEtaRequest, listRecordsRequest } from "../../lib/records.api";
-import {
-  getEtaToDestinationRequest,
-  listAreaCEntriesRequest,
-  listVehicleLivePositionsRequest,
-} from "../../lib/vehicles.api";
+import { getEtaToDestinationRequest, listVehicleLivePositionsRequest } from "../../lib/vehicles.api";
 import { getDriverReturnEtaRequest, listDriverLocationsRequest, listUsersRequest } from "../../lib/users.api";
 
 // Modulo estable fuera del componente: si se recrea en cada render, useJsApiLoader
@@ -83,7 +79,7 @@ const HIDE_POI_STYLES = [
 // Chofer con ubicacion fresca pero sin servicio "en camino" ahora mismo (volviendo de
 // una entrega o esperando el proximo): mismo gris que el estado "En suspenso" en el
 // resto de la app, para diferenciarlo del pin rojo por defecto de los que si reparten.
-const IDLE_DRIVER_COLOR = "#6b7280";
+const IDLE_DRIVER_COLOR = "#8ea3c9";
 const MAP_CONTAINER_STYLE = { width: "100%", height: "100%" };
 
 // Ruta y pin del destino escrito a mano (buscador de targa, "ETA a un destino") -
@@ -96,9 +92,9 @@ const DESTINO_ROUTE_COLOR = "#3987e5";
 // vehiculo parado por el ruido normal de un GPS quieto.
 const VEHICLE_MOVING_SPEED_THRESHOLD = 1;
 const VEHICLE_STATUS_COLOR = {
-  moving: "#22c55e",
-  idlingOn: "#f59e0b",
-  idlingOff: "#ef4444",
+  moving: "#22e093",
+  idlingOn: "#ff8a1a",
+  idlingOff: "#ff3b57",
 };
 const isVehicleMoving = (vehiculoGps) =>
   vehiculoGps.speed != null && vehiculoGps.speed > VEHICLE_MOVING_SPEED_THRESHOLD;
@@ -138,14 +134,66 @@ const vehicleIcon = (vehiculoGps) => {
 // gisportal.comune.milano.it - capas "Confine Area B" y "Confine Area C").
 // Area B viene como MultiPolygon (el contorno grande mas varios enclaves chicos
 // separados), por eso son varios "paths" en el mismo Polygon.
-const AREA_C_COLOR = "#ef4444";
-const AREA_B_COLOR = "#a855f7";
+const AREA_C_COLOR = "#ff3b57";
+const AREA_B_COLOR = "#a78bfa";
 const AREA_C_PATH = MILANO_ZONES.areaC;
 const AREA_B_PATHS = MILANO_ZONES.areaB;
 
 const minutesAgo = (dateString) => {
   const diffMs = Date.now() - new Date(dateString).getTime();
   return Math.max(0, Math.round(diffMs / 60000));
+};
+
+// Estado de cada vehiculo de la lista lateral: con GPS del vehiculo (Velocity Fleet) segun
+// movimiento/motor; sin el, solo se conoce la ubicacion del celular del chofer.
+const locStatus = (loc) => {
+  if (!loc.vehiculoGps) return "noGps";
+  if (isVehicleMoving(loc.vehiculoGps)) return "moving";
+  return loc.vehiculoGps.ignition ? "idlingOn" : "idlingOff";
+};
+const STATUS_ORDER = { moving: 0, idlingOn: 1, idlingOff: 2, noGps: 3 };
+const STATUS_META = {
+  moving: { label: "En movimiento", chip: "En mov.", color: VEHICLE_STATUS_COLOR.moving },
+  idlingOn: { label: "Parado · motor encendido", chip: "Encendido", color: VEHICLE_STATUS_COLOR.idlingOn },
+  idlingOff: { label: "Parado · motor apagado", chip: "Apagado", color: VEHICLE_STATUS_COLOR.idlingOff },
+  noGps: { label: "Ubicación del celular", chip: "Sin GPS", color: IDLE_DRIVER_COLOR },
+};
+
+const VehicleListItem = ({ item, active, onSelect }) => {
+  const meta = STATUS_META[item.status];
+  const speed = item.loc.vehiculoGps?.speed;
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={() => onSelect(item.loc)}
+        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-line/10 ${
+          active ? "bg-line/10 ring-1 ring-accent-500/40" : ""
+        }`}
+      >
+        <span
+          className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-[var(--glass-surface-bg)]"
+          style={{ backgroundColor: meta.color, boxShadow: `0 0 8px ${meta.color}` }}
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[13px] font-semibold tracking-wide text-ink-50">
+            {item.targa ?? "Sin vehículo"}
+          </span>
+          <span className="block truncate text-[12px] text-ink-300">
+            {item.driver ?? "Sin chofer asignado"}
+          </span>
+          <span className="block truncate text-[11px] font-medium" style={{ color: meta.color }}>
+            {meta.label}
+          </span>
+        </span>
+        {item.status === "moving" && speed != null && (
+          <span className="shrink-0 text-[12px] font-semibold text-ink-100">
+            {Math.round(speed)} {item.loc.vehiculoGps.speedUnit ?? ""}
+          </span>
+        )}
+      </button>
+    </li>
+  );
 };
 
 export const MapPage = () => {
@@ -163,10 +211,13 @@ export const MapPage = () => {
   const [openInfoId, setOpenInfoId] = useState(null);
   const [showAreaC, setShowAreaC] = useState(true);
   const [showAreaB, setShowAreaB] = useState(true);
-  // Buscador de targa (o nombre de chofer) de la parte superior - ver targaMatches
-  // mas abajo. searchFocused controla si se muestra el desplegable de resultados.
+  // Lista lateral de vehiculos (encima del mapa, a la izquierda): filtro de texto por
+  // targa/chofer, filtro por estado y si esta desplegada (en celular arranca cerrada).
   const [targaQuery, setTargaQuery] = useState("");
-  const [searchFocused, setSearchFocused] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("todos");
+  const [listOpen, setListOpen] = useState(
+    () => typeof window === "undefined" || window.matchMedia("(min-width: 640px)").matches
+  );
   // ETA a un destino escrito a mano, para el marcador que tiene el InfoWindow abierto
   // (ver el formulario adentro del InfoWindow mas abajo). undefined = todavia no se
   // busco nada, null = se busco pero no se pudo calcular.
@@ -181,9 +232,6 @@ export const MapPage = () => {
   const [vehiclePositions, setVehiclePositions] = useState(null);
   const [records, setRecords] = useState(null);
   const [allDrivers, setAllDrivers] = useState(null);
-  // Seccion "Area C" del Mapa (pestanias Pagado/No pagado) - ver AreaCEntryRow.
-  const [areaCEntries, setAreaCEntries] = useState(null);
-  const [areaCTab, setAreaCTab] = useState("no-pagado");
   // ETA del marcador que tiene el InfoWindow abierto en el mapa (un servicio en camino,
   // o el regreso de un chofer libre) - se pide a demanda (ver el useEffect mas abajo),
   // no para todos los choferes en cada refresco de posiciones: recalcular la ruta de 30
@@ -221,11 +269,6 @@ export const MapPage = () => {
       listVehicleLivePositionsRequest()
         .then((data) => {
           if (!cancelled) setVehiclePositions(data);
-        })
-        .catch(() => {});
-      listAreaCEntriesRequest()
-        .then((data) => {
-          if (!cancelled) setAreaCEntries(data);
         })
         .catch(() => {});
     };
@@ -384,33 +427,59 @@ export const MapPage = () => {
     return merged;
   }, [locations, allDrivers, records, vehiclePositions, driverVehicleTarga, vehiclePositionByTarga]);
 
-  // Resultados del buscador de targa/chofer de la parte superior - matchea contra la
-  // targa (sin espacios, sin importar mayus/minus) o el nombre del chofer. Vacio si
-  // todavia no se escribio nada, para no mostrar el desplegable sin necesidad.
-  const targaMatches = useMemo(() => {
+  // Una fila por vehiculo en la lista lateral: con GPS, por targa; sin GPS, por chofer
+  // (un mismo chofer puede tener varias entradas si tiene mas de un servicio en camino).
+  const vehicleItems = useMemo(() => {
+    const unique = new Map();
+    (enrichedLocations ?? []).forEach((loc) => {
+      const key = loc.vehiculoGps?.targa ? normalizeTarga(loc.vehiculoGps.targa) : `driver-${loc.id}`;
+      if (!unique.has(key)) unique.set(key, loc);
+    });
+    return [...unique.values()]
+      .map((loc) => ({
+        loc,
+        status: locStatus(loc),
+        targa: loc.vehiculoGps?.targa ?? driverVehicleTarga.get(loc.id) ?? null,
+        driver: loc.sinChofer ? null : `${loc.nombre} ${loc.apellido}`.trim(),
+      }))
+      .sort(
+        (a, b) =>
+          STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || (a.targa ?? "~").localeCompare(b.targa ?? "~", "es")
+      );
+  }, [enrichedLocations, driverVehicleTarga]);
+
+  const statusCounts = useMemo(() => {
+    const counts = { todos: vehicleItems.length, moving: 0, idlingOn: 0, idlingOff: 0, noGps: 0 };
+    vehicleItems.forEach((item) => {
+      counts[item.status] += 1;
+    });
+    return counts;
+  }, [vehicleItems]);
+
+  // Filtra por estado y por texto (targa sin espacios o nombre del chofer).
+  const visibleItems = useMemo(() => {
     const query = targaQuery.trim();
-    if (!query) return [];
     const normQuery = normalizeTarga(query);
     const lowerQuery = query.toLowerCase();
-    return (enrichedLocations ?? [])
-      .filter((loc) => {
-        const targa = loc.vehiculoGps?.targa;
-        const matchesTarga = targa && normalizeTarga(targa).includes(normQuery);
-        const matchesNombre = `${loc.nombre} ${loc.apellido}`.toLowerCase().includes(lowerQuery);
-        return matchesTarga || matchesNombre;
-      })
-      .slice(0, 8);
-  }, [targaQuery, enrichedLocations]);
+    return vehicleItems.filter((item) => {
+      if (statusFilter !== "todos" && item.status !== statusFilter) return false;
+      if (!query) return true;
+      return (
+        (item.targa && normalizeTarga(item.targa).includes(normQuery)) ||
+        (item.driver && item.driver.toLowerCase().includes(lowerQuery))
+      );
+    });
+  }, [vehicleItems, statusFilter, targaQuery]);
 
-  // Centra/hace zoom sobre el resultado elegido y abre su InfoWindow - mismo id que
-  // usan los Marker mas abajo (loc.servicio?.id ?? `idle-${loc.id}`).
-  const selectTargaMatch = (loc) => {
+  // Centra/hace zoom sobre el vehiculo elegido en la lista y abre su InfoWindow - mismo
+  // id que usan los Marker mas abajo (loc.servicio?.id ?? `idle-${loc.id}`). En celular
+  // la lista se cierra para dejar ver el mapa.
+  const selectVehicle = (loc) => {
     const markerId = loc.servicio?.id ?? `idle-${loc.id}`;
     setOpenInfoId(markerId);
     map?.panTo({ lat: loc.lat, lng: loc.lng });
     map?.setZoom(15);
-    setTargaQuery("");
-    setSearchFocused(false);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches) setListOpen(false);
   };
 
   // Auditoria del mapa: choferes que no van a aparecer arriba (o que se van a "caer" del
@@ -422,14 +491,6 @@ export const MapPage = () => {
     () => computeLocationPermissionAlerts(allDrivers ?? [], records ?? []),
     [allDrivers, records]
   );
-
-  const unpaidAreaCEntries = (areaCEntries ?? []).filter((e) => !e.pagado);
-  const paidAreaCEntries = (areaCEntries ?? []).filter((e) => e.pagado);
-  const visibleAreaCEntries = areaCTab === "no-pagado" ? unpaidAreaCEntries : paidAreaCEntries;
-
-  const handleAreaCEntrySaved = (updated) => {
-    setAreaCEntries((prev) => (prev ?? []).map((e) => (e.id === updated.id ? updated : e)));
-  };
 
   // ETA del marcador que tiene el InfoWindow abierto en el mapa (puede
   // ser un servicio en camino o un chofer libre volviendo a la base) - solo se pide
@@ -534,82 +595,11 @@ export const MapPage = () => {
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-semibold text-ink-50">Mapa</h1>
-          <p className="mt-1 text-[14px] text-ink-300">Choferes y vehiculos con ubicacion en vivo.</p>
+          <h1 className="text-[28px] font-semibold tracking-tight text-ink-50">Mapa</h1>
+          <p className="mt-1 text-[14px] text-ink-300">Choferes y vehículos con ubicación en vivo.</p>
         </div>
-
-        {/* Buscador de targa/chofer: filtra sobre lo que ya esta en pantalla
-            (enrichedLocations), sin pedir nada al backend. El desplegable se cierra
-            solo al elegir un resultado o al perder el foco (con un delay chico para
-            que el click en un resultado registre antes de que el blur lo cierre). */}
-        <div className="relative w-full sm:w-72">
-          <TextField
-            id="mapa-buscar-targa"
-            placeholder="Buscar por targa o chofer..."
-            value={targaQuery}
-            onChange={(e) => setTargaQuery(e.target.value)}
-            onFocus={() => setSearchFocused(true)}
-            onBlur={() => setTimeout(() => setSearchFocused(false), 150)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && targaMatches[0]) selectTargaMatch(targaMatches[0]);
-            }}
-          />
-          {searchFocused && targaQuery.trim() && (
-            <ul className="absolute left-0 right-0 top-full z-20 mt-1.5 max-h-64 overflow-y-auto rounded-xl glass-surface-sm p-1.5">
-              {targaMatches.length === 0 ? (
-                <li className="px-3 py-2 text-[13px] text-ink-300">Sin resultados.</li>
-              ) : (
-                targaMatches.map((loc) => (
-                  <li key={loc.id}>
-                    <button
-                      type="button"
-                      // onMouseDown (no onClick): dispara antes del blur del input, asi
-                      // el setTimeout de arriba no llega a cerrar el desplegable antes.
-                      onMouseDown={() => selectTargaMatch(loc)}
-                      className="flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2 text-left text-[13px] text-ink-200 transition-colors hover:bg-line/10"
-                    >
-                      <span className="font-medium text-ink-50">
-                        {loc.vehiculoGps?.targa ?? "Sin GPS de vehiculo"}
-                      </span>
-                      <span className="text-ink-300">
-                        {loc.sinChofer ? "Sin chofer asignado" : `${loc.nombre} ${loc.apellido}`}
-                      </span>
-                    </button>
-                  </li>
-                ))
-              )}
-            </ul>
-          )}
-        </div>
+        <MapSectionTabs />
       </div>
-
-      {/* Solo tiene sentido si hay al menos un vehiculo con GPS de Velocity Fleet en
-          pantalla - sin eso, ningun pin usa estos colores todavia. */}
-      {enrichedLocations?.some((loc) => loc.vehiculoGps) && (
-        <div className="flex flex-wrap items-center gap-4 text-[12px] text-ink-300">
-          <span className="flex items-center gap-1.5">
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: VEHICLE_STATUS_COLOR.moving }}
-            />
-            En movimiento
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: VEHICLE_STATUS_COLOR.idlingOn }}
-            />
-            Parado, motor encendido
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span
-              className="h-2.5 w-2.5 rounded-full"
-              style={{ backgroundColor: VEHICLE_STATUS_COLOR.idlingOff }}
-            />
-            Parado, motor apagado
-          </span>
-        </div>
-      )}
 
       <Alert>{error || (loadError ? "No se pudo cargar Google Maps." : "")}</Alert>
 
@@ -643,63 +633,122 @@ export const MapPage = () => {
         </GlassCard>
       )}
 
-      {/* Vehiculos sin autorizadoAreaC detectados dentro del Area C (se registran
-          solos, ver checkAreaCEntries en el backend) - targa y hora ya completados, el
-          checkbox de "Pagado" y la foto del comprobante se cargan a mano aca.
-          Siempre visible (aunque este vacia): asi se distingue "no hay nada todavia"
-          de "esto esta roto", en vez de que la seccion entera desaparezca sin mas. */}
-      <GlassCard className="!p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-[14px] font-semibold text-ink-50">Area C</h2>
-          <SegmentedControl
-            options={[
-              { value: "no-pagado", label: `No pagado (${unpaidAreaCEntries.length})` },
-              { value: "pagado", label: `Pagado (${paidAreaCEntries.length})` },
-            ]}
-            value={areaCTab}
-            onChange={setAreaCTab}
-          />
-        </div>
-
-        {visibleAreaCEntries.length === 0 ? (
-          <p className="mt-3 text-[13px] text-ink-300">
-            {areaCTab === "no-pagado" ? "Nada pendiente de pagar." : "Todavia no hay ninguna pagada."}
-          </p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-2">
-            {visibleAreaCEntries.map((entry) => (
-              <AreaCEntryRow key={entry.id} entry={entry} onSaved={handleAreaCEntrySaved} />
-            ))}
-          </ul>
-        )}
-      </GlassCard>
-
       <div className="glass-surface relative overflow-hidden rounded-3xl">
-        {isLoaded && (
-          <div className="glass-surface-sm absolute left-3 top-3 z-10 flex flex-col gap-1.5 rounded-xl px-3 py-2 text-[12px] text-ink-200">
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showAreaC}
-                onChange={(e) => setShowAreaC(e.target.checked)}
-                className="h-3.5 w-3.5 accent-[#ef4444]"
-              />
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AREA_C_COLOR }} />
-              Area C
-            </label>
-            <label className="flex cursor-pointer items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showAreaB}
-                onChange={(e) => setShowAreaB(e.target.checked)}
-                className="h-3.5 w-3.5 accent-[#a855f7]"
-              />
-              <span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: AREA_B_COLOR }} />
-              Area B
-            </label>
-          </div>
-        )}
-        <div className="h-[calc(100dvh-300px)] min-h-[420px] w-full sm:h-[calc(100dvh-260px)] lg:h-[calc(100dvh-220px)]">
+        {isLoaded &&
+          (listOpen ? (
+            <aside className="glass-surface absolute bottom-9 left-3 top-3 z-10 flex w-[min(300px,calc(100%-1.5rem))] flex-col overflow-hidden rounded-2xl">
+              <header className="flex items-center justify-between gap-2 border-b border-line/10 px-4 py-3">
+                <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink-50">
+                  <TruckIcon className="h-4 w-4 text-ink-300" />
+                  Vehículos <span className="font-normal text-ink-400">({vehicleItems.length})</span>
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setListOpen(false)}
+                  aria-label="Ocultar la lista de vehículos"
+                  title="Ocultar lista"
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-300 transition-colors hover:bg-line/10 hover:text-ink-50"
+                >
+                  <ChevronLeftIcon className="h-4 w-4" />
+                </button>
+              </header>
+
+              <div className="flex flex-col gap-2.5 border-b border-line/10 p-3">
+                <div className="relative">
+                  <SearchIcon className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-ink-400" />
+                  <input
+                    type="search"
+                    value={targaQuery}
+                    onChange={(e) => setTargaQuery(e.target.value)}
+                    placeholder="Buscar targa o chofer..."
+                    aria-label="Buscar targa o chofer"
+                    className="glass-input w-full rounded-lg py-2 pl-9 pr-3 text-[13px] text-ink-50"
+                  />
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { key: "todos", label: "Todos", color: null },
+                    ...["moving", "idlingOn", "idlingOff", "noGps"].map((key) => ({
+                      key,
+                      label: STATUS_META[key].chip,
+                      color: STATUS_META[key].color,
+                    })),
+                  ].map((chip) => (
+                    <button
+                      key={chip.key}
+                      type="button"
+                      onClick={() => setStatusFilter(chip.key)}
+                      aria-pressed={statusFilter === chip.key}
+                      className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                        statusFilter === chip.key
+                          ? "border-accent-500/60 bg-accent-500/15 text-ink-50"
+                          : "border-line/10 text-ink-300 hover:bg-line/10"
+                      }`}
+                    >
+                      {chip.color && (
+                        <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: chip.color }} />
+                      )}
+                      {chip.label} {statusCounts[chip.key]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <ul className="flex-1 overflow-y-auto p-1.5">
+                {enrichedLocations === null ? (
+                  <li className="flex justify-center py-6">
+                    <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+                  </li>
+                ) : visibleItems.length === 0 ? (
+                  <li className="px-3 py-6 text-center text-[13px] text-ink-400">
+                    {vehicleItems.length === 0 ? "Ningún vehículo con ubicación ahora." : "Sin resultados."}
+                  </li>
+                ) : (
+                  visibleItems.map((item) => (
+                    <VehicleListItem
+                      key={item.targa ?? item.loc.id}
+                      item={item}
+                      active={openInfoId === (item.loc.servicio?.id ?? `idle-${item.loc.id}`)}
+                      onSelect={selectVehicle}
+                    />
+                  ))
+                )}
+              </ul>
+
+              <footer className="flex items-center gap-4 border-t border-line/10 px-4 py-2.5 text-[12px] text-ink-300">
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={showAreaC}
+                    onChange={(e) => setShowAreaC(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-[#ff3b57]"
+                  />
+                  <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: AREA_C_COLOR }} />
+                  Área C
+                </label>
+                <label className="flex cursor-pointer items-center gap-1.5">
+                  <input
+                    type="checkbox"
+                    checked={showAreaB}
+                    onChange={(e) => setShowAreaB(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-[#a78bfa]"
+                  />
+                  <span className="inline-block h-2 w-2 rounded-sm" style={{ backgroundColor: AREA_B_COLOR }} />
+                  Área B
+                </label>
+              </footer>
+            </aside>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setListOpen(true)}
+              className="glass-surface absolute left-3 top-3 z-10 flex items-center gap-2 rounded-xl px-3.5 py-2.5 text-[13px] font-medium text-ink-50 transition-colors hover:bg-line/10"
+            >
+              <TruckIcon className="h-4 w-4 text-ink-300" />
+              Vehículos ({vehicleItems.length})
+            </button>
+          ))}
+        <div className="h-[calc(100dvh-17rem)] min-h-[480px] w-full lg:h-[calc(100dvh-14rem)]">
           {!isLoaded ? (
             <div className="flex h-full items-center justify-center">
               <Spinner className="h-6 w-6 border-line/20 border-t-line" />

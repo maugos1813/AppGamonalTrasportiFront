@@ -30,6 +30,7 @@ const NewDriverPage = lazy(() =>
   import("./pages/drivers/NewDriverPage").then((m) => ({ default: m.NewDriverPage })),
 );
 const MapPage = lazy(() => import("./pages/map/MapPage").then((m) => ({ default: m.MapPage })));
+const AreaCPage = lazy(() => import("./pages/map/AreaCPage").then((m) => ({ default: m.AreaCPage })));
 const ControlFlotaPage = lazy(() =>
   import("./pages/control-flota/ControlFlotaPage").then((m) => ({ default: m.ControlFlotaPage })),
 );
@@ -125,6 +126,7 @@ function App() {
               <Route path="/vehiculos/new" element={<NewVehiclePage />} />
               <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
               <Route path="/mapa" element={<MapPage />} />
+              <Route path="/mapa/area-c" element={<AreaCPage />} />
               <Route path="/control-flota" element={<ControlFlotaPage />} />
               <Route path="/mecanica" element={<MecanicaPage />} />
             </Route>
