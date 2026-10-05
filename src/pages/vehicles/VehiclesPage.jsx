@@ -35,7 +35,7 @@ import {
   VEHICLE_STATUS_OPTIONS,
   getTagliandoStatus,
 } from "../../lib/constants";
-import { computeFleetKmUsage, computeVehicleDocumentAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
+import { computeFleetKmUsage, computeVehicleDocumentAlerts, filterToMainAreas } from "../../lib/dashboardStats";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { listVehiclesRequest, syncVehiclesFromVelocityFleetRequest } from "../../lib/vehicles.api";
 import { setListSearch, useListSearch } from "../../lib/listSearchStore";
@@ -410,10 +410,10 @@ const VehicleKmModal = ({ entry, onClose }) => {
 };
 
 // Top de vehiculos por KM recorrido este mes (planificado o real, ver
-// computeFleetKmUsage). Acotado a Piazza + DHL Roma (ver filterToPiazzaYDhlRoma),
+// computeFleetKmUsage). Acotado a las 5 areas principales (ver filterToMainAreas),
 // mismo criterio que el resto de la app.
 const FleetRankingPanel = ({ records }) => {
-  const ranking = records ? computeFleetKmUsage(filterToPiazzaYDhlRoma(records), "mes").slice(0, 10) : undefined;
+  const ranking = records ? computeFleetKmUsage(filterToMainAreas(records), "mes").slice(0, 10) : undefined;
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   return (

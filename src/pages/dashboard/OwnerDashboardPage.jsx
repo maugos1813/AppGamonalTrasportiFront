@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
+import { AreaBadge } from "../../components/records/AreaBadge";
 import { KpiCard } from "../../components/ui/KpiCard";
 import {
   BarsIcon,
@@ -26,6 +27,7 @@ import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { CHART_COLORS } from "../../lib/constants";
 import {
+  computeAreaBreakdown,
   computeClientDistribution,
   computeEconomicStats,
   computeFleetKmTable,
@@ -33,10 +35,9 @@ import {
   computeMonthlyRevenueTrend,
   computeMonthlyServicesTrend,
   computePeriodKpis,
-  isDhlAbRecord,
-  isDhlRomaRecord,
-  isExtrasStefaniaRecord,
+  filterToMainAreas,
 } from "../../lib/dashboardStats";
+import { AREAS_BY_KEY, RECORD_AREAS, classifyRecord } from "../../lib/recordAreas";
 import { formatCurrency, formatCurrencyCompact } from "../../lib/format";
 import { listRecordsRequest } from "../../lib/records.api";
 
@@ -150,26 +151,15 @@ const Delta = ({ pct }) =>
 const monthLabel = (year, month) =>
   new Date(year, month - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" }).toUpperCase();
 
-// Este dashboard es unicamente "Piazza + DHL Roma" (Extras Piazza Milano + Extras
-// Piazza Roma + DHL Roma) - pedido explicito: ya no se ofrece Extras Piazza/DHL -
-// AB Service/Extras Stefania como secciones aparte, ni siquiera al ADMIN de area
-// DHL (el selector de seccion que existia se saco entero, junto con
-// scopedDashboardSections/ADMIN_AREA_DASHBOARD_SECTION en lib/permissions.js y
-// lib/constants.js - ya no queda nada que scopear aca). Sin AB Service ni DHL
-// Milano en la cuenta - ver isDhlRomaRecord en dashboardStats.js. "General" junta
-// las 3; el resto aisla una sola.
+// Vistas del dashboard: "General" junta las 5 areas (DHL Milano, DHL Roma, Extras Piazza
+// Milano, Extras Piazza Roma y AB Service) y las demas aislan una sola - mismas areas que
+// Registros (ver lib/recordAreas.js). "Otros" (Extras Stefania) no entra, como antes.
+const MAIN_AREAS = RECORD_AREAS.filter((a) => a.key !== "otros");
 const MIS_AREAS_VISTA_OPTIONS = [
   { value: "TODAS", label: "General" },
-  { value: "PIAZZA_MILANO", label: "Piazza Milano" },
-  { value: "PIAZZA_ROMA", label: "Piazza Roma" },
-  { value: "DHL_ROMA", label: "DHL Roma" },
+  ...MAIN_AREAS.map((a) => ({ value: a.key, label: a.shortLabel ?? a.label })),
 ];
-const MIS_AREAS_VISTA_LABELS = {
-  TODAS: "Vista general",
-  PIAZZA_MILANO: "Piazza Milano",
-  PIAZZA_ROMA: "Piazza Roma",
-  DHL_ROMA: "DHL Roma",
-};
+const vistaLabel = (value) => (value === "TODAS" ? "Vista general" : (AREAS_BY_KEY[value]?.label ?? value));
 
 // Detalle de que compone un anillo de Control economico (facturacion/costos/
 // ganancia), agrupado por categoria - ver facturacionBreakdown/costosBreakdown
@@ -255,18 +245,16 @@ export const OwnerDashboardPage = () => {
 
   const loaded = Boolean(records);
 
-  // Todo el bloque de Control economico mira Piazza + DHL Roma (ver comentario de
-  // MIS_AREAS_VISTA_OPTIONS mas arriba) - sin zona cargada en Extras Piazza cuenta
-  // como Milano (mismo criterio que ya se usaba con spedizzione null = Extras Piazza).
+  // Registros de las 5 areas principales (sin "Otros"); sin zona cargada, Extras Piazza y DHL
+  // cuentan como Milano (ver classifyRecord).
+  const mainRecords = useMemo(() => (loaded ? filterToMainAreas(records) : null), [loaded, records]);
+
+  // Lo que ve el dashboard segun la vista elegida: todas las areas o una sola.
   const scopedRecords = useMemo(() => {
-    if (!loaded) return null;
-    const piazza = records.filter((r) => !isDhlAbRecord(r) && !isExtrasStefaniaRecord(r));
-    const dhlRoma = records.filter((r) => isDhlRomaRecord(r));
-    if (misAreasVista === "PIAZZA_MILANO") return piazza.filter((r) => r.extrasPiazzaZona !== "ROMA");
-    if (misAreasVista === "PIAZZA_ROMA") return piazza.filter((r) => r.extrasPiazzaZona === "ROMA");
-    if (misAreasVista === "DHL_ROMA") return dhlRoma;
-    return [...piazza, ...dhlRoma];
-  }, [loaded, records, misAreasVista]);
+    if (!mainRecords) return null;
+    if (misAreasVista === "TODAS") return mainRecords;
+    return mainRecords.filter((r) => classifyRecord(r) === misAreasVista);
+  }, [mainRecords, misAreasVista]);
 
   const economicStats = useMemo(
     () => (loaded ? computeEconomicStats(scopedRecords, period, new Date(), selectedMonth) : null),
@@ -305,7 +293,12 @@ export const OwnerDashboardPage = () => {
     [monthlyKmTrend, monthlyTrend]
   );
 
-  const sectionHeading = `Piazza + DHL Roma - ${MIS_AREAS_VISTA_LABELS[misAreasVista]}`;
+  const areaBreakdown = useMemo(
+    () => (loaded ? computeAreaBreakdown(mainRecords, period, new Date(), selectedMonth) : null),
+    [loaded, mainRecords, period, selectedMonth]
+  );
+
+  const sectionHeading = vistaLabel(misAreasVista);
   // Para el sublabel de los modales de desglose (Facturacion/Costos/Ganancia): con
   // "Mes" se ve el mes puntual elegido (ej. "MARZO 2026"), no la palabra generica "Mes".
   const periodLabel =
@@ -333,7 +326,7 @@ export const OwnerDashboardPage = () => {
         </div>
       </div>
 
-      {/* General/Piazza Milano/Piazza Roma/DHL Roma - ver MIS_AREAS_VISTA_OPTIONS. */}
+      {/* General o una sola area - ver MIS_AREAS_VISTA_OPTIONS. */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-[13px] font-medium text-ink-400">Vista</span>
         <SegmentedControl options={MIS_AREAS_VISTA_OPTIONS} value={misAreasVista} onChange={setMisAreasVista} />
@@ -378,6 +371,58 @@ export const OwnerDashboardPage = () => {
           series={kpis.vehiculos.series}
         />
       </div>
+
+      {/* Servicios por area del periodo: DHL Milano, DHL Roma, Extras Piazza Milano/Roma y
+          AB Service contados juntos; tocar una area filtra todo el dashboard a esa area. */}
+      <Panel
+        icon={ClipboardListIcon}
+        tint="#facc15"
+        title="Servicios por área"
+        subtitle={`${period === "mes" ? `${MONTH_NAMES[selectedMonth.month - 1]} ${selectedMonth.year}` : periodLabel} · toca un área para filtrar el dashboard`}
+        aside={
+          <span className="text-[12px] text-ink-300">
+            Total:{" "}
+            <span className="font-semibold text-ink-50">
+              {MAIN_AREAS.reduce((n, a) => n + areaBreakdown[a.key].count, 0).toLocaleString("es-AR")}
+            </span>
+          </span>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+          {MAIN_AREAS.map((a) => {
+            const stat = areaBreakdown[a.key];
+            const total = MAIN_AREAS.reduce((n, x) => n + areaBreakdown[x.key].count, 0);
+            const share = total > 0 ? Math.round((stat.count / total) * 100) : 0;
+            const active = misAreasVista === a.key;
+            return (
+              <button
+                key={a.key}
+                type="button"
+                onClick={() => setMisAreasVista(active ? "TODAS" : a.key)}
+                aria-pressed={active}
+                className={clsx(
+                  "rounded-xl border p-3.5 text-left transition-colors hover:bg-line/[0.05]",
+                  active ? "border-accent-500/60 bg-accent-500/10" : "border-line/10"
+                )}
+              >
+                <span className="flex items-center gap-2">
+                  <AreaBadge areaKey={a.key} size={26} />
+                  <span className="truncate text-[12px] font-medium text-ink-200">{a.label}</span>
+                </span>
+                <span className="mt-2.5 block text-[26px] font-semibold leading-none tracking-tight text-ink-50">
+                  {stat.count.toLocaleString("es-AR")}
+                </span>
+                <span className="mt-1 block text-[11px] text-ink-400">
+                  {share}% · {Math.round(stat.km).toLocaleString("es-AR")} km
+                </span>
+                <span className="mt-2 block h-1 overflow-hidden rounded-full bg-line/10">
+                  <span className="block h-full rounded-full" style={{ width: `${share}%`, backgroundColor: a.chartColor }} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
 
       {/* Control economico: se mantiene tal cual - anillos de progreso con su
           desglose al tocar cada uno. Cada anillo cuenta algo distinto (no son 3 veces
@@ -544,7 +589,7 @@ export const OwnerDashboardPage = () => {
           icon={BarsIcon}
           tint="#a78bfa"
           title="Servicios por mes"
-          subtitle={`Cantidad de servicios realizados en ${year}`}
+          subtitle={`Cantidad de servicios realizados en ${year}${misAreasVista === "TODAS" ? ", por área" : ""}`}
           aside={
             <div className="text-right">
               <div className="text-[20px] font-semibold leading-none text-ink-50">
@@ -556,7 +601,10 @@ export const OwnerDashboardPage = () => {
         >
           <div className="h-[240px]">
             <Suspense fallback={<ChartFallback />}>
-              <ServicesMonthBarChart data={servicesTrend} />
+              <ServicesMonthBarChart
+                data={servicesTrend}
+                areaKeys={misAreasVista === "TODAS" ? MAIN_AREAS.map((a) => a.key) : [misAreasVista]}
+              />
             </Suspense>
           </div>
         </Panel>

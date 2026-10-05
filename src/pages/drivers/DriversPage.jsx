@@ -31,7 +31,7 @@ import { AREA_OPTIONS, CARGO_LABELS, GRUPO_LABELS, GRUPO_OPTIONS } from "../../l
 import {
   computeDriverDocumentAlerts,
   computeDriverKmRanking,
-  filterToPiazzaYDhlRoma,
+  filterToMainAreas,
   isReperibilidadNoDisponibleHoy,
 } from "../../lib/dashboardStats";
 import { listDocumentsRequest } from "../../lib/documents.api";
@@ -427,10 +427,10 @@ const DriverKmModal = ({ entry, onClose }) => {
 };
 
 // Top de choferes por KM recorrido este mes (planificado o real, ver
-// computeDriverKmRanking). Acotado a Piazza + DHL Roma (ver filterToPiazzaYDhlRoma),
+// computeDriverKmRanking). Acotado a las 5 areas principales (ver filterToMainAreas),
 // mismo criterio que el resto de la app.
 const DriverRankingPanel = ({ records }) => {
-  const ranking = records ? computeDriverKmRanking(filterToPiazzaYDhlRoma(records), "mes").slice(0, 10) : undefined;
+  const ranking = records ? computeDriverKmRanking(filterToMainAreas(records), "mes").slice(0, 10) : undefined;
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   return (

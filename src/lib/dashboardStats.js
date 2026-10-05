@@ -1,5 +1,6 @@
 import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS, getTagliandoStatus } from "./constants";
 import { formatDate, formatDateTime } from "./format";
+import { RECORD_AREAS, classifyRecord } from "./recordAreas";
 
 const isSameDay = (a, b) => {
   const dateA = new Date(a);
@@ -915,18 +916,43 @@ export const computeFleetKmTable = (records, period, now = new Date(), selectedM
     .map((row) => ({ ...row, deltaPct: percentChange(row.km, previous.get(row.id)?.km ?? 0) }));
 };
 
-// Servicios por mes del anio en curso (Ene-Dic), para el grafico de barras.
+// Las 5 areas que se muestran juntas en el dashboard y los rankings: DHL Milano, DHL Roma,
+// Extras Piazza Milano, Extras Piazza Roma y AB Service. Deja afuera solo "Otros" (Extras
+// Stefania). Reemplaza al criterio anterior (solo Piazza + DHL Roma): ahora DHL Milano y AB
+// Service tambien cuentan.
+export const filterToMainAreas = (records) => records.filter((r) => classifyRecord(r) !== "otros");
+
+// Servicios, km y facturacion del periodo por area (bloque "Servicios por area").
+export const computeAreaBreakdown = (records, period, now = new Date(), selectedMonth = null) => {
+  const stats = Object.fromEntries(RECORD_AREAS.map((a) => [a.key, { count: 0, km: 0, facturacion: 0 }]));
+  records
+    .filter((r) => isActiveRecord(r) && isWithinPeriod(r.fechaServicio, period, now, selectedMonth))
+    .forEach((r) => {
+      const entry = stats[classifyRecord(r)];
+      entry.count += 1;
+      entry.km += realKm(r);
+      entry.facturacion += recordRevenue(r);
+    });
+  return stats;
+};
+
+// Servicios por mes del anio en curso (Ene-Dic), para el grafico de barras apiladas: cada
+// mes lleva el total (servicios) y el desglose por area (byArea).
 export const computeMonthlyServicesTrend = (records, now = new Date()) => {
   const year = now.getFullYear();
   const buckets = MONTH_LABELS.map((month, index) => ({
     month,
     servicios: 0,
+    byArea: Object.fromEntries(RECORD_AREAS.map((a) => [a.key, 0])),
     isCurrent: index === now.getMonth(),
   }));
   records.forEach((r) => {
     if (!isActiveRecord(r)) return;
     const date = new Date(r.fechaServicio);
-    if (date.getFullYear() === year) buckets[date.getMonth()].servicios += 1;
+    if (date.getFullYear() !== year) return;
+    const bucket = buckets[date.getMonth()];
+    bucket.servicios += 1;
+    bucket.byArea[classifyRecord(r)] += 1;
   });
   return buckets;
 };

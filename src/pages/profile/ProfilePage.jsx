@@ -21,7 +21,7 @@ import {
   computeServicePeriodStats,
   computeVehicleStats,
   computeWeeklyServiceTrend,
-  filterToPiazzaYDhlRoma,
+  filterToMainAreas,
 } from "../../lib/dashboardStats";
 import { formatCurrencyCompact, formatDate } from "../../lib/format";
 import { listRecordsRequest } from "../../lib/records.api";
@@ -150,11 +150,11 @@ export const ProfilePage = () => {
     () => (!isChofer && records && vehicles ? computeVehicleStats(vehicles, records) : null),
     [isChofer, records, vehicles]
   );
-  // Acotado a Piazza + DHL Roma (ver filterToPiazzaYDhlRoma) - solo el resumen
+  // Acotado a las 5 areas principales (ver filterToMainAreas) - solo el resumen
   // economico de OWNER/ADMIN, no records en si (weeklyTrend/computeVehicleStats de
   // abajo siguen mirando todo, no son datos de facturacion por seccion).
   const economicStats = useMemo(
-    () => (!isChofer && records ? computeEconomicStats(filterToPiazzaYDhlRoma(records), "mes") : null),
+    () => (!isChofer && records ? computeEconomicStats(filterToMainAreas(records), "mes") : null),
     [isChofer, records]
   );
   const weeklyTrend = useMemo(() => (records ? computeWeeklyServiceTrend(records) : []), [records]);
