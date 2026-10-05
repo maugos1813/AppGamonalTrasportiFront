@@ -45,40 +45,49 @@ export const AuthLayout = ({ children, title, subtitle }) => (
         alt=""
         className="absolute inset-0 h-full w-full object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-t from-[#06101f] via-[#06101f]/68 to-[#0a2a63]/35" />
-      <div className="absolute inset-0 bg-gradient-to-r from-[#06101f]/70 via-[#06101f]/25 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-[#06101f] via-[#06101f]/45 to-[#0a2a63]/25" />
 
       <div className="relative z-10 flex h-full min-h-dvh flex-col justify-between p-10 xl:p-14">
-        <div className="flex items-center gap-3">
+        <div className="flex w-fit items-center gap-3 rounded-2xl bg-[#06101f]/70 py-2 pl-2 pr-5 backdrop-blur-sm">
           <img src={logo} alt="" className="h-11 w-11 rounded-xl shadow-lg" />
           <span className="text-lg font-semibold tracking-tight">Gamonal Driver</span>
         </div>
 
         <div className="max-w-xl">
-          <h2 className="text-[40px] font-semibold leading-[1.1] tracking-tight xl:text-5xl">
-            Control total de tu flota,
-            <span className="block text-emerald-400">en un solo lugar.</span>
+          <h2 className="space-y-2 text-[40px] font-semibold leading-[1.15] tracking-tight xl:text-5xl">
+            <span className="block w-fit rounded-xl bg-[#06101f]/70 px-4 py-1.5 backdrop-blur-sm">
+              Control total de tu flota,
+            </span>
+            <span className="block w-fit rounded-xl bg-[#06101f]/70 px-4 py-1.5 text-emerald-400 backdrop-blur-sm">
+              en un solo lugar.
+            </span>
           </h2>
-          <p className="mt-4 max-w-md text-[16px] leading-relaxed text-white/75">
-            Servicios, rutas y choferes conectados en tiempo real para que cada entrega salga bien.
+          <p className="mt-5 max-w-md text-[16px] leading-[2] text-white/90">
+            <span className="rounded-md bg-[#06101f]/70 px-2 py-1 box-decoration-clone backdrop-blur-sm">
+              Servicios, rutas y choferes conectados en tiempo real para que cada entrega salga bien.
+            </span>
           </p>
 
           <ul className="mt-9 space-y-5">
             {FEATURES.map((feature) => (
               <li key={feature.title} className="flex items-start gap-4">
-                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/10 text-emerald-300 ring-1 ring-white/15 backdrop-blur">
+                <span className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#06101f]/75 text-emerald-300 ring-1 ring-white/20 backdrop-blur-sm">
                   <FeatureIcon>{feature.icon}</FeatureIcon>
                 </span>
-                <div>
-                  <p className="text-[15px] font-semibold">{feature.title}</p>
-                  <p className="text-[14px] text-white/65">{feature.text}</p>
+                <div className="space-y-1">
+                  <p className="w-fit rounded-md bg-[#06101f]/75 px-2 py-0.5 text-[15px] font-semibold backdrop-blur-sm">
+                    {feature.title}
+                  </p>
+                  <p className="w-fit rounded-md bg-[#06101f]/70 px-2 py-0.5 text-[14px] text-white/85 backdrop-blur-sm">
+                    {feature.text}
+                  </p>
                 </div>
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="text-[13px] text-white/50">
+        <p className="w-fit rounded-md bg-[#06101f]/70 px-2 py-1 text-[13px] text-white/70 backdrop-blur-sm">
           &copy; {new Date().getFullYear()} Gamonal Driver. Todos los derechos reservados.
         </p>
       </div>
@@ -87,9 +96,8 @@ export const AuthLayout = ({ children, title, subtitle }) => (
     {/* Formulario */}
     <main className="relative flex min-h-dvh flex-col overflow-hidden">
       <div className="pointer-events-none absolute inset-0 bg-background">
-        <div className="hidden dark:block absolute -top-1/3 left-1/2 h-[70vh] w-[70vh] -translate-x-1/2 rounded-full bg-accent-500/30 blur-[140px]" />
-        <div className="hidden dark:block absolute bottom-[-20%] left-[-10%] h-[50vh] w-[50vh] rounded-full bg-fuchsia-500/15 blur-[140px]" />
-        <div className="hidden dark:block absolute bottom-[-15%] right-[-10%] h-[55vh] w-[55vh] rounded-full bg-cyan-400/15 blur-[140px]" />
+        <div className="hidden dark:block absolute -top-1/3 left-1/2 h-[70vh] w-[70vh] -translate-x-1/2 rounded-full bg-accent-500/25 blur-[140px]" />
+        <div className="hidden dark:block absolute bottom-[-25%] right-[-15%] h-[55vh] w-[55vh] rounded-full bg-emerald-500/12 blur-[150px]" />
       </div>
 
       {/* Banda con la imagen: solo en celular, el panel grande no entra */}
