@@ -69,3 +69,14 @@ export const deleteVehicleMantenimientoRequest = (vehicleId, mantenimientoId) =>
 // de confirmar en un modal). El backend borra tambien el comprobante.
 export const deleteAreaCEntryRequest = (id) =>
   api.delete(`/vehiculos/area-c-entries/${id}`).then((res) => res.data.data);
+
+// Control de Flota > Exceso de velocidad (acordeones): primero solo el resumen por dia y
+// por vehiculo (liviano); el detalle se pide recien cuando se abre cada acordeon.
+export const getSpeedingSummaryRequest = () =>
+  api.get("/vehiculos/speeding-events/summary").then((res) => res.data.data.summary);
+
+export const listSpeedingEventsByDayRequest = (day) =>
+  api.get("/vehiculos/speeding-events", { params: { day } }).then((res) => res.data.data.events);
+
+export const listSpeedingEventsByVehicleRequest = (vehicleId) =>
+  api.get("/vehiculos/speeding-events", { params: { vehicleId } }).then((res) => res.data.data.events);

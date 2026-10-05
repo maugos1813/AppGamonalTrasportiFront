@@ -1,14 +1,14 @@
 import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
 import { AreaCEntryRow } from "../../components/AreaCEntryRow";
+import { SpeedingSection } from "../../components/SpeedingSection";
 import { Alert } from "../../components/ui/Alert";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Spinner } from "../../components/ui/Spinner";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { formatDateTime } from "../../lib/format";
-import { listAreaCEntriesRequest, listSpeedingEventsRequest } from "../../lib/vehicles.api";
+import { listAreaCEntriesRequest } from "../../lib/vehicles.api";
 
 // Historial completo de Area C (mismas filas/acciones que la seccion homonima del
 // Mapa, ver AreaCEntryRow) y de excesos de velocidad - ambos ya se registran solos en
@@ -20,17 +20,16 @@ export const ControlFlotaPage = () => {
 
   const [areaCEntries, setAreaCEntries] = useState(null);
   const [areaCTab, setAreaCTab] = useState("no-pagado");
-  const [speedingEvents, setSpeedingEvents] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (!isPrivileged) return;
     let cancelled = false;
-    Promise.all([listAreaCEntriesRequest(), listSpeedingEventsRequest()])
-      .then(([entries, events]) => {
-        if (cancelled) return;
-        setAreaCEntries(entries);
-        setSpeedingEvents(events);
+    // Solo Area C: el registro de excesos de velocidad se carga aparte y a demanda
+    // (ver SpeedingSection) en vez de traer todo de entrada.
+    listAreaCEntriesRequest()
+      .then((entries) => {
+        if (!cancelled) setAreaCEntries(entries);
       })
       .catch((err) => {
         if (!cancelled) setError(parseApiError(err).message);
@@ -93,34 +92,7 @@ export const ControlFlotaPage = () => {
         )}
       </GlassCard>
 
-      <GlassCard>
-        <h2 className="text-[16px] font-semibold text-ink-50">Exceso de velocidad</h2>
-        <p className="mt-1 text-[13px] text-ink-300">
-          Se registra solo cuando un vehiculo supera el umbral configurado - los excesos
-          sostenidos se agrupan como el mismo episodio, no una fila por cada minuto.
-        </p>
-
-        {speedingEvents === null ? (
-          <div className="mt-4 flex justify-center py-6">
-            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
-          </div>
-        ) : speedingEvents.length === 0 ? (
-          <p className="mt-3 text-[13px] text-ink-300">Sin excesos registrados.</p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-2">
-            {speedingEvents.map((event) => (
-              <li
-                key={event.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl glass-surface-sm px-4 py-3 text-[13px] text-ink-200"
-              >
-                <span className="font-medium text-ink-50">{event.targa}</span>
-                <span className="font-medium text-danger-500">{Math.round(event.speedKmh)} km/h</span>
-                <span className="text-ink-400">{formatDateTime(event.occurredAt)}</span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </GlassCard>
+      <SpeedingSection />
     </div>
   );
 };
