@@ -4,7 +4,6 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { PasswordField } from "../../components/ui/PasswordField";
 import { AuthLayout } from "../../components/layout/AuthLayout";
-import { GlassCard } from "../../components/ui/GlassCard";
 import { parseApiError } from "../../lib/api";
 import { resetPasswordRequest } from "../../lib/auth.api";
 
@@ -47,42 +46,43 @@ export const ResetPasswordPage = () => {
   };
 
   return (
-    <AuthLayout title="Nueva contrasena" subtitle="Elige una nueva contrasena para tu cuenta">
-      <GlassCard>
-        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-          <Alert>{formError}</Alert>
+    <AuthLayout title="Nueva contrasena" subtitle="Elige una nueva contrasena para tu cuenta"
+      footer={
+        <>
+          <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
+            Volver a iniciar sesion
+          </Link>
+        </>
+      }
+    >
+      <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+        <Alert>{formError}</Alert>
 
-          <PasswordField
-            id="newPassword"
-            label="Nueva contrasena"
-            autoComplete="new-password"
-            placeholder="Minimo 8 caracteres"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            required
-          />
+        <PasswordField
+          id="newPassword"
+          label="Nueva contrasena"
+          autoComplete="new-password"
+          placeholder="Minimo 8 caracteres"
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          required
+        />
 
-          <PasswordField
-            id="confirmPassword"
-            label="Confirmar contrasena"
-            autoComplete="new-password"
-            placeholder="Repite la contrasena"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            required
-          />
+        <PasswordField
+          id="confirmPassword"
+          label="Confirmar contrasena"
+          autoComplete="new-password"
+          placeholder="Repite la contrasena"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+        />
 
-          <Button type="submit" loading={loading}>
-            Restablecer contrasena
-          </Button>
-        </form>
-      </GlassCard>
+        <Button type="submit" loading={loading}>
+          Restablecer contrasena
+        </Button>
+      </form>
 
-      <p className="mt-6 text-center text-[14px] text-ink-300">
-        <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
-          Volver a iniciar sesion
-        </Link>
-      </p>
     </AuthLayout>
   );
 };

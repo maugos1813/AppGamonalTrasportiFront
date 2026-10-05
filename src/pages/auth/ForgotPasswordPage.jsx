@@ -4,7 +4,6 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { TextField } from "../../components/ui/TextField";
 import { AuthLayout } from "../../components/layout/AuthLayout";
-import { GlassCard } from "../../components/ui/GlassCard";
 import { parseApiError } from "../../lib/api";
 import { forgotPasswordRequest } from "../../lib/auth.api";
 
@@ -33,40 +32,40 @@ export const ForgotPasswordPage = () => {
     <AuthLayout
       title="Recuperar acceso"
       subtitle="Te enviaremos un enlace para restablecer tu contrasena"
+      footer={
+        <>
+          <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
+            Volver a iniciar sesion
+          </Link>
+        </>
+      }
     >
-      <GlassCard>
-        {sent ? (
-          <Alert variant="success">
-            Si el correo existe en nuestro sistema, recibiras un enlace para restablecer tu
-            contrasena en unos minutos.
-          </Alert>
-        ) : (
-          <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-            <Alert>{formError}</Alert>
+      {sent ? (
+        <Alert variant="success">
+          Si el correo existe en nuestro sistema, recibiras un enlace para restablecer tu
+          contrasena en unos minutos.
+        </Alert>
+      ) : (
+        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+          <Alert>{formError}</Alert>
 
-            <TextField
-              id="correoElectronico"
-              label="Correo electronico"
-              type="email"
-              autoComplete="email"
-              placeholder="tucorreo@ejemplo.com"
-              value={correoElectronico}
-              onChange={(e) => setCorreoElectronico(e.target.value)}
-              required
-            />
+          <TextField
+            id="correoElectronico"
+            label="Correo electronico"
+            type="email"
+            autoComplete="email"
+            placeholder="tucorreo@ejemplo.com"
+            value={correoElectronico}
+            onChange={(e) => setCorreoElectronico(e.target.value)}
+            required
+          />
 
-            <Button type="submit" loading={loading}>
-              Enviar enlace
-            </Button>
-          </form>
-        )}
-      </GlassCard>
+          <Button type="submit" loading={loading}>
+            Enviar enlace
+          </Button>
+        </form>
+      )}
 
-      <p className="mt-6 text-center text-[14px] text-ink-300">
-        <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
-          Volver a iniciar sesion
-        </Link>
-      </p>
     </AuthLayout>
   );
 };

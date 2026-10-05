@@ -6,7 +6,6 @@ import { PasswordField } from "../../components/ui/PasswordField";
 import { Select } from "../../components/ui/Select";
 import { TextField } from "../../components/ui/TextField";
 import { AuthLayout } from "../../components/layout/AuthLayout";
-import { GlassCard } from "../../components/ui/GlassCard";
 import { useAuth } from "../../context/AuthContext";
 import { AREA_OPTIONS } from "../../lib/constants";
 
@@ -51,103 +50,106 @@ export const RegisterPage = () => {
   };
 
   return (
-    <AuthLayout title="Crea tu cuenta" subtitle="Unite al equipo de Gamonal Trasporti">
-      <GlassCard>
-        <form className="space-y-5" onSubmit={handleSubmit} noValidate>
-          <Alert>{formError}</Alert>
+    <AuthLayout
+      title="Crea tu cuenta"
+      subtitle="Únete al equipo de Gamonal Driver"
+      footer={
+        <>
+          Ya tienes cuenta?{" "}
+          <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
+            Inicia sesion
+          </Link>
+        </>
+      }
+    >
+      <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+        <Alert>{formError}</Alert>
 
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <TextField
-              id="nombre"
-              label="Nombre"
-              autoComplete="given-name"
-              placeholder="Mario"
-              value={form.nombre}
-              onChange={handleChange("nombre")}
-              error={fieldErrors.nombre?.[0]}
-              required
-            />
-            <TextField
-              id="apellido"
-              label="Apellido"
-              autoComplete="family-name"
-              placeholder="Rossi"
-              value={form.apellido}
-              onChange={handleChange("apellido")}
-              error={fieldErrors.apellido?.[0]}
-              required
-            />
-          </div>
-
-          <Select
-            id="area"
-            label="Area"
-            placeholder="Selecciona tu area"
-            options={AREA_OPTIONS}
-            value={form.area}
-            onChange={handleChange("area")}
-            error={fieldErrors.area?.[0]}
-            required
-          />
-
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-            <TextField
-              id="fechaNacimiento"
-              label="Fecha de nacimiento"
-              type="date"
-              value={form.fechaNacimiento}
-              onChange={handleChange("fechaNacimiento")}
-              error={fieldErrors.fechaNacimiento?.[0]}
-              required
-            />
-            <TextField
-              id="numeroCelular"
-              label="Numero de celular"
-              type="tel"
-              autoComplete="tel"
-              placeholder="+39 333 1234567"
-              value={form.numeroCelular}
-              onChange={handleChange("numeroCelular")}
-              error={fieldErrors.numeroCelular?.[0]}
-              required
-            />
-          </div>
-
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
           <TextField
-            id="correoElectronico"
-            label="Correo electronico"
-            type="email"
-            autoComplete="email"
-            placeholder="tucorreo@ejemplo.com"
-            value={form.correoElectronico}
-            onChange={handleChange("correoElectronico")}
-            error={fieldErrors.correoElectronico?.[0]}
+            id="nombre"
+            label="Nombre"
+            autoComplete="given-name"
+            placeholder="Mario"
+            value={form.nombre}
+            onChange={handleChange("nombre")}
+            error={fieldErrors.nombre?.[0]}
             required
           />
-
-          <PasswordField
-            id="password"
-            label="Contrasena"
-            autoComplete="new-password"
-            placeholder="Minimo 8 caracteres"
-            value={form.password}
-            onChange={handleChange("password")}
-            error={fieldErrors.password?.[0]}
+          <TextField
+            id="apellido"
+            label="Apellido"
+            autoComplete="family-name"
+            placeholder="Rossi"
+            value={form.apellido}
+            onChange={handleChange("apellido")}
+            error={fieldErrors.apellido?.[0]}
             required
           />
+        </div>
 
-          <Button type="submit" loading={loading}>
-            Crear cuenta
-          </Button>
-        </form>
-      </GlassCard>
+        <Select
+          id="area"
+          label="Area"
+          placeholder="Selecciona tu area"
+          options={AREA_OPTIONS}
+          value={form.area}
+          onChange={handleChange("area")}
+          error={fieldErrors.area?.[0]}
+          required
+        />
 
-      <p className="mt-6 text-center text-[14px] text-ink-300">
-        Ya tienes cuenta?{" "}
-        <Link to="/login" className="font-medium text-accent-400 hover:text-accent-300">
-          Inicia sesion
-        </Link>
-      </p>
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <TextField
+            id="fechaNacimiento"
+            label="Fecha de nacimiento"
+            type="date"
+            value={form.fechaNacimiento}
+            onChange={handleChange("fechaNacimiento")}
+            error={fieldErrors.fechaNacimiento?.[0]}
+            required
+          />
+          <TextField
+            id="numeroCelular"
+            label="Numero de celular"
+            type="tel"
+            autoComplete="tel"
+            placeholder="+39 333 1234567"
+            value={form.numeroCelular}
+            onChange={handleChange("numeroCelular")}
+            error={fieldErrors.numeroCelular?.[0]}
+            required
+          />
+        </div>
+
+        <TextField
+          id="correoElectronico"
+          label="Correo electronico"
+          type="email"
+          autoComplete="email"
+          placeholder="tucorreo@ejemplo.com"
+          value={form.correoElectronico}
+          onChange={handleChange("correoElectronico")}
+          error={fieldErrors.correoElectronico?.[0]}
+          required
+        />
+
+        <PasswordField
+          id="password"
+          label="Contrasena"
+          autoComplete="new-password"
+          placeholder="Minimo 8 caracteres"
+          value={form.password}
+          onChange={handleChange("password")}
+          error={fieldErrors.password?.[0]}
+          required
+        />
+
+        <Button type="submit" loading={loading}>
+          Crear cuenta
+        </Button>
+      </form>
+
     </AuthLayout>
   );
 };

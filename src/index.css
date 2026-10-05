@@ -38,11 +38,14 @@
   /* Marca Express Dispatch: navy + yellow, fijos en ambos temas. */
   --color-brand-navy: #0a1628;
   --color-brand-yellow: #ffd000;
+  /* Verde de marca (logo Gamonal Driver): acento principal de botones y navegacion. */
+  --color-brand-green: #34d399;
+  --color-brand-green-light: #6ee7b7;
 
   /* Sidebar: siempre navy oscuro, no cambia entre temas (igual que el pack). */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-active: var(--color-brand-yellow);
+  --color-sidebar-active: var(--color-brand-green);
   --color-sidebar-active-foreground: var(--color-brand-navy);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-border: var(--sidebar-border);
@@ -104,10 +107,10 @@
   --sidebar-accent: #16223a;
   --sidebar-border: rgba(255, 255, 255, 0.08);
 
-  --accent-600: #003f8f;
-  --accent-500: #0058c7;
-  --accent-400: #1d6fe0;
-  --accent-300: #4f8fe8;
+  --accent-600: #047857;
+  --accent-500: #059669;
+  --accent-400: #0b9467;
+  --accent-300: #34b98a;
 
   --danger-500: #dc2626;
   --success-500: #16a34a;
@@ -141,9 +144,9 @@
 .dark {
   color-scheme: dark;
 
-  --background: #000000;
+  --background: #050d1b;
   --foreground: #f5f5f7;
-  --popover: #111114;
+  --popover: #0b1730;
   --popover-foreground: #f5f5f7;
 
   --ink-50: #f5f5f7;
@@ -160,10 +163,10 @@
   --sidebar-accent: #16223a;
   --sidebar-border: rgba(255, 255, 255, 0.08);
 
-  --accent-600: #0058c7;
-  --accent-500: #0071e3;
-  --accent-400: #2997ff;
-  --accent-300: #64b5ff;
+  --accent-600: #1fa971;
+  --accent-500: #2fc48d;
+  --accent-400: #3fd69b;
+  --accent-300: #6ee7b7;
 
   --danger-500: #ff3b30;
   --success-500: #30d158;
