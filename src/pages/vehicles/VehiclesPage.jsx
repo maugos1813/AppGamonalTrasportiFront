@@ -10,6 +10,7 @@ import {
   AlertTriangleIcon,
   BellIcon,
   CheckCircleIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   MapPinIcon,
   RouteIcon,
@@ -326,7 +327,7 @@ const AttentionPanel = ({ vehicles }) => {
           Todo en orden: ningún vehículo necesita atención.
         </p>
       ) : (
-        <div className="flex max-h-[420px] flex-col gap-4 overflow-y-auto pr-1">
+        <div className="flex max-h-[300px] flex-col gap-4 overflow-y-auto pr-1">
           <AttentionGroup title="Documentos" count={documents.length} items={documents} />
           <AttentionGroup title="Tagliando" count={tagliando.length} items={tagliando} />
           <AttentionGroup title="Estado de la flota" count={unavailable.length} items={unavailable} />
@@ -356,7 +357,7 @@ const CenterSummaryPanel = ({ vehicles }) => {
     <PanelShell icon={MapPinIcon} title="Resumen por centro">
       <ul className="flex flex-col gap-2.5">
         {centers.map((c) => (
-          <li key={c.label} className="rounded-xl border border-line/[0.07] px-3.5 py-3">
+          <li key={c.label} className="rounded-xl border border-line/[0.07] px-3.5 py-2.5">
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[13px] font-medium text-ink-50">{c.label}</span>
               <span className="text-[12px] text-ink-400">
@@ -515,6 +516,63 @@ const FleetRankingPanel = ({ records }) => {
 // Pagina
 // ---------------------------------------------------------------------------
 
+const PAGE_SIZE_TABLE = 10;
+const PAGE_SIZE_CARDS = 9;
+
+// Numeros de pagina a mostrar: todos si son pocos; si no, primera, ultima y las
+// vecinas de la actual con "…" en los saltos.
+const pageNumbers = (current, count) => {
+  if (count <= 7) return Array.from({ length: count }, (_, i) => i + 1);
+  const pages = new Set([1, count, current - 1, current, current + 1]);
+  const sorted = [...pages].filter((p) => p >= 1 && p <= count).sort((a, b) => a - b);
+  return sorted.flatMap((p, i) => (i > 0 && p - sorted[i - 1] > 1 ? ["…", p] : [p]));
+};
+
+const Pagination = ({ page, pageCount, from, to, total, onChange }) => {
+  const arrow =
+    "flex h-8 w-8 items-center justify-center rounded-lg border border-line/10 text-ink-200 transition-colors enabled:hover:bg-line/10 disabled:opacity-40";
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-[13px] text-ink-400">
+        Mostrando {from} - {to} de {total} vehículos
+      </p>
+      {pageCount > 1 && (
+        <nav aria-label="Paginación" className="flex items-center gap-1.5">
+          <button type="button" className={arrow} disabled={page === 1} onClick={() => onChange(page - 1)} aria-label="Página anterior">
+            <ChevronLeftIcon className="h-4 w-4" />
+          </button>
+          {pageNumbers(page, pageCount).map((p, i) =>
+            p === "…" ? (
+              <span key={`gap-${i}`} className="px-1 text-ink-500">
+                …
+              </span>
+            ) : (
+              <button
+                key={p}
+                type="button"
+                onClick={() => onChange(p)}
+                aria-current={p === page ? "page" : undefined}
+                className={clsx(
+                  "h-8 min-w-8 rounded-lg px-2 text-[13px] font-medium transition-colors",
+                  p === page
+                    ? "bg-accent-500 text-white"
+                    : "border border-line/10 text-ink-200 hover:bg-line/10"
+                )}
+              >
+                {p}
+              </button>
+            )
+          )}
+          <button type="button" className={arrow} disabled={page === pageCount} onClick={() => onChange(page + 1)} aria-label="Página siguiente">
+            <ChevronRightIcon className="h-4 w-4" />
+          </button>
+        </nav>
+      )}
+    </div>
+  );
+};
+
 const todosOption = (label, options) => [{ value: "", label }, ...options];
 
 export const VehiclesPage = () => {
@@ -535,6 +593,7 @@ export const VehiclesPage = () => {
   const [area, setArea] = useState("");
   const [estado, setEstado] = useState("");
   const [sort, setSort] = useState("targa");
+  const [page, setPage] = useState(1);
 
   // La barra superior y la de la pagina comparten el mismo texto (ver vehicleSearchStore).
   const query = useVehicleSearch();
@@ -592,6 +651,17 @@ export const VehiclesPage = () => {
     });
   }, [vehicles, query, centro, area, estado, sort]);
 
+  // Tramo visible: la tabla muestra 10 por pagina, las tarjetas 9 (grilla de 3 columnas).
+  const pageSize = view === "tabla" ? PAGE_SIZE_TABLE : PAGE_SIZE_CARDS;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // Al cambiar busqueda, filtros, orden o vista se vuelve a la primera pagina.
+  useEffect(() => {
+    setPage(1);
+  }, [query, centro, area, estado, sort, view]);
+
   if (!isPrivileged) return <Navigate to="/" replace />;
 
   const hasFilters = Boolean(query.trim() || centro || area || estado);
@@ -627,7 +697,7 @@ export const VehiclesPage = () => {
   };
 
   const groups = [...GRUPO_OPTIONS.map((g) => ({ value: g.value, title: g.label })), { value: null, title: "Sin grupo" }]
-    .map((g) => ({ ...g, members: filtered.filter((v) => (v.grupo ?? null) === g.value) }))
+    .map((g) => ({ ...g, members: pageItems.filter((v) => (v.grupo ?? null) === g.value) }))
     .filter((g) => g.members.length > 0);
 
   return (
@@ -732,7 +802,7 @@ export const VehiclesPage = () => {
 
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-[13px] text-ink-400">
-                Mostrando {filtered.length} de {total} vehículos
+                {hasFilters ? `${filtered.length} de ${total} vehículos coinciden` : `${total} vehículos en la flota`}
               </p>
               <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={changeView} />
             </div>
@@ -742,13 +812,23 @@ export const VehiclesPage = () => {
                 Ningún vehículo coincide con los filtros.
               </GlassCard>
             ) : view === "tabla" ? (
-              <VehicleTable vehicles={filtered} />
+              <VehicleTable vehicles={pageItems} />
             ) : (
               <div className="flex flex-col gap-7">
                 {groups.map((g) => (
                   <GroupSection key={g.title} title={g.title} members={g.members} />
                 ))}
               </div>
+            )}
+            {filtered.length > 0 && (
+              <Pagination
+                page={currentPage}
+                pageCount={pageCount}
+                from={(currentPage - 1) * pageSize + 1}
+                to={Math.min(currentPage * pageSize, filtered.length)}
+                total={filtered.length}
+                onChange={setPage}
+              />
             )}
             {hasFilters && filtered.length > 0 && (
               <button
@@ -766,7 +846,7 @@ export const VehiclesPage = () => {
             )}
           </div>
 
-          <aside className="flex flex-col gap-5">
+          <aside className="flex flex-col gap-5 xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto xl:pr-1">
             <AttentionPanel vehicles={vehicles} />
             <CenterSummaryPanel vehicles={vehicles} />
             <KmMonthPanel records={monthlyRecords} />
