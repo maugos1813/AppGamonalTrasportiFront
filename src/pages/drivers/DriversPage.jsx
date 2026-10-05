@@ -1,23 +1,71 @@
 import clsx from "clsx";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import {
+  AlertTriangleIcon,
+  BellIcon,
+  CheckCircleIcon,
+  MapPinIcon,
+  SearchIcon,
+  TruckIcon,
+  UsersIcon,
+} from "../../components/ui/icons";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { Pagination } from "../../components/ui/Pagination";
+import { AttentionGroup, PanelShell } from "../../components/ui/PanelShell";
+import { SegmentedControl } from "../../components/ui/SegmentedControl";
+import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
+import { StatTile } from "../../components/ui/StatTile";
+import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, GRUPO_OPTIONS } from "../../lib/constants";
+import { AREA_OPTIONS, CARGO_LABELS, GRUPO_LABELS, GRUPO_OPTIONS } from "../../lib/constants";
 import { computeDriverDocumentAlerts, computeDriverKmRanking, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
 import { listDocumentsRequest } from "../../lib/documents.api";
+import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
+const centroLabel = (grupo) => (grupo ? GRUPO_LABELS[grupo] ?? grupo : "Sin grupo");
+const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
+const fullName = (driver) => `${driver.nombre} ${driver.apellido}`;
+const isActive = (driver) => driver.estado === "ACTIVO";
+
+const ESTADO_OPTIONS = [
+  { value: "ACTIVO", label: "Activos" },
+  { value: "INACTIVO", label: "Inactivos" },
+];
+const SORT_OPTIONS = [
+  { value: "nombre", label: "Nombre" },
+  { value: "centro", label: "Centro" },
+  { value: "km", label: "Km del mes" },
+];
+const VIEW_OPTIONS = [
+  { value: "tabla", label: "Tabla" },
+  { value: "tarjetas", label: "Tarjetas" },
+];
+const VIEW_STORAGE_KEY = "gt_drivers_view";
+const PAGE_SIZE_TABLE = 10;
+const PAGE_SIZE_CARDS = 9;
+
+// Tabla en escritorio; en celular arranca en tarjetas (seis columnas no entran).
+const initialView = () => {
+  try {
+    const saved = localStorage.getItem(VIEW_STORAGE_KEY);
+    if (saved === "tabla" || saved === "tarjetas") return saved;
+  } catch {
+    // sin almacenamiento disponible: se usa el valor por defecto
+  }
+  return typeof window !== "undefined" && window.matchMedia("(max-width: 639px)").matches ? "tarjetas" : "tabla";
+};
 
 const PhoneIcon = ({ className }) => (
   <svg viewBox="0 0 20 20" fill="currentColor" className={className} aria-hidden="true">
@@ -25,87 +73,294 @@ const PhoneIcon = ({ className }) => (
   </svg>
 );
 
-// Card compacta: pensada para verse bien en grillas de 2 (mobile) a 4 (desktop
-// grande) columnas, asi que prioriza nombre/estado y deja el resto en una sola
-// fila chica en vez del layout mas espacioso de antes (2 en fila, siempre).
+// Avatar con un punto verde si el chofer esta compartiendo su ubicacion.
+const DriverAvatar = ({ driver, className }) => (
+  <div className="relative shrink-0">
+    <Avatar user={driver} className={className} />
+    {driver.compartirUbicacion && isActive(driver) && (
+      <span
+        title="Compartiendo ubicación"
+        className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success-500 ring-2 ring-[var(--glass-surface-bg)]"
+      />
+    )}
+  </div>
+);
+
+// Activo = verde (correcto); inactivo es neutral, no un problema.
+const DriverStatusBadge = ({ driver, className }) => (
+  <span
+    className={clsx(
+      "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium whitespace-nowrap",
+      isActive(driver) ? "bg-success-500/15 text-success-500" : "bg-line/10 text-ink-300",
+      className
+    )}
+  >
+    <span className={clsx("h-1.5 w-1.5 shrink-0 rounded-full", isActive(driver) ? "bg-success-500" : "bg-ink-400")} />
+    {isActive(driver) ? "Activo" : "Inactivo"}
+  </span>
+);
+
+const PhoneLink = ({ driver }) =>
+  driver.numeroCelular ? (
+    <a
+      href={`tel:${driver.numeroCelular.replace(/\s+/g, "")}`}
+      onClick={(e) => e.stopPropagation()}
+      aria-label={`Llamar a ${fullName(driver)}`}
+      className="inline-flex items-center gap-1.5 whitespace-nowrap text-ink-200 hover:text-accent-400"
+    >
+      <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-ink-400" />
+      {driver.numeroCelular}
+    </a>
+  ) : (
+    <span className="text-ink-400">—</span>
+  );
+
+// ---------------------------------------------------------------------------
+// Vista de tarjetas (agrupada por centro; los inactivos van aparte al final)
+// ---------------------------------------------------------------------------
+
 // state: backgroundLocation - para que App.jsx renderice el detalle como overlay
 // sobre esta lista (que sigue montada), en vez de reemplazarla (ver App.jsx).
 const DriverCard = ({ driver }) => {
   const location = useLocation();
   return (
-  <Link to={`/choferes/${driver.id}`} state={{ backgroundLocation: location }} className="block">
-    <GlassCard className="!p-4 transition-colors hover:bg-line/[0.09]">
-      <div className="flex items-center gap-3">
-        <Avatar user={driver} className="h-10 w-10 shrink-0 text-[13px]" />
-        <div className="min-w-0 flex-1">
-          <h2 className="truncate text-[14px] font-medium text-ink-50">
-            {driver.nombre} {driver.apellido}
-          </h2>
-          <p className="truncate text-[12px] text-ink-300">{driver.correoElectronico}</p>
+    <Link to={`/choferes/${driver.id}`} state={{ backgroundLocation: location }} className="block">
+      <GlassCard className="!rounded-2xl !p-4 transition-colors hover:bg-line/[0.06]">
+        <div className="flex items-center gap-3">
+          <DriverAvatar driver={driver} className="h-10 w-10 text-[13px]" />
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate text-[14px] font-medium text-ink-50">{fullName(driver)}</h2>
+            <p className="truncate text-[12px] text-ink-300">{driver.correoElectronico}</p>
+          </div>
         </div>
-      </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="truncate text-[11px] text-ink-400">{areaLabel(driver.area)}</span>
-        <div className="flex shrink-0 items-center gap-1.5">
-          <span
-            className={`rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-              driver.estado === "ACTIVO"
-                ? "border-success-500/25 bg-success-500/15 text-success-500"
-                : "border-danger-500/25 bg-danger-500/15 text-danger-500"
-            }`}
-          >
-            {driver.estado === "ACTIVO" ? "Activo" : "Inactivo"}
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="truncate text-[11px] text-ink-400">
+            {driver.cargo !== "CHOFER" ? `${CARGO_LABELS[driver.cargo]} · ` : ""}
+            {areaLabel(driver.area)}
           </span>
-          {driver.numeroCelular && (
-            <a
-              href={`tel:${driver.numeroCelular.replace(/\s+/g, "")}`}
-              onClick={(e) => e.stopPropagation()}
-              aria-label={`Llamar a ${driver.nombre} ${driver.apellido}`}
-              title="Llamar"
-              className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-success-500/15 text-success-500 hover:bg-success-500/25"
-            >
-              <PhoneIcon className="h-3.5 w-3.5" />
-            </a>
-          )}
+          <DriverStatusBadge driver={driver} className="shrink-0 !px-2 !py-0.5 !text-[11px]" />
         </div>
-      </div>
-    </GlassCard>
-  </Link>
+      </GlassCard>
+    </Link>
   );
 };
 
-// @container (no breakpoints de viewport): la grilla vive en una columna de 2/3 de
-// pantalla, no en el ancho completo - ver el mismo ajuste en VehiclesPage.
+// @container (no breakpoints de viewport): la grilla vive en una columna que no es el
+// ancho completo, asi que las variantes @sm/@xl miran el ancho real disponible.
 const GroupSection = ({ title, members }) => (
-  <div className="@container flex flex-col gap-4">
-    <h2 className="text-[15px] font-medium text-ink-100">
-      {title}{" "}
-      <span className="text-ink-400">
-        ({members.length} {members.length === 1 ? "chofer" : "choferes"})
-      </span>
+  <div className="@container flex flex-col gap-3">
+    <h2 className="text-[13px] font-medium uppercase tracking-wide text-ink-300">
+      {title} <span className="text-ink-500">({members.length})</span>
     </h2>
-    {members.length === 0 ? (
-      <GlassCard className="text-center text-[14px] text-ink-300">
-        Todavia no hay nadie asignado a este grupo.
-      </GlassCard>
-    ) : (
-      <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @md:grid-cols-3 @xl:grid-cols-4">
-        {members.map((driver) => (
-          <DriverCard key={driver.id} driver={driver} />
-        ))}
-      </div>
-    )}
+    <div className="grid grid-cols-1 gap-3 @sm:grid-cols-2 @xl:grid-cols-3">
+      {members.map((driver) => (
+        <DriverCard key={driver.id} driver={driver} />
+      ))}
+    </div>
   </div>
 );
+
+// ---------------------------------------------------------------------------
+// Vista de tabla
+// ---------------------------------------------------------------------------
+
+const DriverTable = ({ drivers, kmByDriver }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const open = (id) => navigate(`/choferes/${id}`, { state: { backgroundLocation: location } });
+
+  return (
+    <div className="glass-surface overflow-x-auto rounded-2xl">
+      <table className="w-full text-[13px]">
+        <thead>
+          <tr className="text-left text-[11px] font-medium uppercase tracking-wide text-ink-400">
+            <th className="py-3.5 pl-4 pr-2 font-medium">Chofer</th>
+            <th className="px-2 py-3.5 font-medium">Centro</th>
+            <th className="px-2 py-3.5 font-medium">Vehículo</th>
+            <th className="px-2 py-3.5 font-medium">Teléfono</th>
+            <th className="px-2 py-3.5 text-right font-medium">Km mes</th>
+            <th className="py-3.5 pl-2 pr-4 font-medium">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {drivers.map((driver) => {
+            const km = kmByDriver?.get(driver.id);
+            return (
+              <tr
+                key={driver.id}
+                onClick={() => open(driver.id)}
+                className="cursor-pointer border-t border-line/[0.07] transition-colors hover:bg-line/[0.04]"
+              >
+                <td className="py-3 pl-4 pr-2">
+                  <div className="flex items-center gap-3">
+                    <DriverAvatar driver={driver} className="h-9 w-9 text-[12px]" />
+                    <div className="min-w-0 max-w-[190px]">
+                      <Link
+                        to={`/choferes/${driver.id}`}
+                        state={{ backgroundLocation: location }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="block truncate font-medium text-ink-50 hover:text-accent-400"
+                      >
+                        {fullName(driver)}
+                        {driver.cargo !== "CHOFER" && (
+                          <span className="ml-2 rounded-full bg-accent-500/15 px-1.5 py-0.5 text-[10px] font-medium text-accent-400">
+                            {CARGO_LABELS[driver.cargo]}
+                          </span>
+                        )}
+                      </Link>
+                      <span className="block truncate text-[12px] text-ink-400">{driver.correoElectronico}</span>
+                    </div>
+                  </div>
+                </td>
+                <td className="whitespace-nowrap px-2 py-3 text-ink-200">{centroLabel(driver.grupo)}</td>
+                <td className="whitespace-nowrap px-2 py-3 text-ink-100">
+                  {driver.vehiculoAsignado ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <TruckIcon className="h-3.5 w-3.5 text-ink-400" />
+                      {driver.vehiculoAsignado.targa}
+                    </span>
+                  ) : (
+                    <span className="text-ink-400">—</span>
+                  )}
+                </td>
+                <td className="px-2 py-3">
+                  <PhoneLink driver={driver} />
+                </td>
+                <td className="whitespace-nowrap px-2 py-3 text-right tabular-nums text-ink-100">
+                  {km ? fmtKm(km) : "—"}
+                </td>
+                <td className="py-3 pl-2 pr-4">
+                  <DriverStatusBadge driver={driver} />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+// ---------------------------------------------------------------------------
+// Columna derecha
+// ---------------------------------------------------------------------------
+
+// Documentos por vencer / vencidos y choferes sin permiso de ubicacion "todo el
+// tiempo" - mismas reglas que la campanita (computeDriverDocumentAlerts).
+const AttentionPanel = ({ drivers, documents }) => {
+  const location = useLocation();
+  const state = { backgroundLocation: location };
+
+  const { docs, permisos } = useMemo(() => {
+    const now = new Date();
+    const docs = documents
+      ? computeDriverDocumentAlerts(documents, drivers).map((alert) => ({
+          key: alert.id,
+          to: alert.link,
+          state,
+          tone: new Date(alert.date) < now ? "danger" : "warning",
+          title: alert.message,
+        }))
+      : null;
+
+    const permisos = drivers
+      .filter((d) => d.cargo === "CHOFER" && isActive(d) && d.ubicacionPermisoDenegado)
+      .map((d) => ({
+        key: `permiso-${d.id}`,
+        to: `/choferes/${d.id}`,
+        state,
+        tone: "warning",
+        title: fullName(d),
+        detail: 'Sin permiso de ubicación "todo el tiempo"',
+      }));
+
+    return { docs, permisos };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [drivers, documents]);
+
+  const total = (docs?.length ?? 0) + permisos.length;
+
+  return (
+    <PanelShell
+      icon={BellIcon}
+      title="Atención requerida"
+      aside={
+        total > 0 ? (
+          <span className="rounded-full bg-warning-500/15 px-2 py-0.5 text-[12px] font-medium text-warning-500">
+            {total}
+          </span>
+        ) : null
+      }
+    >
+      {docs === null ? (
+        <div className="flex justify-center py-4">
+          <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+        </div>
+      ) : total === 0 ? (
+        <p className="flex items-center gap-2 py-2 text-[13px] text-ink-300">
+          <CheckCircleIcon className="h-5 w-5 text-success-500" />
+          Todo en orden: ningún chofer necesita atención.
+        </p>
+      ) : (
+        <div className="flex max-h-[300px] flex-col gap-4 overflow-y-auto pr-1">
+          <AttentionGroup title="Documentos" items={docs} />
+          <AttentionGroup title="Ubicación" items={permisos} />
+        </div>
+      )}
+    </PanelShell>
+  );
+};
+
+// Cuantas personas hay en cada centro y cuantas estan activas.
+const CenterSummaryPanel = ({ drivers }) => {
+  const centers = [...GRUPO_OPTIONS.map((g) => g.value), null]
+    .map((grupo) => {
+      const members = drivers.filter((d) => (d.grupo ?? null) === grupo);
+      return {
+        label: centroLabel(grupo),
+        total: members.length,
+        activos: members.filter(isActive).length,
+      };
+    })
+    .filter((c) => c.total > 0);
+
+  return (
+    <PanelShell icon={MapPinIcon} title="Resumen por centro">
+      <ul className="flex flex-col gap-2.5">
+        {centers.map((c) => (
+          <li key={c.label} className="rounded-xl border border-line/[0.07] px-3.5 py-2.5">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[13px] font-medium text-ink-50">{c.label}</span>
+              <span className="text-[12px] text-ink-400">
+                {c.total} {c.total === 1 ? "persona" : "personas"}
+              </span>
+            </div>
+            <div className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-line/10">
+              <span className="bg-success-500" style={{ width: `${(c.activos / c.total) * 100}%` }} />
+            </div>
+            <div className="mt-2 flex items-center gap-3 text-[12px] text-ink-300">
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-success-500" />
+                {c.activos} activos
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-1.5 w-1.5 rounded-full bg-ink-400" />
+                {c.total - c.activos} inactivos
+              </span>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </PanelShell>
+  );
+};
 
 const KM_BREAKDOWN_ROWS = [
   { key: "EXTRA_PIAZZA", label: "Extras Piazza", multiplier: 1 },
   { key: "DHL", label: "DHL", multiplier: 2 },
   { key: "AB_SERVICE", label: "AB Service", multiplier: 2 },
 ];
-
-const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
 
 // Desglose de KM del mes por tipo de servicio, con el x2 de DHL/AB Service
 // visible por separado (ver kmMultiplier en dashboardStats.js) en vez de solo
@@ -141,7 +396,7 @@ const DriverKmModal = ({ entry, onClose }) => {
               </span>
             </div>
           ))}
-          <div className="mt-1 flex items-center justify-between rounded-xl bg-accent-500/10 px-3 py-2 text-[13px] font-medium">
+          <div className="mt-1 flex items-center justify-between rounded-xl bg-line/5 px-3 py-2 text-[13px] font-medium">
             <span className="text-ink-50">Total</span>
             <span className="text-ink-50">{fmtKm(entry.km)} km</span>
           </div>
@@ -157,88 +412,49 @@ const DriverKmModal = ({ entry, onClose }) => {
 };
 
 // Top de choferes por KM recorrido este mes (planificado o real, ver
-// computeDriverKmRanking) - misma logica que se usaba antes en el dashboard. Acotado a
-// Piazza + DHL Roma (ver filterToPiazzaYDhlRoma), mismo criterio que el resto de la app.
+// computeDriverKmRanking). Acotado a Piazza + DHL Roma (ver filterToPiazzaYDhlRoma),
+// mismo criterio que el resto de la app.
 const DriverRankingPanel = ({ records }) => {
   const ranking = records ? computeDriverKmRanking(filterToPiazzaYDhlRoma(records), "mes").slice(0, 10) : undefined;
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   return (
-    <GlassCard className="flex flex-col !p-4 lg:max-h-[45vh]">
-      <h2 className="px-1 text-[15px] font-semibold text-ink-50">Ranking de choferes</h2>
-      <p className="mb-3 px-1 text-[12px] text-ink-400">KM recorridos este mes, de mayor a menor.</p>
+    <PanelShell icon={UsersIcon} title="Ranking de choferes">
+      <p className="-mt-1 mb-3 text-[12px] text-ink-400">Km recorridos este mes, de mayor a menor.</p>
 
-      <div className="flex flex-col gap-2 overflow-y-auto">
+      <div className="flex max-h-[360px] flex-col gap-1.5 overflow-y-auto pr-1">
         {ranking === undefined && (
           <div className="flex justify-center py-6">
             <Spinner className="h-5 w-5 border-line/20 border-t-line" />
           </div>
         )}
         {ranking?.length === 0 && (
-          <p className="py-3 text-center text-[13px] text-ink-300">Sin servicios este mes todavia.</p>
+          <p className="py-3 text-center text-[13px] text-ink-300">Sin servicios este mes todavía.</p>
         )}
         {ranking?.map((entry, idx) => (
           <button
             key={entry.id}
             type="button"
             onClick={() => setSelectedEntry(entry)}
-            className="flex items-center gap-3 rounded-xl glass-surface-sm px-3 py-2 text-left text-[13px] transition-colors hover:bg-line/[0.08]"
+            className="flex items-center gap-3 rounded-xl border border-line/[0.07] px-3 py-2 text-left text-[13px] transition-colors hover:bg-line/[0.05]"
           >
             <span className="w-4 shrink-0 text-center text-[12px] font-medium text-ink-400">{idx + 1}</span>
             <span className="min-w-0 flex-1 truncate text-ink-50">{entry.nombre}</span>
-            <span className="shrink-0 text-[12px] text-ink-300">
-              {Math.round(entry.km).toLocaleString("es-AR")} km
-            </span>
+            <span className="shrink-0 text-[12px] text-ink-300">{fmtKm(entry.km)} km</span>
           </button>
         ))}
       </div>
 
       {selectedEntry && <DriverKmModal entry={selectedEntry} onClose={() => setSelectedEntry(null)} />}
-    </GlassCard>
+    </PanelShell>
   );
 };
 
-// Documentos de choferes por vencer (naranja) o ya vencidos (rojo) - misma logica
-// que alimenta la campanita de notificaciones (computeDriverDocumentAlerts).
-const DriverDocumentAlertsPanel = ({ users, documents }) => {
-  const alerts = users && documents ? computeDriverDocumentAlerts(documents, users) : undefined;
+// ---------------------------------------------------------------------------
+// Pagina
+// ---------------------------------------------------------------------------
 
-  return (
-    <GlassCard className="flex flex-col !p-4 lg:max-h-[45vh]">
-      <h2 className="px-1 text-[15px] font-semibold text-ink-50">Documentos</h2>
-      <p className="mb-3 px-1 text-[12px] text-ink-400">Choferes con documentos por vencer o vencidos.</p>
-
-      <div className="flex flex-col gap-2 overflow-y-auto">
-        {alerts === undefined && (
-          <div className="flex justify-center py-6">
-            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
-          </div>
-        )}
-        {alerts?.length === 0 && (
-          <p className="py-3 text-center text-[13px] text-ink-300">Ningun documento por vencer.</p>
-        )}
-        {alerts?.map((alert) => {
-          const vencido = new Date(alert.date) < new Date();
-          return (
-            <Link
-              key={alert.id}
-              to={alert.link}
-              className="flex items-center gap-2.5 rounded-xl glass-surface-sm px-3 py-2.5 text-[13px] transition-colors hover:bg-line/[0.08]"
-            >
-              <span
-                className={clsx(
-                  "h-2.5 w-2.5 shrink-0 rounded-full",
-                  vencido ? "bg-danger-500" : "bg-status-rischedulato"
-                )}
-              />
-              <p className="min-w-0 flex-1 truncate text-ink-50">{alert.message}</p>
-            </Link>
-          );
-        })}
-      </div>
-    </GlassCard>
-  );
-};
+const todosOption = (label, options) => [{ value: "", label }, ...options];
 
 export const DriversPage = () => {
   const location = useLocation();
@@ -252,6 +468,29 @@ export const DriversPage = () => {
   const [documents, setDocuments] = useState(null);
   const [error, setError] = useState("");
 
+  const [view, setView] = useState(initialView);
+  const [centro, setCentro] = useState("");
+  const [area, setArea] = useState("");
+  const [estado, setEstado] = useState("");
+  const [sort, setSort] = useState("nombre");
+  const [page, setPage] = useState(1);
+
+  // La barra superior y la de la pagina comparten el mismo texto (ver listSearchStore).
+  const query = useListSearch();
+  const setQuery = setListSearch;
+
+  // Al salir de Choferes se limpia la busqueda.
+  useEffect(() => () => setListSearch(""), []);
+
+  const changeView = (next) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      // sin almacenamiento disponible: la vista solo dura esta sesion
+    }
+  };
+
   useEffect(() => {
     if (!isPrivileged) return;
     listUsersRequest()
@@ -259,9 +498,9 @@ export const DriversPage = () => {
       .catch((err) => setError(parseApiError(err).message));
   }, [isPrivileged, driversVersion]);
 
-  // Depende tambien de recordsVersion: el ranking de km sale de los registros del mes,
-  // no de los choferes - si se edita un km desde el detalle de un registro, esto tiene
-  // que reflejarse aca tambien.
+  // Depende tambien de recordsVersion: el ranking y los km por chofer salen de los
+  // registros del mes, no de los choferes - si se edita un km desde el detalle de un
+  // registro, esto tiene que reflejarse aca tambien.
   useEffect(() => {
     if (!isPrivileged) return;
     const now = new Date();
@@ -277,21 +516,86 @@ export const DriversPage = () => {
       .catch((err) => setError(parseApiError(err).message));
   }, [isPrivileged]);
 
+  // Km del mes por chofer (real si ya se cargo, si no el planificado; sin anulados).
+  const kmByDriver = useMemo(() => {
+    if (!monthlyRecords) return null;
+    const totals = new Map();
+    monthlyRecords.forEach((r) => {
+      if (r.estado === "ANNULLATO" || !r.driver?.id) return;
+      totals.set(r.driver.id, (totals.get(r.driver.id) ?? 0) + (r.kilometrosReales ?? r.kilometros ?? 0));
+    });
+    return totals;
+  }, [monthlyRecords]);
+
+  const filtered = useMemo(() => {
+    if (!drivers) return [];
+    const needle = query.trim().toLowerCase();
+
+    const list = drivers.filter((d) => {
+      if (centro && (centro === "SIN_GRUPO" ? d.grupo : d.grupo !== centro)) return false;
+      if (area && d.area !== area) return false;
+      if (estado === "ACTIVO" && !isActive(d)) return false;
+      if (estado === "INACTIVO" && isActive(d)) return false;
+      if (!needle) return true;
+      const haystack = [
+        fullName(d),
+        d.correoElectronico,
+        d.numeroCelular,
+        centroLabel(d.grupo),
+        areaLabel(d.area),
+        d.vehiculoAsignado?.targa,
+      ]
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(needle);
+    });
+
+    // Los activos van primero; despues, el orden elegido.
+    return [...list].sort((a, b) => {
+      if (isActive(a) !== isActive(b)) return isActive(a) ? -1 : 1;
+      if (sort === "km") return (kmByDriver?.get(b.id) ?? 0) - (kmByDriver?.get(a.id) ?? 0);
+      if (sort === "centro") {
+        return centroLabel(a.grupo).localeCompare(centroLabel(b.grupo), "es") || fullName(a).localeCompare(fullName(b), "es");
+      }
+      return fullName(a).localeCompare(fullName(b), "es");
+    });
+  }, [drivers, query, centro, area, estado, sort, kmByDriver]);
+
+  // Tramo visible: la tabla muestra 10 por pagina, las tarjetas 9 (grilla de 3 columnas).
+  const pageSize = view === "tabla" ? PAGE_SIZE_TABLE : PAGE_SIZE_CARDS;
+  const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const currentPage = Math.min(page, pageCount);
+  const pageItems = filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+  // Al cambiar busqueda, filtros, orden o vista se vuelve a la primera pagina.
+  useEffect(() => {
+    setPage(1);
+  }, [query, centro, area, estado, sort, view]);
+
   if (!isPrivileged) return <Navigate to="/" replace />;
 
-  const activeUsers = drivers?.filter((u) => u.estado === "ACTIVO") ?? [];
-  const inactiveUsers = drivers?.filter((u) => u.estado !== "ACTIVO") ?? [];
-  const unassignedUsers = activeUsers.filter((u) => !u.grupo);
+  const hasFilters = Boolean(query.trim() || centro || area || estado);
+  const total = drivers?.length ?? 0;
+  const activos = drivers?.filter(isActive).length ?? 0;
+  const compartiendo = drivers?.filter((d) => isActive(d) && d.compartirUbicacion).length ?? 0;
+  const docAlerts = drivers && documents ? computeDriverDocumentAlerts(documents, drivers).length : null;
+  const pct = (n) => (total > 0 ? `${Math.round((n / total) * 100)}% del equipo` : "");
+
+  const groups = [
+    ...GRUPO_OPTIONS.map((g) => ({ title: g.label, members: pageItems.filter((d) => isActive(d) && d.grupo === g.value) })),
+    { title: "Sin grupo", members: pageItems.filter((d) => isActive(d) && !d.grupo) },
+    { title: "Inactivos", members: pageItems.filter((d) => !isActive(d)) },
+  ].filter((g) => g.members.length > 0);
 
   return (
-    <div className="flex flex-col gap-8">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+    <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-semibold text-ink-50">Choferes</h1>
-          <p className="mt-1 text-[14px] text-ink-300">Equipo de choferes de Gamonal Trasporti.</p>
+          <h1 className="text-[28px] font-semibold tracking-tight text-ink-50">Choferes</h1>
+          <p className="mt-1 text-[14px] text-ink-300">Gestiona y monitorea a tu equipo en tiempo real.</p>
         </div>
         <Link to="/choferes/new" state={{ backgroundLocation: location }}>
-          <Button className="w-auto px-5">Nuevo chofer</Button>
+          <Button className="!w-auto px-5">+ Nuevo chofer</Button>
         </Link>
       </div>
 
@@ -300,35 +604,125 @@ export const DriversPage = () => {
       {drivers === null && !error && <PageLoader />}
 
       {drivers?.length === 0 && (
-        <GlassCard className="text-center text-[14px] text-ink-300">
-          Todavia no hay choferes cargados.
-        </GlassCard>
+        <GlassCard className="text-center text-[14px] text-ink-300">Todavía no hay choferes cargados.</GlassCard>
       )}
 
       {drivers !== null && drivers.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-start">
-          <div className="flex flex-col gap-8">
-            {GRUPO_OPTIONS.map((grupo) => (
-              <GroupSection
-                key={grupo.value}
-                title={grupo.label.toUpperCase()}
-                members={activeUsers.filter((u) => u.grupo === grupo.value)}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_310px] xl:items-start">
+          <div className="flex min-w-0 flex-col gap-5">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              <StatTile icon={UsersIcon} value={total} label="Total del equipo" />
+              <StatTile icon={CheckCircleIcon} tone="success" value={activos} label="Activos" detail={pct(activos)} />
+              <StatTile
+                icon={MapPinIcon}
+                value={compartiendo}
+                label="Compartiendo ubicación"
+                detail={activos > 0 ? `de ${activos} activos` : ""}
               />
-            ))}
+              <StatTile
+                icon={AlertTriangleIcon}
+                tone={docAlerts > 0 ? "warning" : "neutral"}
+                value={docAlerts ?? "…"}
+                label="Documentos por vencer"
+                detail="Próximos 30 días"
+              />
+            </div>
 
-            {unassignedUsers.length > 0 && (
-              <GroupSection title="SIN GRUPO ASIGNAR" members={unassignedUsers} />
+            <div className="glass-surface grid grid-cols-2 gap-3 rounded-2xl p-4 md:grid-cols-4">
+              <TextField
+                id="drivers-search"
+                icon={SearchIcon}
+                type="search"
+                placeholder="Buscar chofer, correo, teléfono..."
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                className="col-span-2 md:col-span-4"
+              />
+              <Select
+                id="drivers-centro"
+                label="Centro"
+                value={centro}
+                onChange={(e) => setCentro(e.target.value)}
+                options={todosOption("Todos", [
+                  ...GRUPO_OPTIONS.map((g) => ({ value: g.value, label: g.label })),
+                  { value: "SIN_GRUPO", label: "Sin grupo" },
+                ])}
+              />
+              <Select
+                id="drivers-area"
+                label="Área"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                options={todosOption("Todas", AREA_OPTIONS)}
+              />
+              <Select
+                id="drivers-estado"
+                label="Estado"
+                value={estado}
+                onChange={(e) => setEstado(e.target.value)}
+                options={todosOption("Todos", ESTADO_OPTIONS)}
+              />
+              <Select
+                id="drivers-sort"
+                label="Ordenar por"
+                value={sort}
+                onChange={(e) => setSort(e.target.value)}
+                options={SORT_OPTIONS}
+              />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-[13px] text-ink-400">
+                {hasFilters ? `${filtered.length} de ${total} personas coinciden` : `${total} personas en el equipo`}
+              </p>
+              <SegmentedControl options={VIEW_OPTIONS} value={view} onChange={changeView} />
+            </div>
+
+            {filtered.length === 0 ? (
+              <GlassCard className="text-center text-[14px] text-ink-300">
+                Ningún chofer coincide con los filtros.
+              </GlassCard>
+            ) : view === "tabla" ? (
+              <DriverTable drivers={pageItems} kmByDriver={kmByDriver} />
+            ) : (
+              <div className="flex flex-col gap-7">
+                {groups.map((g) => (
+                  <GroupSection key={g.title} title={g.title} members={g.members} />
+                ))}
+              </div>
             )}
 
-            {inactiveUsers.length > 0 && (
-              <GroupSection title="INACTIVOS" members={inactiveUsers} />
+            {filtered.length > 0 && (
+              <Pagination
+                page={currentPage}
+                pageCount={pageCount}
+                pageSize={pageSize}
+                total={filtered.length}
+                noun="personas"
+                onChange={setPage}
+              />
+            )}
+            {hasFilters && filtered.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCentro("");
+                  setArea("");
+                  setEstado("");
+                  setQuery("");
+                }}
+                className="self-start text-[13px] font-medium text-accent-400 hover:text-accent-300"
+              >
+                Limpiar filtros
+              </button>
             )}
           </div>
 
-          <div className="flex flex-col gap-4">
+          <aside className="flex flex-col gap-5 xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto xl:pr-1">
+            <AttentionPanel drivers={drivers} documents={documents} />
+            <CenterSummaryPanel drivers={drivers} />
             <DriverRankingPanel records={monthlyRecords} />
-            <DriverDocumentAlertsPanel users={drivers} documents={documents} />
-          </div>
+          </aside>
         </div>
       )}
     </div>

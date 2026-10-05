@@ -10,17 +10,18 @@ import {
   AlertTriangleIcon,
   BellIcon,
   CheckCircleIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   MapPinIcon,
   RouteIcon,
   SearchIcon,
   TruckIcon,
 } from "../../components/ui/icons";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { Pagination } from "../../components/ui/Pagination";
+import { AttentionGroup, PanelShell } from "../../components/ui/PanelShell";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
+import { StatTile } from "../../components/ui/StatTile";
 import { TextField } from "../../components/ui/TextField";
 import { VehicleStatusBadge } from "../../components/ui/VehicleStatusBadge";
 import { useAuth } from "../../context/AuthContext";
@@ -37,7 +38,7 @@ import {
 import { computeFleetKmUsage, computeVehicleDocumentAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { listVehiclesRequest, syncVehiclesFromVelocityFleetRequest } from "../../lib/vehicles.api";
-import { setVehicleSearch, useVehicleSearch } from "../../lib/vehicleSearchStore";
+import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 
 const areaLabel = (value) => VEHICLE_AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 const centroLabel = (grupo) => (grupo ? GRUPO_LABELS[grupo] ?? grupo : "Sin grupo");
@@ -84,28 +85,6 @@ const VehicleThumb = ({ vehicle, className }) =>
 // ---------------------------------------------------------------------------
 // Indicadores
 // ---------------------------------------------------------------------------
-
-// Color solo cuando hay algo que decir: naranja/rojo apagados si el conteo es 0.
-const KpiTile = ({ icon: Icon, value, label, detail, tone = "neutral" }) => (
-  <div className="glass-surface flex items-center gap-3 rounded-2xl p-4">
-    <span
-      className={clsx(
-        "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
-        tone === "success" && "bg-success-500/15 text-success-500 ring-1 ring-success-500/30",
-        tone === "warning" && "bg-warning-500/15 text-warning-500 ring-1 ring-warning-500/30",
-        tone === "danger" && "bg-danger-500/15 text-danger-500 ring-1 ring-danger-500/30",
-        tone === "neutral" && "bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/30"
-      )}
-    >
-      <Icon className="h-5 w-5" />
-    </span>
-    <div className="min-w-0">
-      <div className="text-[26px] font-semibold leading-none tracking-tight text-ink-50">{value}</div>
-      <div className="mt-1 text-[13px] leading-tight text-ink-200">{label}</div>
-      {detail && <div className="mt-0.5 text-[12px] text-ink-400">{detail}</div>}
-    </div>
-  </div>
-);
 
 // ---------------------------------------------------------------------------
 // Vista de tarjetas (agrupada por centro, como antes)
@@ -214,49 +193,6 @@ const VehicleTable = ({ vehicles }) => {
 // Columna derecha
 // ---------------------------------------------------------------------------
 
-const PanelShell = ({ icon: Icon, title, aside, children, className }) => (
-  <section className={clsx("glass-surface rounded-2xl p-5", className)}>
-    <header className="mb-3 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-2.5">
-        <Icon className="h-5 w-5 text-ink-300" />
-        <h2 className="text-[15px] font-semibold text-ink-50">{title}</h2>
-      </div>
-      {aside}
-    </header>
-    {children}
-  </section>
-);
-
-const TONE_DOT = { danger: "bg-danger-500", warning: "bg-warning-500" };
-
-const AttentionGroup = ({ title, count, items }) =>
-  items.length === 0 ? null : (
-    <div>
-      <h3 className="mb-1.5 flex items-center gap-2 text-[12px] font-medium uppercase tracking-wide text-ink-400">
-        {title}
-        <span className="rounded-full bg-line/10 px-1.5 text-[11px] text-ink-200">{count}</span>
-      </h3>
-      <ul className="flex flex-col gap-1.5">
-        {items.map((item) => (
-          <li key={item.key}>
-            <Link
-              to={item.to}
-              state={item.state}
-              className="flex items-center gap-2.5 rounded-xl border border-line/[0.07] px-3 py-2.5 text-[13px] transition-colors hover:bg-line/[0.05]"
-            >
-              <span className={clsx("h-2 w-2 shrink-0 rounded-full", TONE_DOT[item.tone])} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-ink-50">{item.title}</span>
-                {item.detail && <span className="block truncate text-[12px] text-ink-400">{item.detail}</span>}
-              </span>
-              <ChevronRightIcon className="h-4 w-4 shrink-0 text-ink-500" />
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-
 // Documentos por vencer (poliza / revision tecnica), Tagliando proximo o urgente y
 // vehiculos que no estan disponibles - todo con lo que ya trae la lista de vehiculos.
 const AttentionPanel = ({ vehicles }) => {
@@ -328,9 +264,9 @@ const AttentionPanel = ({ vehicles }) => {
         </p>
       ) : (
         <div className="flex max-h-[300px] flex-col gap-4 overflow-y-auto pr-1">
-          <AttentionGroup title="Documentos" count={documents.length} items={documents} />
-          <AttentionGroup title="Tagliando" count={tagliando.length} items={tagliando} />
-          <AttentionGroup title="Estado de la flota" count={unavailable.length} items={unavailable} />
+          <AttentionGroup title="Documentos" items={documents} />
+          <AttentionGroup title="Tagliando" items={tagliando} />
+          <AttentionGroup title="Estado de la flota" items={unavailable} />
         </div>
       )}
     </PanelShell>
@@ -519,60 +455,6 @@ const FleetRankingPanel = ({ records }) => {
 const PAGE_SIZE_TABLE = 10;
 const PAGE_SIZE_CARDS = 9;
 
-// Numeros de pagina a mostrar: todos si son pocos; si no, primera, ultima y las
-// vecinas de la actual con "…" en los saltos.
-const pageNumbers = (current, count) => {
-  if (count <= 7) return Array.from({ length: count }, (_, i) => i + 1);
-  const pages = new Set([1, count, current - 1, current, current + 1]);
-  const sorted = [...pages].filter((p) => p >= 1 && p <= count).sort((a, b) => a - b);
-  return sorted.flatMap((p, i) => (i > 0 && p - sorted[i - 1] > 1 ? ["…", p] : [p]));
-};
-
-const Pagination = ({ page, pageCount, from, to, total, onChange }) => {
-  const arrow =
-    "flex h-8 w-8 items-center justify-center rounded-lg border border-line/10 text-ink-200 transition-colors enabled:hover:bg-line/10 disabled:opacity-40";
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <p className="text-[13px] text-ink-400">
-        Mostrando {from} - {to} de {total} vehículos
-      </p>
-      {pageCount > 1 && (
-        <nav aria-label="Paginación" className="flex items-center gap-1.5">
-          <button type="button" className={arrow} disabled={page === 1} onClick={() => onChange(page - 1)} aria-label="Página anterior">
-            <ChevronLeftIcon className="h-4 w-4" />
-          </button>
-          {pageNumbers(page, pageCount).map((p, i) =>
-            p === "…" ? (
-              <span key={`gap-${i}`} className="px-1 text-ink-500">
-                …
-              </span>
-            ) : (
-              <button
-                key={p}
-                type="button"
-                onClick={() => onChange(p)}
-                aria-current={p === page ? "page" : undefined}
-                className={clsx(
-                  "h-8 min-w-8 rounded-lg px-2 text-[13px] font-medium transition-colors",
-                  p === page
-                    ? "bg-accent-500 text-white"
-                    : "border border-line/10 text-ink-200 hover:bg-line/10"
-                )}
-              >
-                {p}
-              </button>
-            )
-          )}
-          <button type="button" className={arrow} disabled={page === pageCount} onClick={() => onChange(page + 1)} aria-label="Página siguiente">
-            <ChevronRightIcon className="h-4 w-4" />
-          </button>
-        </nav>
-      )}
-    </div>
-  );
-};
-
 const todosOption = (label, options) => [{ value: "", label }, ...options];
 
 export const VehiclesPage = () => {
@@ -595,12 +477,12 @@ export const VehiclesPage = () => {
   const [sort, setSort] = useState("targa");
   const [page, setPage] = useState(1);
 
-  // La barra superior y la de la pagina comparten el mismo texto (ver vehicleSearchStore).
-  const query = useVehicleSearch();
-  const setQuery = setVehicleSearch;
+  // La barra superior y la de la pagina comparten el mismo texto (ver listSearchStore).
+  const query = useListSearch();
+  const setQuery = setListSearch;
 
   // Al salir de Vehiculos se limpia la busqueda.
-  useEffect(() => () => setVehicleSearch(""), []);
+  useEffect(() => () => setListSearch(""), []);
 
   const changeView = (next) => {
     setView(next);
@@ -733,22 +615,22 @@ export const VehiclesPage = () => {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_310px] xl:items-start">
           <div className="flex min-w-0 flex-col gap-5">
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-              <KpiTile icon={TruckIcon} value={total} label="Total de vehículos" />
-              <KpiTile
+              <StatTile icon={TruckIcon} value={total} label="Total de vehículos" />
+              <StatTile
                 icon={CheckCircleIcon}
                 tone="success"
                 value={disponibles}
                 label="Disponibles"
                 detail={pct(disponibles)}
               />
-              <KpiTile
+              <StatTile
                 icon={AlertTriangleIcon}
                 tone={mantenimiento > 0 ? "warning" : "neutral"}
                 value={mantenimiento}
                 label="En mantenimiento"
                 detail={pct(mantenimiento)}
               />
-              <KpiTile
+              <StatTile
                 icon={AlertCircleIcon}
                 tone={fuera > 0 ? "danger" : "neutral"}
                 value={fuera}
@@ -824,9 +706,9 @@ export const VehiclesPage = () => {
               <Pagination
                 page={currentPage}
                 pageCount={pageCount}
-                from={(currentPage - 1) * pageSize + 1}
-                to={Math.min(currentPage * pageSize, filtered.length)}
+                pageSize={pageSize}
                 total={filtered.length}
+                noun="vehículos"
                 onChange={setPage}
               />
             )}

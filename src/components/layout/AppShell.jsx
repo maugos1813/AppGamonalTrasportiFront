@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
 import { CARGO_LABELS } from "../../lib/constants";
-import { setVehicleSearch, useVehicleSearch } from "../../lib/vehicleSearchStore";
+import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationsProvider } from "../../context/NotificationsContext";
 import { useTheme } from "../../context/ThemeContext";
@@ -261,6 +261,12 @@ const DRAWER_NAV_ITEMS = [
   { to: "/mecanica", label: "Mecánica", icon: WrenchIcon },
 ];
 
+// Placeholder de la barra superior en las paginas de lista donde filtra en vivo.
+const LIST_SEARCH_PLACEHOLDERS = {
+  "/vehiculos": "Buscar vehículo, matrícula, conductor o centro...",
+  "/choferes": "Buscar chofer, correo, teléfono o centro...",
+};
+
 export const AppShell = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -269,21 +275,22 @@ export const AppShell = () => {
   const [searchText, setSearchText] = useState("");
   const navigate = useNavigate();
   const location = useLocation();
-  const vehicleSearch = useVehicleSearch();
+  const listSearch = useListSearch();
 
-  // Buscador contextual: dentro de Vehiculos filtra la flota en vivo (comparte el texto
-  // con la barra de esa pagina); en el resto de la app reutiliza el buscador de
+  // Buscador contextual: dentro de Vehiculos y Choferes filtra la lista en vivo (comparte
+  // el texto con la barra de esa pagina); en el resto de la app reutiliza el buscador de
   // Registros (codigo/cliente/chofer) y lleva a /records?q=... con el texto cargado.
-  const onVehicles = location.pathname === "/vehiculos";
-  const searchValue = onVehicles ? vehicleSearch : searchText;
+  const listPlaceholder = LIST_SEARCH_PLACEHOLDERS[location.pathname];
+  const onList = Boolean(listPlaceholder);
+  const searchValue = onList ? listSearch : searchText;
   const handleSearchChange = (e) => {
     const value = e.target.value;
-    if (onVehicles) setVehicleSearch(value);
+    if (onList) setListSearch(value);
     else setSearchText(value);
   };
   const handleSearch = (e) => {
     e.preventDefault();
-    if (onVehicles) return;
+    if (onList) return;
     const query = searchText.trim();
     if (query.length < 2) return;
     navigate(`/records?q=${encodeURIComponent(query)}`);
@@ -308,12 +315,8 @@ export const AppShell = () => {
               type="search"
               value={searchValue}
               onChange={handleSearchChange}
-              placeholder={
-                onVehicles
-                  ? "Buscar vehículo, matrícula, conductor o centro..."
-                  : "Buscar servicio, cliente o chofer..."
-              }
-              aria-label={onVehicles ? "Buscar vehículo" : "Buscar servicio, cliente o chofer"}
+              placeholder={listPlaceholder ?? "Buscar servicio, cliente o chofer..."}
+              aria-label={listPlaceholder ?? "Buscar servicio, cliente o chofer"}
               className="glass-input w-full rounded-xl py-2.5 pl-11 pr-4 text-[14px] text-ink-50"
             />
           </form>
