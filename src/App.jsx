@@ -111,7 +111,7 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/resumen" element={<DailySummaryPage />} />
               <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/records" element={<Navigate to="/records/extras-piazza" replace />} />
+              <Route path="/records" element={<RecordsListPage />} />
               <Route path="/records/extras-piazza" element={<RecordsListPage section="extras-piazza" />} />
               <Route path="/records/extras-piazza/new" element={<NewRecordPage />} />
               <Route path="/records/dhl-ab-service" element={<RecordsListPage section="dhl-ab-service" />} />

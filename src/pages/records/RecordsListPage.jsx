@@ -1,10 +1,24 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, NavLink, Navigate, useLocation, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
+import { AreaBadge } from "../../components/records/AreaBadge";
 import { ExportRecordsModal } from "../../components/records/ExportRecordsModal";
+import {
+  BarsIcon,
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ClipboardListIcon,
+  ClockIcon,
+  DownloadIcon,
+  PlusIcon,
+  RefreshIcon,
+  SearchIcon,
+} from "../../components/ui/icons";
+import { MonthPicker } from "../../components/ui/MonthPicker";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { PanelShell } from "../../components/ui/PanelShell";
 import { Select } from "../../components/ui/Select";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Spinner } from "../../components/ui/Spinner";
@@ -19,9 +33,9 @@ import {
   RECORD_STATUS_OPTIONS,
   TERMINADOS_STATUSES,
 } from "../../lib/constants";
-import { isDhlRomaRecord } from "../../lib/dashboardStats";
 import { formatDate, formatDateTime, formatTimeRemaining } from "../../lib/format";
 import { scopedRecordsSections } from "../../lib/permissions";
+import { AREA_ALL, AREAS_BY_KEY, RECORD_AREAS, allowedAreaKeys, classifyRecord } from "../../lib/recordAreas";
 import {
   listPendingRecordsRequest,
   listRecordsByDayRequest,
@@ -33,39 +47,6 @@ import {
 } from "../../lib/records.api";
 import { getAppsheetSyncStatusRequest, runAppsheetSyncRequest } from "../../lib/sync.api";
 
-const SyncIcon = (props) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-    <path d="M21 3v5h-5" />
-    <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-    <path d="M3 21v-5h5" />
-  </svg>
-);
-
-const DownloadIcon = (props) => (
-  <svg
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="1.8"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    {...props}
-  >
-    <path d="M12 3v13" />
-    <path d="M7 11l5 5 5-5" />
-    <path d="M4 21h16" />
-  </svg>
-);
-
 const SYNC_ERROR_PREVIEW = 5;
 
 const TAB_OPTIONS = [
@@ -76,51 +57,6 @@ const TAB_OPTIONS = [
 const TAB_STATUSES = {
   en_proceso: EN_PROCESO_STATUSES,
   terminados: TERMINADOS_STATUSES,
-};
-
-// "Extras Piazza" es lo unico que existia hasta ahora: los registros viejos no
-// tienen spedizzione cargada, asi que se tratan como Extras Piazza por defecto.
-// "DHL - AB Service" agrupa ambos spedizzione; el alta desde esta seccion crea
-// siempre servicios DHL (AB_SERVICE por ahora solo llega via sincronizacion externa).
-// "Extras Stefania" la administra el mismo ADMIN de DHL (ver ADMIN_AREA_RECORDS_SECTION).
-// Las 3 quedan definidas igual (rutas /new y edicion siguen andando si se entra por
-// URL directa), pero SECTION_OPTIONS de mas abajo solo ofrece navegar a "extras-piazza"
-// y "dhl-ab-service" (ahora acotada a DHL Roma) - pedido explicito: Registros solo
-// muestra Extras Piazza Milano/Roma + DHL Roma, ocultando DHL Milano/AB Service/Extras
-// Stefania para cualquiera que entre (OWNER, y tambien el ADMIN de area DHL).
-const SECTIONS = {
-  "extras-piazza": {
-    label: "Extras Piazza",
-    matchesSpedizzione: (s) => s === "EXTRA_PIAZZA" || s == null,
-    allowCreate: true,
-    newPath: "/records/extras-piazza/new",
-  },
-  "dhl-ab-service": {
-    label: "DHL Roma",
-    matchesSpedizzione: (s) => s === "DHL",
-    allowCreate: true,
-    newPath: "/records/dhl-ab-service/new",
-  },
-  "extras-stefania": {
-    label: "Extras Stefania",
-    matchesSpedizzione: (s) => s === "EXTRAS_STEFANIA",
-    allowCreate: true,
-    newPath: "/records/extras-stefania/new",
-  },
-};
-const VISIBLE_SECTION_KEYS = ["extras-piazza", "dhl-ab-service"];
-const SECTION_OPTIONS = VISIBLE_SECTION_KEYS.map((value) => ({ value, label: SECTIONS[value].label }));
-
-// Switch Milano/Roma dentro de cada seccion (ver extrasPiazzaZona en el registro).
-// Extras Stefania no tiene, no opera por zona. "dhl-ab-service" quedo acotada a un
-// solo valor (Roma) a proposito - ver comentario de SECTIONS arriba - asi que no
-// necesita switch, matchesZona igual exige "ROMA" con esta unica opcion.
-const ZONA_OPTIONS_BY_SECTION = {
-  "extras-piazza": [
-    { value: "MILANO", label: "Milano" },
-    { value: "ROMA", label: "Roma" },
-  ],
-  "dhl-ab-service": [{ value: "ROMA", label: "Roma" }],
 };
 
 // El backend arma los rangos /:year/:month/:day en UTC (buildDateRange). El resumen
@@ -144,11 +80,22 @@ const dayLabel = (value) =>
     timeZone: "UTC",
   });
 
+// "Hoy, 30 de septiembre de 2026" / "Ayer, ..." / "29 de septiembre de 2026".
+const longDayLabel = (value) => {
+  const text = new Date(value).toLocaleDateString("es-ES", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const key = dayKey(value);
+  if (key === dayKey(new Date())) return `Hoy, ${text}`;
+  if (key === dayKey(new Date(Date.now() - 86400000))) return `Ayer, ${text}`;
+  return text;
+};
+
 const driverName = (record) =>
   record.driver ? `${record.driver.nombre} ${record.driver.apellido}` : "Sin chofer asignado";
-
-const isDhlAb = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
-const isExtrasStefania = (record) => record.spedizzione === "EXTRAS_STEFANIA";
 
 const fmtKm = (km) => Math.round(km).toLocaleString("es-AR");
 
@@ -184,33 +131,6 @@ const groupSummaryByDay = (list) => {
 const shiftMonth = ({ year, month }, delta) => {
   const d = new Date(Date.UTC(year, month - 1 + delta, 1));
   return { year: d.getUTCFullYear(), month: d.getUTCMonth() + 1 };
-};
-
-// Igual al SegmentedControl visualmente, pero enrutado (NavLink) en vez de
-// controlado por estado, para que la seccion quede reflejada en la URL.
-// allowedSections: si el ADMIN esta acotado a mas de una seccion (ej. DHL: DHL - AB
-// Service + Extras Stefania), solo se muestran esas, nunca las que no puede ver.
-const SectionTabs = ({ allowedSections }) => {
-  const options = allowedSections
-    ? SECTION_OPTIONS.filter((opt) => allowedSections.includes(opt.value))
-    : SECTION_OPTIONS;
-  return (
-  <div className="inline-flex items-center gap-1 rounded-full glass-surface-sm p-1">
-    {options.map((opt) => (
-      <NavLink
-        key={opt.value}
-        to={`/records/${opt.value}`}
-        className={({ isActive }) =>
-          `rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${
-            isActive ? "bg-line/15 text-ink-50" : "text-ink-300 hover:text-ink-50"
-          }`
-        }
-      >
-        {opt.label}
-      </NavLink>
-    ))}
-  </div>
-  );
 };
 
 const ChevronIcon = ({ open }) => (
@@ -267,59 +187,70 @@ const RecordCard = ({ record }) => {
   );
 };
 
-const ROW_COLUMN_CLASSES = {
-  chofer: "w-32 shrink-0 truncate",
-  vehiculo: "w-28 shrink-0 truncate",
-  estado: "w-24 shrink-0",
-  eta: "w-56 shrink-0 truncate",
-  km: "w-16 shrink-0 text-right",
-  destino: "min-w-0 flex-1 truncate",
-  aplicativo: "w-24 shrink-0 truncate text-right",
-};
+// Columnas de la tabla de servicios: Servicio (area + codigo) | Destino / cliente |
+// Vehiculo | Conductor | Estado | ETA. Misma grilla en el encabezado y en cada fila.
+const ROW_GRID =
+  "grid min-w-[780px] grid-cols-[minmax(150px,1.1fr)_minmax(120px,1.3fr)_100px_minmax(100px,0.9fr)_96px_minmax(110px,1fr)] items-center gap-3 px-4";
 
 const CompactRowHeader = () => (
-  <div className="flex items-center gap-3 px-4 py-1.5 text-[10px] font-medium uppercase tracking-wide text-ink-500">
-    <span className={ROW_COLUMN_CLASSES.chofer}>Chofer</span>
-    <span className={ROW_COLUMN_CLASSES.vehiculo}>Vehiculo</span>
-    <span className={ROW_COLUMN_CLASSES.estado}>Estado</span>
-    <span className={ROW_COLUMN_CLASSES.eta}>ETA / restante</span>
-    <span className={ROW_COLUMN_CLASSES.km}>KM</span>
-    <span className={ROW_COLUMN_CLASSES.destino}>Destino</span>
-    <span className={ROW_COLUMN_CLASSES.aplicativo}>Aplicativo</span>
+  <div className={`${ROW_GRID} py-2 text-[11px] font-medium uppercase tracking-wide text-ink-500`}>
+    <span>Servicio</span>
+    <span>Destino / cliente</span>
+    <span>Vehiculo</span>
+    <span>Conductor</span>
+    <span>Estado</span>
+    <span>ETA / restante</span>
   </div>
 );
 
-// Fila compacta (50px) para escanear muchos servicios de un mismo dia de un vistazo.
+// Fila de un servicio: el area (badge + nombre), el codigo, a donde va y con que cliente/km,
+// vehiculo, conductor, estado y cuanto falta. Abre el detalle como overlay.
 const RecordRow = ({ record }) => {
   const location = useLocation();
+  const area = AREAS_BY_KEY[classifyRecord(record)];
   return (
-  <Link
-    to={`/records/${record.id}`}
-    state={{ backgroundLocation: location }}
-    className="flex h-[50px] items-center gap-3 rounded-xl px-4 text-[12px] text-ink-200 transition-colors hover:bg-line/[0.08]"
-  >
-    <span className={ROW_COLUMN_CLASSES.chofer} title={driverName(record)}>
-      {driverName(record)}
-    </span>
-    <span className={ROW_COLUMN_CLASSES.vehiculo} title={record.vehicle?.targa}>
-      {record.vehicle?.targa ?? "-"}
-    </span>
-    <span className={ROW_COLUMN_CLASSES.estado}>
-      <StatusBadge status={record.estado} className="px-2 py-0.5 text-[11px]" />
-    </span>
-    <span className={ROW_COLUMN_CLASSES.eta} title={formatDate(record.eta)}>
-      {/* "Vencido hace X" no tiene sentido para un servicio ya terminado - ahi solo
-          se muestra la fecha de referencia, no la cuenta regresiva/vencida. */}
-      {TERMINADOS_STATUSES.includes(record.estado) ? formatDate(record.eta) : formatTimeRemaining(record.eta)}
-    </span>
-    <span className={ROW_COLUMN_CLASSES.km}>{record.kilometros ?? "-"}</span>
-    <span className={ROW_COLUMN_CLASSES.destino} title={record.destinazione}>
-      {record.destinazione}
-    </span>
-    <span className={ROW_COLUMN_CLASSES.aplicativo}>
-      {APLICATIVO_LABELS[record.aplicativo] ?? "-"}
-    </span>
-  </Link>
+    <Link
+      to={`/records/${record.id}`}
+      state={{ backgroundLocation: location }}
+      className={`${ROW_GRID} rounded-xl py-2.5 text-[12px] text-ink-200 transition-colors hover:bg-line/[0.06]`}
+    >
+      <span className="flex min-w-0 items-center gap-2.5">
+        <AreaBadge areaKey={area.key} size={32} />
+        <span className="min-w-0">
+          <span className="block truncate text-[13px] font-semibold text-ink-50">{record.codigo}</span>
+          <span className="block truncate text-[11px] text-ink-400">{area.label}</span>
+        </span>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-[13px] text-ink-50" title={record.destinazione}>
+          {record.destinazione}
+        </span>
+        <span className="block truncate text-[11px] text-ink-400">
+          {record.client?.nombre ?? "Sin cliente"}
+          {record.kilometros != null ? ` · ${fmtKm(record.kilometros)} km` : ""}
+        </span>
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate text-ink-100">{record.vehicle?.targa ?? "-"}</span>
+        <span className="block truncate text-[11px] text-ink-400">{record.vehicle?.modelo ?? ""}</span>
+      </span>
+      <span className="truncate" title={driverName(record)}>
+        {driverName(record)}
+      </span>
+      <span>
+        <StatusBadge status={record.estado} className="px-2 py-0.5 text-[11px]" />
+      </span>
+      <span className="min-w-0" title={formatDate(record.eta)}>
+        <span className="block truncate text-ink-100">
+          {/* "Vencido hace X" no tiene sentido para un servicio ya terminado - ahi solo
+              se muestra la fecha de referencia, no la cuenta regresiva/vencida. */}
+          {TERMINADOS_STATUSES.includes(record.estado) ? formatDate(record.eta) : formatTimeRemaining(record.eta)}
+        </span>
+        {record.aplicativo && (
+          <span className="block truncate text-[11px] text-ink-400">{APLICATIVO_LABELS[record.aplicativo]}</span>
+        )}
+      </span>
+    </Link>
   );
 };
 
@@ -344,16 +275,9 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => {
     >
       <div className="flex items-center justify-between gap-2">
         <span className="min-w-0 truncate font-medium text-ink-50">{record.codigo}</span>
-        <span
-          className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase ${
-            isDhlAb(record)
-              ? "bg-accent-500/15 text-accent-300"
-              : isExtrasStefania(record)
-                ? "bg-success-500/15 text-success-500"
-                : "bg-line/15 text-ink-300"
-          }`}
-        >
-          {isDhlAb(record) ? "DHL/AB" : isExtrasStefania(record) ? "Extras Stefania" : "Extras Piazza"}
+        <span className="flex shrink-0 items-center gap-1.5 text-[10px] font-medium uppercase text-ink-400">
+          <AreaBadge areaKey={classifyRecord(record)} size={16} />
+          {AREAS_BY_KEY[classifyRecord(record)].label}
         </span>
       </div>
       <span className="min-w-0 truncate text-ink-300">{record.destinazione}</span>
@@ -376,74 +300,141 @@ const PendingRow = ({ record, closeTo, onChangeEstado, updating }) => {
   );
 };
 
-// El backend ya filtra (en curso, servicios de hoy) y ordena por ETA - solo se
-// renderiza tal cual. Records llega filtrado ademas por seccion/zona (ver el
-// sectionConfig.matchesSpedizzione/matchesZona del caller): el backend acota por
-// area solo a un ADMIN, un OWNER sin restriccion recibia el pendiente de TODAS las
-// secciones/zonas sin importar cual pestana estuviera mirando - se filtra aca
-// tambien para que Pendientes respete la pestana activa igual que el resto de la
-// pagina. scopedLabel: si es un ADMIN de area, el backend ya solo le manda su
-// seccion, asi que el subtitulo no debe prometer "Extras Piazza y DHL - AB Service
-// juntos".
-const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId, scopedLabel }) => {
-  return (
-    <GlassCard className="flex min-w-0 flex-col !p-4 lg:h-[calc(100dvh-220px)]">
-      <h2 className="px-1 text-[15px] font-semibold text-ink-50">Pendientes</h2>
-      <p className="mb-3 px-1 text-[12px] text-ink-400">
-        {scopedLabel
-          ? `Servicios de hoy de ${scopedLabel}, ordenado por lo mas urgente.`
-          : "Servicios de hoy: Extras Piazza, DHL - AB Service y Extras Stefania juntos, ordenado por lo mas urgente."}
-      </p>
+// El backend ya filtra (en curso, servicios de hoy) y ordena por ETA - solo se renderiza
+// tal cual. Llega ademas filtrado por el area activa (matchesArea del caller). scopedLabel:
+// si es un ADMIN de area, el backend ya solo le manda su(s) area(s).
+const PendingPanel = ({ records: pending, closeTo, onChangeEstado, updatingId, scopedLabel }) => (
+  <PanelShell icon={ClockIcon} title="Pendientes de hoy">
+    <p className="-mt-1 mb-3 text-[12px] text-ink-400">
+      {scopedLabel ? `Servicios de hoy de ${scopedLabel}` : "Servicios de hoy de todas las areas"}, lo mas urgente
+      primero.
+    </p>
+    <div className="flex max-h-[420px] flex-col gap-2 overflow-y-auto pr-1">
+      {pending === undefined && (
+        <div className="flex justify-center py-8">
+          <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+        </div>
+      )}
+      {pending?.length === 0 && <p className="py-4 text-center text-[13px] text-ink-300">No hay servicios pendientes.</p>}
+      {pending?.map((record) => (
+        <PendingRow
+          key={record.id}
+          record={record}
+          closeTo={closeTo}
+          updating={updatingId === record.id}
+          onChangeEstado={onChangeEstado}
+        />
+      ))}
+    </div>
+  </PanelShell>
+);
 
-      <div className="flex flex-col gap-2 overflow-y-auto">
-        {pending === undefined && (
-          <div className="flex justify-center py-8">
-            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
-          </div>
-        )}
-        {pending?.length === 0 && (
-          <p className="py-4 text-center text-[13px] text-ink-300">No hay servicios pendientes.</p>
-        )}
-        {pending?.map((record) => (
-          <PendingRow
-            key={record.id}
-            record={record}
-            closeTo={closeTo}
-            updating={updatingId === record.id}
-            onChangeEstado={onChangeEstado}
-          />
-        ))}
+// Boton "Nuevo servicio" dividido: el principal crea directo en el area activa (o abre el
+// menu si se esta viendo "Todos"); la flecha abre el menu para elegir cualquiera de las
+// areas permitidas, incluidas DHL Milano y AB Service.
+const NewServiceMenu = ({ areas, activeKey }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e) => {
+      if (e.type === "keydown" ? e.key === "Escape" : !containerRef.current?.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", close);
+    document.addEventListener("keydown", close);
+    return () => {
+      document.removeEventListener("mousedown", close);
+      document.removeEventListener("keydown", close);
+    };
+  }, [open]);
+
+  // state: backgroundLocation - el formulario se abre como panel sobre esta misma lista.
+  const goTo = (area) => {
+    setOpen(false);
+    navigate(area.newPath, { state: { backgroundLocation: location, ...area.newState } });
+  };
+
+  const active = areas.find((a) => a.key === activeKey);
+
+  return (
+    <div ref={containerRef} className="relative">
+      <div className="flex">
+        <button
+          type="button"
+          onClick={() => (active ? goTo(active) : setOpen((v) => !v))}
+          className="inline-flex items-center gap-2 rounded-l-full bg-brand-green py-2.5 pl-5 pr-4 text-[14px] font-semibold text-brand-navy transition-colors hover:bg-brand-green-light focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-green/40"
+        >
+          <PlusIcon className="h-4 w-4" />
+          Nuevo servicio
+        </button>
+        <button
+          type="button"
+          aria-label="Elegir el area del nuevo servicio"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+          className="inline-flex items-center rounded-r-full border-l border-brand-navy/25 bg-brand-green px-3 text-brand-navy transition-colors hover:bg-brand-green-light focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-green/40"
+        >
+          <ChevronDownIcon className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
+        </button>
       </div>
-    </GlassCard>
+
+      {open && (
+        <ul className="glass-surface absolute right-0 top-full z-30 mt-2 w-64 rounded-2xl bg-popover p-1.5 shadow-xl">
+          <li className="px-3 pb-1 pt-2 text-[11px] font-medium uppercase tracking-wide text-ink-400">
+            Crear servicio en
+          </li>
+          {areas.map((area) => (
+            <li key={area.key}>
+              <button
+                type="button"
+                onClick={() => goTo(area)}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-[13px] text-ink-100 transition-colors hover:bg-line/10"
+              >
+                <AreaBadge areaKey={area.key} size={26} />
+                {area.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 };
 
-export const RecordsListPage = ({ section }) => {
+// section: solo una pista de las rutas viejas (/records/extras-piazza, ...) para abrir en el
+// area que corresponde; el area activa vive en ?area= (ver recordAreas.js).
+const SECTION_TO_AREA_HINT = {
+  "extras-piazza": "piazza-milano",
+  "dhl-ab-service": "dhl-milano",
+  "extras-stefania": "otros",
+};
+
+export const RecordsListPage = ({ section: sectionHint }) => {
   const location = useLocation();
   const { version, refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  // ADMIN "de area" (ver lib/permissions.js): solo puede estar en su(s) propia(s)
-  // seccion(es), las demas ni siquiera se le ofrecen (el backend tampoco le manda
-  // esos registros). Puede ser mas de una (ej. DHL: DHL - AB Service + Extras
-  // Stefania), por eso es un array.
+  // ADMIN "de area" (ver lib/permissions.js): solo ve las areas de su(s) seccion(es), las
+  // demas ni siquiera se le ofrecen (el backend tampoco le manda esos registros).
   const scopedSections = scopedRecordsSections(user);
-  const sectionConfig = SECTIONS[section];
-  const zonaOptions = ZONA_OPTIONS_BY_SECTION[section];
+  const allowedKeys = allowedAreaKeys(scopedSections);
+  const availableAreas = RECORD_AREAS.filter((a) => !allowedKeys || allowedKeys.includes(a.key));
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedArea = searchParams.get("area") ?? SECTION_TO_AREA_HINT[sectionHint] ?? AREA_ALL;
+  const areaKey =
+    requestedArea === AREA_ALL || availableAreas.some((a) => a.key === requestedArea) ? requestedArea : AREA_ALL;
+  const selectArea = (key) => {
+    const next = new URLSearchParams(searchParams);
+    next.set("area", key);
+    setSearchParams(next, { replace: true });
+  };
+  const matchesArea = (r) => areaKey === AREA_ALL || classifyRecord(r) === areaKey;
   const [error, setError] = useState("");
   const [tab, setTab] = useState("en_proceso");
-  const [zonaFilter, setZonaFilter] = useState(() => zonaOptions?.[0]?.value ?? null);
-  // El useState de arriba solo corre su inicializador una vez (al montar) - cambiar de
-  // seccion con la pestana (NavLink, no remonta el componente) no lo vuelve a correr,
-  // asi que zonaFilter quedaba pegado al valor de la seccion anterior (ej. "MILANO" de
-  // Extras Piazza al entrar a DHL Roma, que solo tiene "ROMA" como opcion) - la lista
-  // terminaba filtrando por una zona que no tiene sentido en la seccion nueva y
-  // mostraba vacio. Se resetea a mano cada vez que cambia section.
-  useEffect(() => {
-    setZonaFilter(ZONA_OPTIONS_BY_SECTION[section]?.[0]?.value ?? null);
-  }, [section]);
-  // Sin switch (Extras Stefania) matchea cualquier zona - no filtra nada.
-  const matchesZona = (r) => !zonaOptions || r.extrasPiazzaZona === zonaFilter;
 
   // Sincronizacion manual con AppSheet (antes vivia en Mi perfil) - solo
   // OWNER/ADMIN, un boton chico redondo arriba de la lista en vez de una seccion
@@ -500,7 +491,6 @@ export const RecordsListPage = ({ section }) => {
   // Buscador (codigo/cliente/chofer/destino): reemplaza el acordeon de la izquierda
   // mientras hay una busqueda activa. null = sin busqueda, [] = sin resultados.
   // Precarga con ?q= (buscador de la barra superior del AppShell).
-  const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(() => searchParams.get("q") ?? "");
   const [searchResults, setSearchResults] = useState(null);
   const [searching, setSearching] = useState(false);
@@ -693,108 +683,108 @@ export const RecordsListPage = ({ section }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [version]);
 
-  const visibleRecords = records?.filter(
-    (r) => TAB_STATUSES[tab].includes(r.estado) && sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r)
-  );
-  const summaryDays = summary
-    ? groupSummaryByDay(summary.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r)))
-    : null;
+  const visibleRecords = records?.filter((r) => TAB_STATUSES[tab].includes(r.estado) && matchesArea(r));
+
+  // Servicios y km por area del mes (OWNER/ADMIN: del resumen liviano; chofer: de su lista).
+  const areaStats = useMemo(() => {
+    const stats = Object.fromEntries(RECORD_AREAS.map((a) => [a.key, { count: 0, km: 0 }]));
+    (isPrivileged ? summary : records)?.forEach((r) => {
+      const entry = stats[classifyRecord(r)];
+      entry.count += 1;
+      entry.km += r.kilometros ?? r.kilometrosReales ?? 0;
+    });
+    return stats;
+  }, [isPrivileged, summary, records]);
+  const totalCount = availableAreas.reduce((n, a) => n + areaStats[a.key].count, 0);
+  const totalKm = availableAreas.reduce((n, a) => n + areaStats[a.key].km, 0);
+
+  const summaryDays = summary ? groupSummaryByDay(summary.filter(matchesArea)) : null;
   const unpaidVisibleRecords = unpaidRecords
-    ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r) && r.pagoRecibido == null)
+    ?.filter((r) => matchesArea(r) && r.pagoRecibido == null)
     .sort((a, b) => new Date(a.fechaServicio) - new Date(b.fechaServicio));
 
-  // Total de KM del mes, Piazza Milano vs Piazza Roma vs DHL Roma - de todo el mes
-  // (no solo la seccion que se esta mirando), para tener una idea general del
-  // volumen sin tener que cambiar de pestana. DHL Milano/AB Service/Extras Stefania
-  // quedan afuera (ver isDhlRomaRecord en dashboardStats.js), mismo criterio que el
-  // resto de Registros desde que se acoto a Piazza + DHL Roma. DHL pesa x2 en los
-  // rankings (ver kmMultiplier en dashboardStats.js), asi que se muestra el crudo y
-  // el ponderado por separado.
-  const monthKmTotals = summary?.reduce(
-    (acc, r) => {
-      const km = r.kilometros ?? r.kilometrosReales ?? 0;
-      if (isDhlRomaRecord(r)) acc.dhlRoma += km;
-      else if (!isDhlAb(r) && !isExtrasStefania(r)) {
-        if (r.extrasPiazzaZona === "ROMA") acc.piazzaRoma += km;
-        else acc.piazzaMilano += km;
-      }
-      return acc;
-    },
-    { piazzaMilano: 0, piazzaRoma: 0, dhlRoma: 0 }
-  );
+  // Al abrir un mes se despliega solo el dia mas reciente (un unico pedido) para no mostrar
+  // una pantalla vacia; el resto se sigue cargando solo cuando se despliega.
+  const autoOpenedRef = useRef(null);
+  useEffect(() => {
+    if (!isPrivileged || !summary) return;
+    const monthKey = `${viewDate.year}-${viewDate.month}`;
+    if (autoOpenedRef.current === monthKey) return;
+    const newest = groupSummaryByDay(summary.filter(matchesArea))[0];
+    if (!newest) return;
+    autoOpenedRef.current = monthKey;
+    setOpenDays((prev) => new Set(prev).add(newest.key));
+    if (!dayRecords.has(newest.key) && !loadingDays.has(newest.key)) fetchDay(newest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summary]);
 
-  // Un ADMIN de area no tiene ninguna otra seccion como opcion (backend tampoco le
-  // manda esos registros) - se lo redirige de vuelta a la primera de las suyas.
-  if (scopedSections && !scopedSections.includes(section)) {
-    return <Navigate to={`/records/${scopedSections[0]}`} replace />;
-  }
+  const tabs = [{ key: AREA_ALL, label: "Todos" }, ...availableAreas];
+  const monthText = new Date(Date.UTC(viewDate.year, viewDate.month - 1, 1)).toLocaleDateString("es-ES", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const monthName = monthText.charAt(0).toUpperCase() + monthText.slice(1);
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-[24px] font-semibold text-ink-50">{sectionConfig.label}</h1>
-          <p className="mt-1 text-[14px] text-ink-300">
+          <h1 className="text-[28px] font-semibold tracking-tight text-ink-50">Registros de Servicios</h1>
+          <p className="mt-1 max-w-2xl text-[14px] text-ink-300">
             {isPrivileged
-              ? "Navega mes a mes; cada dia se carga al desplegarlo."
+              ? "Gestiona y consulta los servicios de todas las areas. Cada dia se carga solo al desplegarlo."
               : "Viajes asignados, ordenados por fecha."}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {/* Un ADMIN de area con una sola seccion no tiene a donde mas ir, asi que no
-              se le muestra el selector. Uno con 2+ (ej. DHL: DHL - AB Service +
-              Extras Stefania) si necesita elegir entre las suyas. */}
-          {(!scopedSections || scopedSections.length > 1) && <SectionTabs allowedSections={scopedSections} />}
-          {/* zonaOptions con 1 solo valor (hoy: DHL Roma) no necesita switch - ya esta
-              fijo, mostrar un SegmentedControl de un boton no aporta nada. */}
-          {zonaOptions && zonaOptions.length > 1 && (
-            <SegmentedControl options={zonaOptions} value={zonaFilter} onChange={setZonaFilter} />
-          )}
-          {/* En proceso/Terminados solo tiene sentido para el chofer: no tiene el panel
-              de Pendientes ni navegacion mes a mes, asi que es su unica forma de acotar
-              la lista. El OWNER/ADMIN ya tiene Pendientes a la derecha, asi que ve todo
-              el mes junto (el StatusBadge de cada fila alcanza para diferenciar). */}
-          {!isPrivileged && <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />}
-          {isPrivileged && (
-            <button
-              type="button"
-              aria-label="Sincronizar con AppSheet"
-              title={
-                syncState?.lastSyncedAt
-                  ? `Ultima sincronizacion: ${formatDateTime(syncState.lastSyncedAt)}`
-                  : "Todavia no se sincronizo nunca"
-              }
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/15 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <SyncIcon className={`h-[16px] w-[16px] ${syncing ? "animate-spin" : ""}`} />
-            </button>
-          )}
-          {isPrivileged && (
-            <button
-              type="button"
-              aria-label="Exportar a CSV"
-              title="Exportar registros a CSV"
-              onClick={() => setShowExportModal(true)}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/15 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20"
-            >
-              <DownloadIcon className="h-[16px] w-[16px]" />
-            </button>
-          )}
-          {isPrivileged && sectionConfig.allowCreate && (
-            // Se manda la zona activa (si esta seccion tiene switch) para que el
-            // formulario de alta arranque en la misma zona que se esta mirando - antes
-            // "Nuevo servicio" desde Roma igual abria el formulario en Milano por
-            // defecto, distinto de lo que se ve en Milano (arranca en Milano siempre).
-            <Link
-              to={sectionConfig.newPath}
-              state={{ backgroundLocation: location, zona: zonaOptions ? zonaFilter : undefined }}
-            >
-              <Button className="w-auto px-5">Nuevo servicio</Button>
-            </Link>
+          {isPrivileged ? (
+            <>
+              <MonthPicker value={viewDate} onChange={setViewDate} />
+              <NewServiceMenu areas={availableAreas} activeKey={areaKey} />
+            </>
+          ) : (
+            // En proceso/Terminados solo tiene sentido para el chofer: no tiene el panel de
+            // Pendientes ni navegacion mes a mes, asi que es su unica forma de acotar la lista.
+            <SegmentedControl options={TAB_OPTIONS} value={tab} onChange={setTab} />
           )}
         </div>
+      </div>
+
+      {/* Areas: cada una con su cantidad del mes. */}
+      <div role="tablist" aria-label="Areas de servicio" className="-mx-1 flex gap-2.5 overflow-x-auto px-1 pb-1">
+        {tabs.map((t) => {
+          const active = areaKey === t.key;
+          const count = t.key === AREA_ALL ? totalCount : areaStats[t.key].count;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              onClick={() => selectArea(t.key)}
+              className={`flex shrink-0 items-center gap-2.5 rounded-2xl border px-3 py-2.5 text-left transition-colors ${
+                active
+                  ? "border-accent-500/60 bg-accent-500/10 shadow-[0_0_0_1px_var(--accent-500)_inset]"
+                  : "glass-surface hover:bg-line/[0.05]"
+              }`}
+            >
+              {t.key === AREA_ALL ? (
+                <span className="flex h-[30px] w-[30px] shrink-0 items-center justify-center rounded-full bg-accent-500/15 text-accent-400">
+                  <ClipboardListIcon className="h-[18px] w-[18px]" />
+                </span>
+              ) : (
+                <AreaBadge areaKey={t.key} size={30} />
+              )}
+              <span className="min-w-0">
+                <span className="block truncate text-[13px] font-semibold text-ink-50">{t.label}</span>
+                <span className="block text-[12px] text-ink-400">
+                  {summary === null && isPrivileged ? "…" : `${count} servicio${count === 1 ? "" : "s"}`}
+                </span>
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {isPrivileged && (syncError || syncResult) && (
@@ -829,15 +819,17 @@ export const RecordsListPage = ({ section }) => {
       )}
 
       {isPrivileged && (
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="glass-surface flex flex-wrap items-center gap-x-5 gap-y-3 rounded-2xl p-3">
           <TextField
             id="records-search"
+            icon={SearchIcon}
+            type="search"
             placeholder="Buscar por codigo, cliente o chofer..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="sm:max-w-sm"
+            className="min-w-[240px] flex-1"
           />
-          <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ink-300">
+          <label className="flex cursor-pointer items-center gap-2 text-[13px] text-ink-200">
             <input
               type="checkbox"
               checked={showUnpaidOnly}
@@ -855,74 +847,53 @@ export const RecordsListPage = ({ section }) => {
 
       {!isPrivileged && visibleRecords?.length === 0 && (
         <GlassCard className="text-center text-[14px] text-ink-300">
-          {tab === "en_proceso"
-            ? "No tienes registros en proceso."
-            : "Todavia no tienes registros terminados."}
+          {tab === "en_proceso" ? "No tienes registros en proceso." : "Todavia no tienes registros terminados."}
         </GlassCard>
       )}
 
       {isPrivileged ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[2fr_1fr] lg:items-start">
-          <GlassCard className="min-w-0 !p-0">
-            {searchResults !== null ? (
-              <div className="flex items-center justify-between gap-2 px-5 py-4">
-                <h2 className="text-[15px] font-semibold text-ink-100">
-                  Resultados de busqueda{searching && " - buscando..."}
-                </h2>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-                >
-                  Volver al mes
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center justify-between gap-2 px-5 py-4">
-                <button
-                  type="button"
-                  onClick={() => setViewDate((v) => shiftMonth(v, -1))}
-                  className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-                >
-                  &larr; Mes anterior
-                </button>
-                <div className="flex flex-col items-center gap-0.5">
-                  <h2 className="text-[15px] font-semibold uppercase text-ink-100">
-                    {monthLabel(viewDate.year, viewDate.month)}
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_330px] xl:items-start">
+          <section className="glass-surface min-w-0 rounded-2xl">
+            <header className="flex flex-wrap items-center justify-between gap-2 px-5 py-4">
+              {searchResults !== null ? (
+                <>
+                  <h2 className="text-[15px] font-semibold text-ink-50">
+                    Resultados de busqueda{searching && " - buscando..."}
                   </h2>
-                  {monthKmTotals && (
-                    <p className="text-[11px] normal-case text-ink-400">
-                      Piazza Milano: {fmtKm(monthKmTotals.piazzaMilano)} km · Piazza Roma:{" "}
-                      {fmtKm(monthKmTotals.piazzaRoma)} km · DHL Roma: {fmtKm(monthKmTotals.dhlRoma)} km x2 ={" "}
-                      {fmtKm(monthKmTotals.dhlRoma * 2)} km
-                    </p>
-                  )}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setViewDate((v) => shiftMonth(v, 1))}
-                  className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-                >
-                  Mes siguiente &rarr;
-                </button>
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery("")}
+                    className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
+                  >
+                    Volver al mes
+                  </button>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-[15px] font-semibold text-ink-50">
+                    {showUnpaidOnly ? "Sin cobrar" : "Servicios"} · {monthName}
+                  </h2>
+                  <span className="text-[12px] text-ink-400">
+                    {AREAS_BY_KEY[areaKey]?.label ?? "Todas las areas"}
+                  </span>
+                </>
+              )}
+            </header>
 
             {searchResults !== null ? (
               <div className="border-t border-line/10 px-2 pb-4 pt-3">
-                {searchResults.length === 0 ? (
+                {searchResults.filter(matchesArea).length === 0 ? (
                   <p className="py-4 text-center text-[14px] text-ink-300">
-                    Sin resultados para "{searchQuery.trim()}".
+                    Sin resultados para "{searchQuery.trim()}"
+                    {areaKey !== AREA_ALL && ` en ${AREAS_BY_KEY[areaKey].label}`}.
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <div className="min-w-[720px]">
-                      <CompactRowHeader />
-                      <div className="flex flex-col gap-0.5 px-2">
-                        {searchResults.map((record) => (
-                          <RecordRow key={record.id} record={record} />
-                        ))}
-                      </div>
+                    <CompactRowHeader />
+                    <div className="flex min-w-[780px] flex-col gap-0.5 px-2">
+                      {searchResults.filter(matchesArea).map((record) => (
+                        <RecordRow key={record.id} record={record} />
+                      ))}
                     </div>
                   </div>
                 )}
@@ -935,97 +906,159 @@ export const RecordsListPage = ({ section }) => {
                   </div>
                 ) : unpaidVisibleRecords.length === 0 ? (
                   <p className="py-4 text-center text-[14px] text-ink-300">
-                    Ningun servicio de {sectionConfig.label} sin cobrar este mes.
+                    Ningun servicio sin cobrar este mes en {AREAS_BY_KEY[areaKey]?.label ?? "ninguna area"}.
                   </p>
                 ) : (
                   <div className="overflow-x-auto">
-                    <div className="min-w-[720px]">
-                      <CompactRowHeader />
-                      <div className="flex flex-col gap-0.5 px-2">
-                        {unpaidVisibleRecords.map((record) => (
-                          <RecordRow key={record.id} record={record} />
-                        ))}
-                      </div>
+                    <CompactRowHeader />
+                    <div className="flex min-w-[780px] flex-col gap-0.5 px-2">
+                      {unpaidVisibleRecords.map((record) => (
+                        <RecordRow key={record.id} record={record} />
+                      ))}
                     </div>
                   </div>
                 )}
               </div>
             ) : (
-            <div className="flex flex-col gap-2 border-t border-line/10 px-5 pb-4 pt-3">
-              {summary === null && (
-                <div className="flex justify-center py-8">
-                  <Spinner className="h-5 w-5 border-line/20 border-t-line" />
-                </div>
-              )}
+              <div className="flex flex-col gap-2.5 border-t border-line/10 p-4">
+                {summary === null && (
+                  <div className="flex justify-center py-8">
+                    <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+                  </div>
+                )}
 
-              {summaryDays?.length === 0 && (
-                <p className="py-4 text-center text-[14px] text-ink-300">No hay servicios este mes.</p>
-              )}
+                {summaryDays?.length === 0 && (
+                  <p className="py-6 text-center text-[14px] text-ink-300">
+                    {areaKey === AREA_ALL
+                      ? "No hay servicios este mes."
+                      : `No hay servicios de ${AREAS_BY_KEY[areaKey].label} en ${monthName}.`}
+                  </p>
+                )}
 
-              {summaryDays?.map((day) => {
-                const dayOpen = openDays.has(day.key);
-                const loaded = dayRecords.get(day.key);
-                const dayVisibleRecords = loaded
-                  ?.filter((r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r))
-                  .sort((a, b) => driverName(a).localeCompare(driverName(b)));
+                {summaryDays?.map((day) => {
+                  const dayOpen = openDays.has(day.key);
+                  const loaded = dayRecords.get(day.key);
+                  const dayVisibleRecords = loaded
+                    ?.filter(matchesArea)
+                    .sort((a, b) => driverName(a).localeCompare(driverName(b)));
 
-                return (
-                  <div key={day.key} className="rounded-2xl glass-surface-sm">
-                    <DisclosureHeader
-                      open={dayOpen}
-                      onClick={() => toggleDay(day)}
-                      className="px-4 py-3 text-[14px] text-ink-100"
-                    >
-                      <span>
-                        {dayLabel(day.date)}{" "}
-                        <span className="text-ink-400">
-                          ({day.count} servicio{day.count === 1 ? "" : "s"})
+                  return (
+                    <div key={day.key} className="rounded-2xl border border-line/[0.08] bg-line/[0.02]">
+                      <DisclosureHeader
+                        open={dayOpen}
+                        onClick={() => toggleDay(day)}
+                        className="px-4 py-3 text-[14px] text-ink-100"
+                      >
+                        <span className="flex flex-wrap items-center gap-2.5">
+                          <span className="font-semibold text-ink-50">{longDayLabel(day.date)}</span>
+                          <span className="rounded-full bg-accent-500/15 px-2.5 py-0.5 text-[11px] font-medium text-accent-400">
+                            {day.count} servicio{day.count === 1 ? "" : "s"}
+                          </span>
                         </span>
-                      </span>
-                    </DisclosureHeader>
+                      </DisclosureHeader>
 
-                    {dayOpen && (
-                      <div className="border-t border-line/10 pb-2">
-                        {loadingDays.has(day.key) && (
-                          <div className="flex justify-center py-6">
-                            <Spinner className="h-5 w-5 border-line/20 border-t-line" />
-                          </div>
-                        )}
-                        {dayErrors.has(day.key) && <Alert>{dayErrors.get(day.key)}</Alert>}
-                        {dayVisibleRecords && (
-                          <div className="overflow-x-auto">
-                            <div className="min-w-[720px]">
+                      {dayOpen && (
+                        <div className="border-t border-line/10 pb-2">
+                          {loadingDays.has(day.key) && (
+                            <div className="flex justify-center py-6">
+                              <Spinner className="h-5 w-5 border-line/20 border-t-line" />
+                            </div>
+                          )}
+                          {dayErrors.has(day.key) && <Alert>{dayErrors.get(day.key)}</Alert>}
+                          {dayVisibleRecords && (
+                            <div className="overflow-x-auto">
                               <CompactRowHeader />
-                              <div className="flex flex-col gap-0.5 px-2">
+                              <div className="flex min-w-[780px] flex-col gap-0.5 px-2">
                                 {dayVisibleRecords.map((record) => (
                                   <RecordRow key={record.id} record={record} />
                                 ))}
                               </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             )}
-          </GlassCard>
+          </section>
 
-          <PendingPanel
-            records={pendingRecords?.filter(
-              (r) => sectionConfig.matchesSpedizzione(r.spedizzione) && matchesZona(r)
-            )}
-            closeTo={`/records/${section}`}
-            scopedLabel={
-              scopedSections
-                ? scopedSections.map((s) => SECTIONS[s]?.label).filter(Boolean).join(" y ")
-                : null
-            }
-            onChangeEstado={handleChangeEstado}
-            updatingId={updatingId}
-          />
+          <aside className="flex flex-col gap-5 xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto xl:pr-1">
+            <PanelShell icon={BarsIcon} title="Resumen del mes">
+              <div className="grid grid-cols-2 gap-2.5">
+                {availableAreas.map((a) => (
+                  <button
+                    key={a.key}
+                    type="button"
+                    onClick={() => selectArea(a.key)}
+                    className={`flex items-center gap-2.5 rounded-xl border p-2.5 text-left transition-colors hover:bg-line/[0.05] ${
+                      areaKey === a.key ? "border-accent-500/50 bg-accent-500/10" : "border-line/10"
+                    }`}
+                  >
+                    <AreaBadge areaKey={a.key} size={30} />
+                    <span className="min-w-0">
+                      <span className="block text-[18px] font-semibold leading-none text-ink-50">
+                        {summary === null ? "…" : areaStats[a.key].count}
+                      </span>
+                      <span className="mt-1 block truncate text-[11px] text-ink-400">{a.shortLabel ?? a.label}</span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <p className="mt-3 flex items-center justify-between border-t border-line/10 pt-3 text-[12px] text-ink-300">
+                <span>Total del mes</span>
+                <span className="font-medium text-ink-100">
+                  {totalCount} servicios · {fmtKm(totalKm)} km
+                </span>
+              </p>
+            </PanelShell>
+
+            <PendingPanel
+              records={pendingRecords?.filter(matchesArea)}
+              closeTo={areaKey === AREA_ALL ? "/records" : `/records?area=${areaKey}`}
+              scopedLabel={
+                allowedKeys ? availableAreas.map((a) => a.label).join(", ") : null
+              }
+              onChangeEstado={handleChangeEstado}
+              updatingId={updatingId}
+            />
+
+            <PanelShell icon={ClockIcon} title="Acciones rapidas">
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowExportModal(true)}
+                  className="flex items-center gap-3 rounded-xl border border-line/10 px-3.5 py-2.5 text-left text-[13px] text-ink-100 transition-colors hover:bg-line/[0.05]"
+                >
+                  <DownloadIcon className="h-[18px] w-[18px] text-ink-300" />
+                  Exportar registros a CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSync}
+                  disabled={syncing}
+                  title={
+                    syncState?.lastSyncedAt
+                      ? `Ultima sincronizacion: ${formatDateTime(syncState.lastSyncedAt)}`
+                      : "Todavia no se sincronizo nunca"
+                  }
+                  className="flex items-center gap-3 rounded-xl border border-line/10 px-3.5 py-2.5 text-left text-[13px] text-ink-100 transition-colors hover:bg-line/[0.05] disabled:opacity-60"
+                >
+                  <RefreshIcon className={`h-[18px] w-[18px] text-ink-300 ${syncing ? "animate-spin" : ""}`} />
+                  Sincronizar con AppSheet
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowUnpaidOnly((v) => !v)}
+                  className="flex items-center gap-3 rounded-xl border border-line/10 px-3.5 py-2.5 text-left text-[13px] text-ink-100 transition-colors hover:bg-line/[0.05]"
+                >
+                  <CheckCircleIcon className="h-[18px] w-[18px] text-ink-300" />
+                  {showUnpaidOnly ? "Volver a todos los servicios" : "Ver servicios sin cobrar"}
+                </button>
+              </div>
+            </PanelShell>
+          </aside>
         </div>
       ) : (
         <div className="flex flex-col gap-3">
@@ -1035,9 +1068,7 @@ export const RecordsListPage = ({ section }) => {
         </div>
       )}
 
-      {isPrivileged && (
-        <ExportRecordsModal open={showExportModal} onClose={() => setShowExportModal(false)} />
-      )}
+      {isPrivileged && <ExportRecordsModal open={showExportModal} onClose={() => setShowExportModal(false)} />}
     </div>
   );
 };

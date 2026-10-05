@@ -67,6 +67,7 @@ export const NewDhlAbServiceRecordPage = () => {
   const [form, setForm] = useState(() => ({
     ...INITIAL_FORM,
     extrasPiazzaZona: location.state?.zona ?? INITIAL_FORM.extrasPiazzaZona,
+    spedizzione: location.state?.spedizzione ?? INITIAL_FORM.spedizzione,
   }));
   const [drivers, setDrivers] = useState(null);
   const [vehicles, setVehicles] = useState(null);

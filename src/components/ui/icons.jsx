@@ -180,3 +180,28 @@ export const UserCheckIcon = (props) => (
     <path d="m15.5 17.5 2 2 4-4.2" />
   </Svg>
 );
+
+export const PlusIcon = (props) => (
+  <Svg {...props}>
+    <path d="M12 5v14M5 12h14" />
+  </Svg>
+);
+
+export const ClockIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </Svg>
+);
+
+export const DownloadIcon = (props) => (
+  <Svg {...props}>
+    <path d="M12 3v13M7 11l5 5 5-5M4 21h16" />
+  </Svg>
+);
+
+export const RefreshIcon = (props) => (
+  <Svg {...props}>
+    <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
+  </Svg>
+);
