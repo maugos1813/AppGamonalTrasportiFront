@@ -60,7 +60,7 @@ export const useLocationSharing = () => {
       watcherId = await BackgroundGeolocation.addWatcher(
         {
           backgroundMessage:
-            "Gamonal Trasporti esta compartiendo tu ubicacion durante tu horario laboral.",
+            "Gamonal Driver esta compartiendo tu ubicacion durante tu horario laboral.",
           backgroundTitle: "Compartiendo ubicacion",
           requestPermissions: true,
           stale: false,

@@ -40,7 +40,7 @@ export const LoginPage = () => {
   };
 
   return (
-    <AuthLayout title="Bienvenido" subtitle="Inicia sesion en Gamonal Trasporti">
+    <AuthLayout title="Bienvenido" subtitle="Inicia sesion en Gamonal Driver">
       <GlassCard>
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>
           {location.state?.resetSuccess && (

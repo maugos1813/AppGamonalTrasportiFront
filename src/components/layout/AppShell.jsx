@@ -291,8 +291,8 @@ export const AppShell = () => {
         <aside className="hidden sm:sticky sm:top-0 sm:flex sm:h-dvh sm:w-60 sm:shrink-0 sm:flex-col sm:justify-between sm:border-r sm:border-sidebar-border sm:bg-sidebar sm:px-4 sm:py-6">
           <div>
             <Link to="/" className="flex items-center gap-3 px-2">
-              <img src={logo} alt="Gamonal Trasporti" className="h-10 w-10 shrink-0 rounded-xl" />
-              <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Trasporti</span>
+              <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-xl" />
+              <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Driver</span>
             </Link>
 
             <nav className="mt-8 flex flex-col gap-1">
@@ -357,7 +357,7 @@ export const AppShell = () => {
               title="Abrir menu"
               className="flex items-center gap-3"
             >
-              <img src={logo} alt="Gamonal Trasporti" className="h-10 w-10 shrink-0 rounded-xl" />
+              <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-xl" />
             </button>
 
             <div className="flex items-center gap-2">

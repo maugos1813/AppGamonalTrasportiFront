@@ -76,8 +76,8 @@ export const MobileNavDrawer = ({ open, onClose, items, theme, onToggleTheme, on
       <div className="relative z-10 flex h-dvh w-72 max-w-[80vw] animate-slide-in-left flex-col justify-between border-r border-sidebar-border bg-sidebar px-4 py-6">
         <div>
           <div className="flex items-center gap-3 px-2">
-            <img src={logo} alt="Gamonal Trasporti" className="h-10 w-10 shrink-0 rounded-xl" />
-            <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Trasporti</span>
+            <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-xl" />
+            <span className="text-[15px] font-semibold text-sidebar-foreground">Gamonal Driver</span>
           </div>
 
           <nav className="mt-8 flex flex-col gap-1">

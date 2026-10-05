@@ -48,7 +48,7 @@ const requestLocationPermission = () =>
       let watcherId;
       BackgroundGeolocation.addWatcher(
         {
-          backgroundMessage: "Gamonal Trasporti puede compartir tu ubicacion durante tu horario laboral.",
+          backgroundMessage: "Gamonal Driver puede compartir tu ubicacion durante tu horario laboral.",
           backgroundTitle: "Compartir ubicacion",
           requestPermissions: true,
           stale: true,
@@ -205,7 +205,7 @@ export const ProfilePage = () => {
           {greeting()}, {user?.nombre}!
         </h1>
         <p className="mt-1 text-[14px] text-ink-300">
-          {isChofer ? "Tu resumen personal en Gamonal Trasporti." : "Resumen de la operacion."}
+          {isChofer ? "Tu resumen personal en Gamonal Driver." : "Resumen de la operacion."}
         </p>
       </div>
 
