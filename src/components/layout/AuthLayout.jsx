@@ -47,7 +47,7 @@ const Wordmark = ({ className }) => (
 const SHADOW = "[text-shadow:0_2px_14px_rgba(3,10,25,0.85)]";
 
 export const AuthLayout = ({ children, title, subtitle, footer }) => (
-  <div className="min-h-dvh w-full lg:grid lg:grid-cols-[1.1fr_1fr]">
+  <div className="min-h-dvh w-full lg:grid lg:grid-cols-[1.3fr_1fr] xl:grid-cols-[1.5fr_1fr]">
     {/* Panel de marca: solo en pantallas grandes */}
     <aside className="relative hidden overflow-hidden bg-[#050d1b] text-white lg:block">
       <img src={heroImage} alt="" className="absolute inset-0 h-full w-full object-cover" />
