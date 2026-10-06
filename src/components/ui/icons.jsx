@@ -205,3 +205,70 @@ export const RefreshIcon = (props) => (
     <path d="M3 12a9 9 0 0 1 15-6.7L21 8M21 3v5h-5M21 12a9 9 0 0 1-15 6.7L3 16M3 21v-5h5" />
   </Svg>
 );
+
+export const UserIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="12" cy="8" r="3.6" />
+    <path d="M4.5 20c0-3.9 3.4-6 7.5-6s7.5 2.1 7.5 6" />
+  </Svg>
+);
+
+export const ShieldIcon = (props) => (
+  <Svg {...props}>
+    <path d="M12 3 5 6v5.5c0 4.4 2.9 8 7 9.5 4.1-1.5 7-5.1 7-9.5V6l-7-3Z" />
+    <path d="m9 12 2.2 2.2L15.5 10" />
+  </Svg>
+);
+
+export const FileTextIcon = (props) => (
+  <Svg {...props}>
+    <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z" />
+    <path d="M14 3v5h5M9 13h6M9 17h6" />
+  </Svg>
+);
+
+export const PhoneIcon = (props) => (
+  <Svg {...props}>
+    <path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
+  </Svg>
+);
+
+export const PencilIcon = (props) => (
+  <Svg {...props}>
+    <path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4Z" />
+    <path d="m13.5 6.5 4 4" />
+  </Svg>
+);
+
+export const KeyIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="8" cy="15" r="4" />
+    <path d="m11 12 8-8m-3 3 3 3m-6-6 2 2" />
+  </Svg>
+);
+
+export const CameraIcon = (props) => (
+  <Svg {...props}>
+    <path d="M4 8h3l1.5-2h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z" />
+    <circle cx="12" cy="13" r="3.4" />
+  </Svg>
+);
+
+export const BriefcaseIcon = (props) => (
+  <Svg {...props}>
+    <rect x="3" y="7" width="18" height="13" rx="2" />
+    <path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M3 13h18" />
+  </Svg>
+);
+
+export const ZapIcon = (props) => (
+  <Svg {...props}>
+    <path d="M13 3 5 13.5h6L10.5 21 19 10h-6l0-7Z" />
+  </Svg>
+);
+
+export const HomeIcon = (props) => (
+  <Svg {...props}>
+    <path d="m4 11 8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-8Z" />
+  </Svg>
+);
