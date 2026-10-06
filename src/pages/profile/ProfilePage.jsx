@@ -36,7 +36,7 @@ import { parseApiError } from "../../lib/api";
 import { AREA_OPTIONS, CARGO_LABELS, GRUPO_LABELS, TIPO_DOCUMENTO_LABELS } from "../../lib/constants";
 import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { listDocumentsRequest } from "../../lib/documents.api";
-import { formatDate, formatKm } from "../../lib/format";
+import { formatDate, formatDateOnly, formatKm } from "../../lib/format";
 import { scopedRecordsSections } from "../../lib/permissions";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import {
