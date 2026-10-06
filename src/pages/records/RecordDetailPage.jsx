@@ -599,6 +599,10 @@ const RecordSummaryView = ({
         </label>
       )}
 
+      <p className="mt-2 text-[12px] text-ink-400">
+        Las fotos de comprobante se borran solas pasados 3 meses desde que se suben.
+      </p>
+
       <ul className="mt-4 flex flex-col gap-2">
         {files.length === 0 && (
           <li className="text-[14px] text-ink-400">Todavia no hay archivos cargados.</li>

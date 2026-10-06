@@ -39,6 +39,9 @@ const MILAN_CENTER = { lat: 45.4642, lng: 9.19 };
 // aplica igual a ubicaciones/registros/ETA para no tener 2 cadencias distintas en la
 // misma pagina.
 const REFRESH_INTERVAL_MS = 30000;
+// El Mapa se usa para mirar sin tocar nada: se tolera mas inactividad que en la campanita
+// antes de pausar el refresco (ver startVisibleInterval).
+const MAP_IDLE_MS = 15 * 60 * 1000;
 
 // Estilo "Night Mode" estandar de Google Maps - se aplica solo cuando el tema de la
 // app esta en oscuro (ver useTheme), asi el mapa combina con el resto de la UI en vez
@@ -286,7 +289,7 @@ export const MapPage = () => {
     // Pausa sola mientras la pestania no esta visible (ver startVisibleInterval) - una
     // pestania del Mapa olvidada en segundo plano no tiene por que seguir pidiendo
     // ubicaciones/registros cada 20s para siempre.
-    const stopPolling = startVisibleInterval(load, REFRESH_INTERVAL_MS);
+    const stopPolling = startVisibleInterval(load, REFRESH_INTERVAL_MS, { idleMs: MAP_IDLE_MS });
     return () => {
       cancelled = true;
       stopPolling();
@@ -538,7 +541,7 @@ export const MapPage = () => {
     };
 
     fetchEta();
-    const stopPolling = startVisibleInterval(fetchEta, REFRESH_INTERVAL_MS);
+    const stopPolling = startVisibleInterval(fetchEta, REFRESH_INTERVAL_MS, { idleMs: MAP_IDLE_MS });
     return () => {
       cancelled = true;
       stopPolling();

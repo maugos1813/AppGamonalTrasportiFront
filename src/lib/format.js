@@ -86,3 +86,16 @@ export const toDateInputValue = (value) => {
   if (!value) return "";
   return new Date(value).toISOString().slice(0, 10);
 };
+
+// Fechas "puras" (sin hora, ej. fecha de nacimiento, vencimientos) llegan del backend como
+// medianoche UTC: formatearlas en la hora local las corre un dia para quien este al oeste
+// de UTC (ej. Argentina muestra el 23 en vez del 24), asi que se formatean en UTC.
+export const formatDateOnly = (value) => {
+  if (!value) return "-";
+  return new Date(value).toLocaleDateString("es-AR", {
+    timeZone: "UTC",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};

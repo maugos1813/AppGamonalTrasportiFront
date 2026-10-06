@@ -208,7 +208,7 @@ const DocumentItem = ({ document }) => {
           {TIPO_DOCUMENTO_LABELS[document.tipoDocumento] ?? document.tipoDocumento}
         </span>
         <span className="block text-[12px] text-ink-400">
-          {document.fechaScadenza ? `Valido hasta ${formatDate(document.fechaScadenza)}` : "Sin fecha de vencimiento"}
+          {document.fechaScadenza ? `Valido hasta ${formatDateOnly(document.fechaScadenza)}` : "Sin fecha de vencimiento"}
         </span>
       </span>
       <Badge tone={status.tone}>{status.label}</Badge>
@@ -403,7 +403,7 @@ const TeamAlerts = () => {
             </span>
             <span className="block truncate text-[12px] text-ink-400">
               {TIPO_DOCUMENTO_LABELS[document.tipoDocumento] ?? document.tipoDocumento} -{" "}
-              {formatDate(document.fechaScadenza)}
+              {formatDateOnly(document.fechaScadenza)}
             </span>
           </span>
           <Badge tone={status.tone}>{status.label}</Badge>
@@ -717,7 +717,7 @@ export const ProfilePage = () => {
                 label="Fecha de nacimiento"
                 value={
                   user?.fechaNacimiento
-                    ? `${formatDate(user.fechaNacimiento)}${age != null ? ` (${age} anos)` : ""}`
+                    ? `${formatDateOnly(user.fechaNacimiento)}${age != null ? ` (${age} anos)` : ""}`
                     : null
                 }
               />
