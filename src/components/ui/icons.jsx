@@ -272,3 +272,62 @@ export const HomeIcon = (props) => (
     <path d="m4 11 8-7 8 7v8a1 1 0 0 1-1 1h-4v-6H9v6H5a1 1 0 0 1-1-1v-8Z" />
   </Svg>
 );
+
+export const ReceiptIcon = (props) => (
+  <Svg {...props}>
+    <path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3Z" />
+    <path d="M9 8h6M9 12h6" />
+  </Svg>
+);
+
+export const TrashIcon = (props) => (
+  <Svg {...props}>
+    <path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3" />
+  </Svg>
+);
+
+export const FilterIcon = (props) => (
+  <Svg {...props}>
+    <path d="M4 5h16l-6 7.5V19l-4-2v-4.5L4 5Z" />
+  </Svg>
+);
+
+export const ExternalLinkIcon = (props) => (
+  <Svg {...props}>
+    <path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" />
+  </Svg>
+);
+
+export const PaperclipIcon = (props) => (
+  <Svg {...props}>
+    <path d="m20 11-8.5 8.5a5 5 0 0 1-7-7L13 4a3.3 3.3 0 0 1 4.7 4.7L9.2 17.2a1.7 1.7 0 0 1-2.4-2.4L14.5 7" />
+  </Svg>
+);
+
+export const EuroIcon = (props) => (
+  <Svg {...props}>
+    <path d="M18 6.5A7 7 0 1 0 18 17.5M4 10h9M4 14h9" />
+  </Svg>
+);
+
+export const ImageIcon = (props) => (
+  <Svg {...props}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <circle cx="9" cy="10" r="1.8" />
+    <path d="m4 18 5-5 4 4 3-3 4 4" />
+  </Svg>
+);
+
+export const DotsIcon = (props) => (
+  <Svg {...props}>
+    <circle cx="5" cy="12" r="1.4" />
+    <circle cx="12" cy="12" r="1.4" />
+    <circle cx="19" cy="12" r="1.4" />
+  </Svg>
+);
+
+export const BulbIcon = (props) => (
+  <Svg {...props}>
+    <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3Z" />
+  </Svg>
+);

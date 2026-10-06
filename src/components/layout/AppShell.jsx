@@ -10,7 +10,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { Avatar } from "../ui/Avatar";
-import { ChevronDownIcon, SearchIcon } from "../ui/icons";
+import { ChevronDownIcon, ReceiptIcon, SearchIcon } from "../ui/icons";
 import { MobileNavDrawer } from "./MobileNavDrawer";
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -256,6 +256,7 @@ const BottomNavTab = ({ to, label, icon: Icon }) => (
 // nav inferior, para no saturarlo de iconos - se activa tocando el logo GT del
 // header. En desktop siguen en el sidebar fijo de siempre, sin cambios.
 const DRAWER_NAV_ITEMS = [
+  { to: "/mancato-pagamento", label: "Mancato Pagamento", icon: ReceiptIcon },
   { to: "/mapa", label: "Mapa", icon: MapPinIcon },
   { to: "/control-flota", label: "Control de Flota", icon: ShieldIcon },
   { to: "/mecanica", label: "Mecánica", icon: WrenchIcon },
@@ -358,6 +359,7 @@ export const AppShell = () => {
               <SidebarNavTab to="/" label="Inicio" icon={HomeIcon} />
               <SidebarNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
               <SidebarNavTab to="/records" label="Registros" icon={ListIcon} />
+              <SidebarNavTab to="/mancato-pagamento" label="Mancato Pagamento" icon={ReceiptIcon} />
               {isPrivileged && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
               {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
               {isPrivileged && <SidebarNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
@@ -455,6 +457,7 @@ export const AppShell = () => {
         <BottomNavTab to="/" label="Inicio" icon={HomeIcon} />
         <BottomNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
         <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
+        {!isPrivileged && <BottomNavTab to="/mancato-pagamento" label="Mancato" icon={ReceiptIcon} />}
         {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
         {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
       </nav>

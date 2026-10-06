@@ -1,0 +1,39 @@
+import { api } from "./api";
+
+const BASE = "/mancato-pagamentos";
+
+// fields: texto (los vacios/undefined se omiten); files: { foto, comprobante } (File).
+const toFormData = (fields = {}, files = {}) => {
+  const formData = new FormData();
+  Object.entries(fields).forEach(([key, value]) => {
+    if (value !== undefined && value !== null) formData.append(key, value);
+  });
+  Object.entries(files).forEach(([key, file]) => {
+    if (file) formData.append(key, file);
+  });
+  return formData;
+};
+
+// Devuelve { items, total, page, pageSize }.
+export const listMancatosRequest = (params) =>
+  api.get(BASE, { params }).then((res) => res.data.data);
+
+// Cantidad y total en plata por estado: { VENCIDO, PENDIENTE, PAGADO } -> { count, total }.
+export const getMancatoSummaryRequest = (params) =>
+  api.get(`${BASE}/summary`, { params }).then((res) => res.data.data.summary);
+
+// Indicadores del encabezado: deuda abierta, variacion contra el mes anterior, deuda por
+// chofer, evolucion mensual y datos para la recomendacion.
+export const getMancatoStatsRequest = (params) =>
+  api.get(`${BASE}/stats`, { params }).then((res) => res.data.data.stats);
+
+export const getMancatoRequest = (id) =>
+  api.get(`${BASE}/${id}`).then((res) => res.data.data.mancato);
+
+export const createMancatoRequest = (fields, files) =>
+  api.post(BASE, toFormData(fields, files)).then((res) => res.data.data.mancato);
+
+export const updateMancatoRequest = (id, fields, files) =>
+  api.patch(`${BASE}/${id}`, toFormData(fields, files)).then((res) => res.data.data.mancato);
+
+export const deleteMancatoRequest = (id) => api.delete(`${BASE}/${id}`);

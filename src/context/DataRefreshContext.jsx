@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useMemo, useState } from "react
 
 const DataRefreshContext = createContext(null);
 
-const INITIAL_VERSIONS = { records: 0, drivers: 0, vehicles: 0 };
+const INITIAL_VERSIONS = { records: 0, drivers: 0, vehicles: 0, mancato: 0 };
 
 // Las listas (Registros/Choferes/Vehiculos) quedan montadas de fondo mientras se
 // crea/edita/borra un registro en el overlay superpuesto (ver App.jsx) - por eso ya
