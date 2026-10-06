@@ -23,12 +23,12 @@ const hashColor = (name) =>
 
 // Deuda por chofer (OWNER/ADMIN) o por estado (chofer): nombre, cantidad, importe y una
 // barra proporcional al mayor.
-const DebtSummary = ({ rows, total }) => {
+export const DebtSummary = ({ rows, total, unit = ["aviso", "avisos"], title = "Resumen de deudas" }) => {
   const max = Math.max(...rows.map((r) => r.total), 1);
   return (
     <PanelShell
       icon={ReceiptIcon}
-      title="Resumen de deudas"
+      title={title}
       aside={
         <span className="text-right text-[11px] text-ink-400">
           Total por pagar
@@ -56,14 +56,14 @@ const DebtSummary = ({ rows, total }) => {
                   </span>
                 </div>
                 <span className="block text-[12px] text-ink-400">
-                  {row.count} {row.count === 1 ? "aviso" : "avisos"}
+                  {row.count} {row.count === 1 ? unit[0] : unit[1]}
                 </span>
                 <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-line/10">
                   <div
                     className="h-full rounded-full"
                     style={{
                       width: `${Math.max(4, (row.total / max) * 100)}%`,
-                      backgroundColor: BAR_COLORS[index] ?? BAR_COLORS.at(-1),
+                      backgroundColor: row.color ?? BAR_COLORS[index] ?? BAR_COLORS.at(-1),
                     }}
                   />
                 </div>
@@ -76,7 +76,7 @@ const DebtSummary = ({ rows, total }) => {
   );
 };
 
-const Evolution = ({ serie, deltaPct }) => (
+export const Evolution = ({ serie, deltaPct }) => (
   <PanelShell
     icon={TrendIcon}
     title="Evolucion de la deuda"

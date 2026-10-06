@@ -10,6 +10,7 @@ import {
   computeDriverDocumentAlerts,
   computeLocationPermissionAlerts,
   computeOverdueServices,
+  computeMultaAlerts,
   computeSpeedingAlerts,
   computeVehicleDocumentAlerts,
   computeVehicleMaintenanceAlerts,
@@ -25,6 +26,7 @@ import {
   listRecordFilesRequest,
   listRecordsRequest,
 } from "../lib/records.api";
+import { listMultaAlertsRequest } from "../lib/multas.api";
 import { listUsersRequest } from "../lib/users.api";
 import {
   getVehicleRequest,
@@ -128,6 +130,9 @@ const buildChoferAlerts = async () => {
     }
   });
 
+  // Multas que el chofer tiene que pagar el mismo (las "a descontar" las paga la empresa).
+  list.push(...computeMultaAlerts(await listMultaAlertsRequest().catch(() => null), false));
+
   return list;
 };
 
@@ -138,7 +143,7 @@ const buildChoferAlerts = async () => {
 // tardaran en cargar. computeLocationPermissionAlerts solo necesita saber que chofer
 // esta "en camino" ahora mismo, asi que le alcanza con los pendientes de hoy.
 const buildOwnerAlerts = async () => {
-  const [pendingRecords, users, vehicles, documents, syncFailures, areaCEntries, speedingEvents] =
+  const [pendingRecords, users, vehicles, documents, syncFailures, areaCEntries, speedingEvents, multaAlerts] =
     await Promise.all([
       listPendingRecordsRequest(),
       listUsersRequest(),
@@ -147,6 +152,8 @@ const buildOwnerAlerts = async () => {
       listAppsheetSyncFailuresRequest(),
       listUnpaidAreaCEntriesRequest(),
       listSpeedingEventsRequest(),
+      // Multas vencidas / por vencer / descuentos pendientes (una sola consulta liviana).
+      listMultaAlertsRequest().catch(() => null),
       // Se pide (y se descarta el resultado) solo para que el backend corra la
       // deteccion de Area C/exceso de velocidad como efecto de esta misma consulta
       // (ver checkAreaCEntries/checkSpeedingEvents en vehicle.service.js) - asi corre
@@ -164,6 +171,7 @@ const buildOwnerAlerts = async () => {
     ...computeAppsheetSyncAlerts(syncFailures),
     ...computeAreaCAlerts(areaCEntries),
     ...computeSpeedingAlerts(speedingEvents),
+    ...computeMultaAlerts(multaAlerts, true),
   ]);
 };
 

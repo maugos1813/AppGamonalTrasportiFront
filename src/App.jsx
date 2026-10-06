@@ -69,6 +69,11 @@ const NewMancatoPage = lazy(() =>
 const MancatoDetailPage = lazy(() =>
   import("./pages/mancato/MancatoDetailPage").then((m) => ({ default: m.MancatoDetailPage })),
 );
+const MultasPage = lazy(() => import("./pages/multas/MultasPage").then((m) => ({ default: m.MultasPage })));
+const NewMultaPage = lazy(() => import("./pages/multas/NewMultaPage").then((m) => ({ default: m.NewMultaPage })));
+const MultaDetailPage = lazy(() =>
+  import("./pages/multas/MultaDetailPage").then((m) => ({ default: m.MultaDetailPage })),
+);
 const VehiclesPage = lazy(() => import("./pages/vehicles/VehiclesPage").then((m) => ({ default: m.VehiclesPage })));
 
 // Rutas de detalle/alta que las listas (Registros, Choferes, Vehiculos) pueden abrir
@@ -91,6 +96,8 @@ const OverlayRoutes = () => (
         <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
         <Route path="/mancato-pagamento/new" element={<NewMancatoPage />} />
         <Route path="/mancato-pagamento/:id" element={<MancatoDetailPage />} />
+        <Route path="/multas/new" element={<NewMultaPage />} />
+        <Route path="/multas/:id" element={<MultaDetailPage />} />
       </Route>
     </Routes>
   </Suspense>
@@ -139,6 +146,9 @@ function App() {
               <Route path="/mancato-pagamento" element={<MancatoPagamentoPage />} />
               <Route path="/mancato-pagamento/new" element={<NewMancatoPage />} />
               <Route path="/mancato-pagamento/:id" element={<MancatoDetailPage />} />
+              <Route path="/multas" element={<MultasPage />} />
+              <Route path="/multas/new" element={<NewMultaPage />} />
+              <Route path="/multas/:id" element={<MultaDetailPage />} />
               <Route path="/mapa" element={<MapPage />} />
               <Route path="/mapa/area-c" element={<AreaCPage />} />
               <Route path="/control-flota" element={<ControlFlotaPage />} />

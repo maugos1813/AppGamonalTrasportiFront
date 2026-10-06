@@ -1,5 +1,5 @@
 import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS, getTagliandoStatus } from "./constants";
-import { formatDate, formatDateTime } from "./format";
+import { formatCurrency, formatDate, formatDateTime } from "./format";
 import { RECORD_AREAS, classifyRecord } from "./recordAreas";
 
 const isSameDay = (a, b) => {
@@ -955,4 +955,64 @@ export const computeMonthlyServicesTrend = (records, now = new Date()) => {
     bucket.byArea[classifyRecord(r)] += 1;
   });
   return buckets;
+};
+
+// Multas para la campanita (ver getMultaAlertsForActor en el backend): vencidas, por vencer en
+// 7 dias y, para la oficina, lo que falta descontar a los choferes. El chofer solo recibe las
+// que tiene que pagar el mismo. Se muestran las primeras de cada grupo y un aviso con el resto.
+export const computeMultaAlerts = (data, isPrivileged) => {
+  if (!data) return [];
+  const list = [];
+  const who = (item) => (isPrivileged && item.chofer ? ` - ${item.chofer}` : "");
+  const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+  data.vencidas.items.forEach((item) => {
+    const dias = -item.diasRestantes;
+    list.push({
+      id: `multa-vencida-${item.id}`,
+      severity: "urgent",
+      message: `La multa ${item.numeroVerbale} (${item.targa}${who(item)}) vencio hace ${plural(dias, "dia", "dias")} - ${formatCurrency(item.costo)}.`,
+      link: `/multas/${item.id}`,
+    });
+  });
+  const vencidasRestantes = data.vencidas.count - data.vencidas.items.length;
+  if (vencidasRestantes > 0) {
+    list.push({
+      id: "multas-vencidas-mas",
+      severity: "urgent",
+      message: `Hay ${plural(vencidasRestantes, "multa vencida mas", "multas vencidas mas")}.`,
+      link: "/multas",
+    });
+  }
+
+  data.porVencer.items.forEach((item) => {
+    const cuando = item.diasRestantes === 0 ? "vence hoy" : `vence en ${plural(item.diasRestantes, "dia", "dias")}`;
+    list.push({
+      id: `multa-por-vencer-${item.id}`,
+      severity: item.diasRestantes <= 2 ? "urgent" : "warning",
+      message: `La multa ${item.numeroVerbale} (${item.targa}${who(item)}) ${cuando} - ${formatCurrency(item.costo)}.`,
+      link: `/multas/${item.id}`,
+    });
+  });
+  const porVencerRestantes = data.porVencer.count - data.porVencer.items.length;
+  if (porVencerRestantes > 0) {
+    list.push({
+      id: "multas-por-vencer-mas",
+      severity: "warning",
+      message: `Hay ${plural(porVencerRestantes, "multa mas que vence", "multas mas que vencen")} en los proximos 7 dias.`,
+      link: "/multas",
+    });
+  }
+
+  if (isPrivileged && data.aDescontar.count > 0) {
+    list.push({
+      // El id cambia con la cantidad: si aparecen mas descuentos, vuelve a mostrarse aunque se haya descartado.
+      id: `multas-descuento-${data.aDescontar.count}`,
+      severity: "reminder",
+      message: `Faltan descontar ${formatCurrency(data.aDescontar.total)} a los choferes (${plural(data.aDescontar.count, "multa", "multas")}).`,
+      link: "/multas",
+    });
+  }
+
+  return list;
 };
