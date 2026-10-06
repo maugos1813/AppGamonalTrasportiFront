@@ -36,8 +36,8 @@ import {
 
 const FOURTEEN_DAYS_MS = 14 * 24 * 60 * 60 * 1000;
 // Las alertas OWNER/ADMIN dependen de tiempos concretos (ETA a 45min, vencimientos
-// a 30 dias): se refrescan solas cada minuto para no depender de que el usuario navegue.
-const OWNER_REFRESH_MS = 60 * 1000;
+// a 30 dias): se refrescan solas cada 2 minutos para no depender de que el usuario navegue.
+const OWNER_REFRESH_MS = 2 * 60 * 1000;
 
 const SEVERITY_ORDER = { urgent: 0, warning: 1, reminder: 2 };
 const sortBySeverity = (list) =>
@@ -150,7 +150,7 @@ const buildOwnerAlerts = async () => {
       // Se pide (y se descarta el resultado) solo para que el backend corra la
       // deteccion de Area C/exceso de velocidad como efecto de esta misma consulta
       // (ver checkAreaCEntries/checkSpeedingEvents en vehicle.service.js) - asi corre
-      // cada 60s mientras cualquier pantalla de la app este abierta, no solo el Mapa.
+      // cada 2 minutos mientras cualquier pantalla de la app este abierta, no solo el Mapa.
       // El resultado real de las alertas viene de las requests de arriba.
       listVehicleLivePositionsRequest().catch(() => null),
     ]);
@@ -226,7 +226,7 @@ export const NotificationsProvider = ({ children }) => {
     const idleId = scheduleIdle(run);
     // Pausa sola mientras la pestania no esta visible (ver startVisibleInterval) - una
     // pestania olvidada en segundo plano no tiene por que seguir pidiendo esto cada
-    // minuto para siempre (5 pedidos en paralelo cada vez, ver buildOwnerAlerts).
+    // 2 minutos para siempre (5 pedidos en paralelo cada vez, ver buildOwnerAlerts).
     const stopPolling = isPrivileged ? startVisibleInterval(run, OWNER_REFRESH_MS) : null;
 
     return () => {

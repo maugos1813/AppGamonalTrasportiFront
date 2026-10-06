@@ -226,10 +226,20 @@ export const OwnerDashboardPage = () => {
     return { year: now.getFullYear(), month: now.getMonth() + 1 };
   });
 
+  // Trae solo desde diciembre del año anterior al mas viejo que se necesita (el año en curso,
+  // o el del mes elegido si se navega hacia atras): las tendencias son del año en curso y
+  // la variacion de enero compara contra diciembre. Antes pedia todo el historico y esa
+  // respuesta crece para siempre. Al navegar a un año anterior se vuelve a pedir, sin
+  // vaciar la pantalla mientras llega.
+  const sinceYear = Math.min(new Date().getFullYear(), selectedMonth.year);
+
   useEffect(() => {
     let cancelled = false;
 
-    listRecordsRequest()
+    const since = new Date(sinceYear - 1, 11, 1);
+    const days = Math.ceil((Date.now() - since.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+
+    listRecordsRequest({ days })
       .then((recordsData) => {
         if (cancelled) return;
         setRecords(recordsData);
@@ -241,7 +251,7 @@ export const OwnerDashboardPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [sinceYear]);
 
   const loaded = Boolean(records);
 

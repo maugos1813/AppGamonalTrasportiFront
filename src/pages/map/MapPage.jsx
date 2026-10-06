@@ -24,7 +24,7 @@ import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { addMinutes } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { startVisibleInterval } from "../../lib/polling";
-import { getRecordLiveEtaRequest, listRecordsRequest } from "../../lib/records.api";
+import { getRecordLiveEtaRequest, listPendingRecordsRequest } from "../../lib/records.api";
 import { getEtaToDestinationRequest, listVehicleLivePositionsRequest } from "../../lib/vehicles.api";
 import { getDriverReturnEtaRequest, listDriverLocationsRequest, listUsersRequest } from "../../lib/users.api";
 
@@ -259,7 +259,9 @@ export const MapPage = () => {
       } else {
         setLocations([]);
       }
-      listRecordsRequest()
+      // Solo los servicios de hoy en curso (/records/pending), no el historial completo: el
+      // mapa se refresca cada 30s y el historial pesa MBs.
+      listPendingRecordsRequest()
         .then((data) => {
           // Acotado a Piazza + DHL Roma (ver filterToPiazzaYDhlRoma) - la lista de
           // "servicios en curso" no debe mostrar pendientes de DHL Milano/AB Service/
