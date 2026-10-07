@@ -1,5 +1,19 @@
 // Punto de partida fijo de todo servicio (coincide con DEPOT_ORIGIN del backend).
 // Aca es solo para mostrarlo en la UI, no se geocodifica en el frontend.
+// Sugerencias para el punto de salida de un servicio (solo atajos: el campo es de texto libre). Las que
+// traen coordenadas se guardan con ubicacion exacta, sin geocodificar.
+export const SALIDA_SUGERENCIAS = [
+  {
+    id: "dhl-milano",
+    label: "DHL Milano",
+    direccion: "Via Walter Tobagi, 8, 20068 Bettola-Zeloforamagno MI",
+    lat: 45.4316679,
+    lng: 9.2858459,
+  },
+  { id: "ab-service", label: "AB Service", direccion: "AB Service", lat: 45.37563890454172, lng: 9.79930539971582 },
+  { id: "dhl-roma", label: "DHL Roma", direccion: "DHL Roma", lat: 41.87714283318788, lng: 12.359177365097292 },
+];
+
 export const DEPOT_ORIGIN_LABEL = "Via Walter Tobagi, 8, 20068 Bettola-Zeloforamagno MI";
 
 export const AREA_OPTIONS = [

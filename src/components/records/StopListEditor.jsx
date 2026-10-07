@@ -1,6 +1,7 @@
 import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
 import { DEPOT_ORIGIN_LABEL } from "../../lib/constants";
+import { SalidaField } from "./SalidaField";
 
 // Arma la direccion final que recibe el backend a partir de la parada (texto
 // libre, puede incluir el CAP) + el campo CAP aparte (ayuda opcional para que
@@ -13,11 +14,12 @@ export const combineStopAddress = ({ direccion, cap }) => {
   return [trimmedDireccion, trimmedCap].filter(Boolean).join(", ");
 };
 
-// Lista ordenada de paradas de un servicio (siempre arranca en el deposito fijo,
-// que se muestra solo como referencia, no es editable). Cada parada tiene una
+// Lista ordenada de paradas de un servicio. Arranca en el punto de salida (campo "Salida", ver
+// SalidaField: texto libre con sugerencias; si no se pasa "salida" se muestra el deposito fijo solo como
+// referencia). Cada parada tiene una
 // direccion de texto libre y un CAP opcional aparte (ayuda para que el backend
 // geocodifique mejor); se combinan en un solo string antes de enviar al backend.
-export const StopListEditor = ({ stops, onChange, error, disabled }) => {
+export const StopListEditor = ({ stops, onChange, error, disabled, salida, onSalidaChange, salidaError }) => {
   const updateStop = (index, field, value) => {
     const next = [...stops];
     next[index] = { ...next[index], [field]: value };
@@ -41,12 +43,19 @@ export const StopListEditor = ({ stops, onChange, error, disabled }) => {
 
   return (
     <div className="flex flex-col gap-3">
-      <div>
-        <span className="mb-1.5 block text-[13px] font-medium text-ink-300">Paradas</span>
-        <p className="glass-surface-sm rounded-xl px-4 py-3 text-[14px] text-ink-300">
-          Salida: {DEPOT_ORIGIN_LABEL}
-        </p>
-      </div>
+      {salida && onSalidaChange ? (
+        <SalidaField value={salida} onChange={onSalidaChange} disabled={disabled} error={salidaError} />
+      ) : (
+        <div>
+          <span className="mb-1.5 block text-[13px] font-medium text-ink-300">Paradas</span>
+          <p className="glass-surface-sm rounded-xl px-4 py-3 text-[14px] text-ink-300">
+            Salida: {DEPOT_ORIGIN_LABEL}
+          </p>
+        </div>
+      )}
+      {salida && onSalidaChange && (
+        <span className="-mb-1.5 block text-[13px] font-medium text-ink-300">Paradas</span>
+      )}
 
       {stops.map((stop, index) => (
         <div key={index} className="flex flex-wrap items-start gap-2">

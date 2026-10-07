@@ -10,6 +10,7 @@ import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
+import { buildSalidaPayload, EMPTY_SALIDA } from "../../components/records/SalidaField";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
@@ -29,6 +30,8 @@ const INITIAL_FORM = {
   // de Registros sin poder confiar en el filtro (ver backfill-zona-milano.js).
   extrasPiazzaZona: "MILANO",
   stops: [{ direccion: "", cap: "" }],
+  // Punto de salida: en blanco al empezar (si queda vacio se usa el deposito).
+  salida: EMPTY_SALIDA,
   descripcion: "",
   fechaServicio: "",
   eta: "",
@@ -93,8 +96,10 @@ export const NewRecordPage = () => {
 
     // Esta pantalla solo se usa hoy para la seccion "Extras Piazza" (DHL/AB Service
     // todavia no tiene su propia alta), asi que el spedizzione queda fijo aca.
+    const { salida, ...formWithoutSalida } = form;
+    const salidaPayload = buildSalidaPayload(salida);
     const payload = Object.fromEntries(
-      Object.entries({ ...form, stops: trimmedStops, spedizzione: "EXTRA_PIAZZA" }).filter(
+      Object.entries({ ...formWithoutSalida, ...(salidaPayload ? { salida: salidaPayload } : {}), stops: trimmedStops, spedizzione: "EXTRA_PIAZZA" }).filter(
         ([key, value]) => key === "stops" || value !== ""
       )
     );
@@ -263,6 +268,9 @@ export const NewRecordPage = () => {
             <StopListEditor
               stops={form.stops}
               onChange={(stops) => setField("stops", stops)}
+              salida={form.salida}
+              onSalidaChange={(salida) => setField("salida", salida)}
+              salidaError={fieldErrors.salida?.[0]}
               error={fieldErrors.stops?.[0]}
               disabled={submitting}
             />

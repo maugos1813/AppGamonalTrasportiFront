@@ -16,6 +16,7 @@ import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
+import { buildSalidaPayload } from "../../components/records/SalidaField";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
@@ -280,6 +281,11 @@ const toFormState = (record) => ({
   otroChoferTermino: Boolean(record.relevo),
   choferRelevoId: record.relevo?.driverId ?? "",
   vehicleId: record.vehicle?.id ?? "",
+  salida: {
+    direccion: record.salida?.direccion ?? "",
+    lat: record.salida?.lat ?? null,
+    lng: record.salida?.lng ?? null,
+  },
   aplicativo: record.aplicativo ?? "",
   extrasPiazzaZona: record.extrasPiazzaZona ?? "",
   stops: record.stops?.length
@@ -484,6 +490,15 @@ export const RecordDetailPage = () => {
         ])
         .filter(([, value]) => value !== "" && value !== undefined)
     );
+
+    // Salida: solo si cambio respecto de lo guardado; vacia = vuelve al deposito.
+    if (!isChofer) {
+      const saved = record.salida;
+      const next = form.salida;
+      const changed =
+        next.direccion.trim() !== (saved?.direccion ?? "") || next.lat !== (saved?.lat ?? null) || next.lng !== (saved?.lng ?? null);
+      if (changed) payload.salida = buildSalidaPayload(next) ?? null;
+    }
 
     // Traspaso: solo si cambio respecto de lo guardado.
     if (!isChofer && !record.origen) {
@@ -730,6 +745,7 @@ const RecordSummaryView = ({
           value={record.fechaRetiro ? `${formatRomeDateTime(record.fechaRetiro)} (Roma)` : "Sin cargar"}
         />
         <InfoRow label="ETA" value={formatDateTime(record.eta)} />
+        {record.salida?.direccion && <InfoRow label="Salida" value={record.salida.direccion} />}
         <InfoRow
           label="Vehiculo"
           value={`${record.vehicle?.targa ?? "-"} - ${record.vehicle?.modelo ?? ""}`}
@@ -1046,6 +1062,8 @@ const RecordEditForm = ({
             <StopListEditor
               stops={form.stops}
               onChange={(stops) => setField("stops", stops)}
+              salida={form.salida}
+              onSalidaChange={(salida) => setField("salida", salida)}
               disabled={saving}
             />
 

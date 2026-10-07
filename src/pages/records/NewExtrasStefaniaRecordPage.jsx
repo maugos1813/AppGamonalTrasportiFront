@@ -10,6 +10,7 @@ import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
+import { buildSalidaPayload, EMPTY_SALIDA } from "../../components/records/SalidaField";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
@@ -25,6 +26,8 @@ const INITIAL_FORM = {
   driverId: "",
   vehicleId: "",
   stops: [{ direccion: "", cap: "" }],
+  // Punto de salida: en blanco al empezar (si queda vacio se usa el deposito).
+  salida: EMPTY_SALIDA,
   descripcion: "",
   fechaServicio: "",
   eta: "",
@@ -84,8 +87,10 @@ export const NewExtrasStefaniaRecordPage = () => {
 
     // Esta pantalla es la unica alta de la seccion "Extras Stefania", asi que el
     // spedizzione queda fijo aca (igual que "Extras Piazza" en NewRecordPage.jsx).
+    const { salida, ...formWithoutSalida } = form;
+    const salidaPayload = buildSalidaPayload(salida);
     const payload = Object.fromEntries(
-      Object.entries({ ...form, stops: trimmedStops, spedizzione: "EXTRAS_STEFANIA" }).filter(
+      Object.entries({ ...formWithoutSalida, ...(salidaPayload ? { salida: salidaPayload } : {}), stops: trimmedStops, spedizzione: "EXTRAS_STEFANIA" }).filter(
         ([key, value]) => key === "stops" || value !== ""
       )
     );
@@ -244,6 +249,9 @@ export const NewExtrasStefaniaRecordPage = () => {
             <StopListEditor
               stops={form.stops}
               onChange={(stops) => setField("stops", stops)}
+              salida={form.salida}
+              onSalidaChange={(salida) => setField("salida", salida)}
+              salidaError={fieldErrors.salida?.[0]}
               error={fieldErrors.stops?.[0]}
               disabled={submitting}
             />

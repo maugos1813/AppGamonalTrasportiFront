@@ -15,6 +15,7 @@ import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
+import { buildSalidaPayload, EMPTY_SALIDA, SalidaField } from "../../components/records/SalidaField";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
 
@@ -45,6 +46,8 @@ const INITIAL_FORM = {
   vignetta: "",
   costoHotel: "",
   costoTraforoFrejusBrennero: "",
+  // Punto de salida: en blanco al empezar (si queda vacio se usa el deposito).
+  salida: EMPTY_SALIDA,
 };
 
 // Arma la direccion de la parada final a partir de calle/CAP/ciudad, en el mismo
@@ -100,14 +103,15 @@ export const NewDhlAbServiceRecordPage = () => {
     setFormError("");
     setFieldErrors({});
 
-    const { calle, cap, ciudad, ...rest } = form;
+    const { calle, cap, ciudad, salida, ...rest } = form;
+    const salidaPayload = buildSalidaPayload(salida);
     const direccion = buildAddress({ calle, cap, ciudad });
     // DHL/AB Service no maneja codigos propios: se genera uno interno solo para
     // cumplir la columna unica de la base, no se le muestra al usuario.
     const codigo = `${form.spedizzione}-${Date.now()}`;
 
     const payload = Object.fromEntries(
-      Object.entries({ ...rest, codigo, ciudad, stops: [direccion] }).filter(
+      Object.entries({ ...rest, ...(salidaPayload ? { salida: salidaPayload } : {}), codigo, ciudad, stops: [direccion] }).filter(
         ([key, value]) => key === "stops" || value !== ""
       )
     );
@@ -319,6 +323,21 @@ export const NewDhlAbServiceRecordPage = () => {
               value={form.comentarios}
               onChange={handleChange("comentarios")}
               error={fieldErrors.comentarios?.[0]}
+            />
+          </div>
+        </GlassCard>
+
+        <GlassCard>
+          <h2 className="text-[17px] font-medium text-ink-50">Salida</h2>
+          <p className="mt-1 text-[13px] text-ink-300">
+            Desde donde sale el servicio. Elige una sugerencia o escribe una direccion.
+          </p>
+          <div className="mt-5">
+            <SalidaField
+              value={form.salida}
+              onChange={(salida) => setField("salida", salida)}
+              disabled={submitting}
+              error={fieldErrors.salida?.[0]}
             />
           </div>
         </GlassCard>
