@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { CombustibleSidebar } from "../../components/combustible/CombustibleSidebar";
 import { MancatoKpi } from "../../components/mancato/MancatoKpi";
 import { Alert } from "../../components/ui/Alert";
@@ -25,7 +25,12 @@ import {
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, COMBUSTIBLE_AREAS } from "../../lib/combustible";
+import {
+  AREA_OPTIONS,
+  COMBUSTIBLE_ASIGNACIONES,
+  COMBUSTIBLE_ASIGNACION_FILTER_OPTIONS,
+  COMBUSTIBLE_AREAS,
+} from "../../lib/combustible";
 import {
   getCombustibleStatsRequest,
   getCombustibleSummaryRequest,
@@ -38,7 +43,17 @@ import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const PAGE_SIZE = 20;
 
-const EMPTY_FILTERS = { area: "", driverId: "", targa: "", metodo: "", from: "", to: "", q: "", orden: "" };
+const EMPTY_FILTERS = {
+  area: "",
+  driverId: "",
+  targa: "",
+  metodo: "",
+  asignacion: "",
+  from: "",
+  to: "",
+  q: "",
+  orden: "",
+};
 
 const ORDEN_OPTIONS = [
   { value: "", label: "Mas recientes" },
@@ -126,6 +141,17 @@ const RowMenu = ({ registro, location }) => {
   );
 };
 
+// Servicio al que se imputa la carga, o por que todavia no tiene (no vence: queda esperando).
+const ServicioTag = ({ registro }) => {
+  if (registro.asignacion === "AUTO" || registro.asignacion === "CONFIRMADO" || registro.asignacion === "MANUAL") {
+    return registro.servicio ? (
+      <span className="block truncate text-[11px] text-ink-400">Servicio {registro.servicio.codigo}</span>
+    ) : null;
+  }
+  const info = COMBUSTIBLE_ASIGNACIONES[registro.asignacion];
+  return <span className={clsx("block text-[11px] font-medium", info.tone)}>{info.label}</span>;
+};
+
 const CombustibleRow = ({ registro, area, showDriver, vehicle, location }) => {
   const driverName = registro.driver ? `${registro.driver.nombre} ${registro.driver.apellido}` : "Sin chofer";
 
@@ -166,6 +192,7 @@ const CombustibleRow = ({ registro, area, showDriver, vehicle, location }) => {
           <span className="block text-[12px] text-ink-400 underline decoration-ink-500/50 underline-offset-2">
             {registro.targa}
           </span>
+          <ServicioTag registro={registro} />
         </div>
 
         {/* Gasolinera */}
@@ -345,7 +372,14 @@ export const CombustiblePage = () => {
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const { version } = useDataRefresh("combustible");
 
-  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [searchParams] = useSearchParams();
+  const asignacionParam = searchParams.get("asignacion");
+  // Los avisos de "Atencion requerida" (Finanzas) llegan con ?asignacion=... para abrir la lista ya
+  // filtrada.
+  const [filters, setFilters] = useState(() => ({ ...EMPTY_FILTERS, asignacion: asignacionParam ?? "" }));
+  useEffect(() => {
+    if (asignacionParam !== null) setFilters((prev) => ({ ...prev, asignacion: asignacionParam }));
+  }, [asignacionParam]);
   // En celular arrancan cerrados (ocupan media pantalla); en escritorio, abiertos.
   const [filtersOpen, setFiltersOpen] = useState(() => window.innerWidth >= 1024);
   const [vehicles, setVehicles] = useState([]);
@@ -384,10 +418,11 @@ export const CombustiblePage = () => {
       driverId: filters.driverId || undefined,
       targa: filters.targa.trim() || undefined,
       metodo: filters.metodo.trim() || undefined,
+      asignacion: filters.asignacion || undefined,
       from: filters.from || undefined,
       to: filters.to || undefined,
     }),
-    [filters.q, filters.driverId, filters.targa, filters.metodo, filters.from, filters.to]
+    [filters.q, filters.driverId, filters.targa, filters.metodo, filters.asignacion, filters.from, filters.to]
   );
   const params = useDebounced(rawParams, 350);
   const paramsKey = JSON.stringify(params);
@@ -638,6 +673,17 @@ export const CombustiblePage = () => {
                     ))}
                   </datalist>
                 </div>
+                {isPrivileged && (
+                  <div className="min-w-[170px] flex-[1_1_170px]">
+                    <Select
+                      id="filtro-asignacion"
+                      label="Servicio"
+                      options={COMBUSTIBLE_ASIGNACION_FILTER_OPTIONS}
+                      value={filters.asignacion}
+                      onChange={(e) => setFilter("asignacion", e.target.value)}
+                    />
+                  </div>
+                )}
                 <div className="min-w-[150px] flex-[1_1_150px]">
                   <Select
                     id="filtro-orden"

@@ -29,6 +29,8 @@ import { formatCurrency } from "../../lib/format";
 const TONE = {
   danger: { dot: "bg-danger-500 shadow-[0_0_6px_var(--danger-500)]", edge: "border-l-danger-500" },
   warning: { dot: "bg-warning-500 shadow-[0_0_6px_var(--warning-500)]", edge: "border-l-warning-500" },
+  // Informativo y sin urgencia (p. ej. cargas de combustible esperando su servicio).
+  info: { dot: "bg-accent-400", edge: "border-l-accent-400" },
 };
 
 // KPI que lleva a la pestaña correspondiente.
@@ -171,7 +173,9 @@ export const FinanzasResumenPage = () => {
               value={formatCurrency(mes.combustible.total)}
               deltaPct={mes.combustible.deltaPct}
               deltaLabel="vs. mes anterior"
-              detail={`${mes.combustible.cargas} ${mes.combustible.cargas === 1 ? "carga" : "cargas"}`}
+              detail={`${mes.combustible.cargas} ${mes.combustible.cargas === 1 ? "carga" : "cargas"}${
+                mes.combustible.estimado > 0 ? ` + ${formatCurrency(mes.combustible.estimado)} estimado` : ""
+              }`}
               color={COSTO_COLORS.combustible}
             />
           </KpiLink>

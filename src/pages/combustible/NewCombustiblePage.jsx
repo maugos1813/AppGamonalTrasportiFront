@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { CombustibleForm } from "../../components/combustible/CombustibleForm";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
+import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { createCombustibleRequest } from "../../lib/combustible.api";
@@ -14,13 +15,20 @@ export const NewCombustiblePage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  const { user } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  // Cuando el backend avisa de un posible duplicado (409), la oficina puede registrarla igual.
+  const [duplicate, setDuplicate] = useState(false);
+  const lastSubmit = useRef(null);
 
-  const handleSubmit = async (fields, files) => {
+  const handleSubmit = async (fields, files, { force = false } = {}) => {
+    lastSubmit.current = { fields, files };
     setSubmitting(true);
     setError("");
     setFieldErrors({});
+    setDuplicate(false);
     try {
-      const registro = await createCombustibleRequest(fields, files);
+      const registro = await createCombustibleRequest(force ? { ...fields, forzar: "true" } : fields, files);
       refresh();
       // Se preserva backgroundLocation (ver App.jsx) para que el detalle tambien se
       // muestre como overlay sobre la lista.
@@ -32,6 +40,7 @@ export const NewCombustiblePage = () => {
       const parsed = parseApiError(err);
       setError(parsed.message);
       setFieldErrors(parsed.fieldErrors || {});
+      if (err?.response?.status === 409) setDuplicate(true);
     } finally {
       setSubmitting(false);
     }
@@ -57,6 +66,11 @@ export const NewCombustiblePage = () => {
           <CombustibleForm
             mode="create"
             onSubmit={handleSubmit}
+            onForce={
+              duplicate && isPrivileged
+                ? () => handleSubmit(lastSubmit.current.fields, lastSubmit.current.files, { force: true })
+                : undefined
+            }
             submitting={submitting}
             error={error}
             fieldErrors={fieldErrors}

@@ -41,3 +41,11 @@ export const updateCombustibleRequest = (id, fields, files) =>
   api.patch(`${BASE}/${id}`, toFormData(fields, files)).then((res) => res.data.data.registro);
 
 export const deleteCombustibleRequest = (id) => api.delete(`${BASE}/${id}`);
+
+// Servicios del vehiculo cerca de la carga, para elegir a mano a cual pertenece (OWNER/ADMIN).
+export const listCombustibleCandidatesRequest = (id) =>
+  api.get(`${BASE}/${id}/candidatos`).then((res) => res.data.data.candidatos);
+
+// Vuelve a evaluar las cargas que la oficina no fijo a mano. Devuelve { revisados, cambiados }.
+export const rematchCombustibleRequest = () =>
+  api.post(`${BASE}/reasignar`).then((res) => res.data.data.resultado);

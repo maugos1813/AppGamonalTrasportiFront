@@ -398,7 +398,7 @@ export const NewDhlAbServiceRecordPage = () => {
             />
             <TextField
               id="costoCombustible"
-              label="Costo combustible"
+              label="Costo combustible (a mano)"
               type="number"
               step="0.01"
               min="0"

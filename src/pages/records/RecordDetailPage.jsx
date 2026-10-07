@@ -85,6 +85,57 @@ const MancatosOfService = ({ mancatos }) => {
   );
 };
 
+// Combustible del servicio: los comprobantes asignados mandan; si no hay, vale lo cargado a mano.
+// Si lo cargado a mano es casi el doble (o mas) de lo que suman los comprobantes, se avisa para
+// auditar. Nunca se suman las dos fuentes.
+const FuelOfService = ({ record }) => {
+  const location = useLocation();
+  const fuel = record.combustible;
+  if (!fuel) return null;
+  const items = fuel.comprobantes?.items ?? [];
+
+  return (
+    <div className="flex flex-col gap-2 sm:col-span-2">
+      <InfoRow
+        label="Combustible (fuera del total)"
+        value={
+          fuel.total
+            ? `${formatCurrency(fuel.total)} - ${
+                fuel.fuente === "COMPROBANTES"
+                  ? `${fuel.comprobantes.count} ${fuel.comprobantes.count === 1 ? "comprobante" : "comprobantes"}`
+                  : "estimado (a mano, sin comprobantes)"
+              }`
+            : "-"
+        }
+      />
+      {items.length > 0 && (
+        <ul className="flex flex-col gap-1">
+          {items.map((c) => (
+            <li key={c.id}>
+              <Link
+                to={`/finanzas/combustible/${c.id}`}
+                state={{ backgroundLocation: location }}
+                className="flex flex-wrap items-center gap-x-3 rounded-lg bg-line/[0.06] px-3 py-1.5 text-[12px] transition-colors hover:bg-line/10"
+              >
+                <span className="text-ink-300">{formatRomeDateTime(c.fechaHora)}</span>
+                <span className="text-ink-200">{c.metodo}</span>
+                <span className="ml-auto font-semibold text-ink-50">{formatCurrency(c.monto)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {fuel.auditar && (
+        <div className="rounded-xl bg-warning-500/10 px-3 py-2 text-[12px] text-warning-500">
+          A auditar: el combustible cargado a mano ({formatCurrency(fuel.manual)}) es casi el doble o mas de lo
+          que suman los comprobantes ({formatCurrency(fuel.comprobantes.total)}). Se usa el de los
+          comprobantes; revisa si falta subir alguno o si el valor a mano esta inflado.
+        </div>
+      )}
+    </div>
+  );
+};
+
 const OPERATIONAL_FIELDS = [
   "estado",
   "horasDia",
@@ -155,7 +206,9 @@ const toFormState = (record) => ({
   costoHotel: record.costoHotel ?? "",
   costoOtros: record.costoOtros ?? "",
   pagoRecibido: record.pagoRecibido ?? "",
-  costoCombustible: record.costoCombustible ?? "",
+  // Lo que se escribio a mano (record.costoCombustible es el efectivo: comprobantes o, si no hay,
+  // este valor). Si se cargara el efectivo aca, al guardar se pisaria el valor a mano.
+  costoCombustible: record.costoCombustibleManual ?? "",
   clienteConfirmado: record.clienteConfirmado ?? false,
 });
 
@@ -631,10 +684,7 @@ const RecordSummaryView = ({
             />
           </div>
           <div className="mt-4 grid grid-cols-1 gap-4 border-t border-line/10 pt-4 sm:grid-cols-3">
-            <InfoRow
-              label="Combustible (fuera del total)"
-              value={record.costoCombustible ? formatCurrency(record.costoCombustible) : "-"}
-            />
+            <FuelOfService record={record} />
             <InfoRow label="Monto recibido" value={record.pagoRecibido ? formatCurrency(record.pagoRecibido) : "-"} />
           </div>
         </div>
@@ -934,7 +984,7 @@ const RecordEditForm = ({
               />
               <TextField
                 id="costoCombustible"
-                label="Costo combustible"
+                label="Costo combustible (a mano)"
                 type="number"
                 step="0.01"
                 min="0"

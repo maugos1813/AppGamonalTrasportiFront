@@ -5,7 +5,7 @@ import { MancatoKpi } from "../../components/mancato/MancatoKpi";
 import { DebtSummary } from "../../components/mancato/MancatoSidebar";
 import { Alert } from "../../components/ui/Alert";
 import { PageLoader } from "../../components/ui/PageLoader";
-import { EuroIcon, FileTextIcon, TruckIcon } from "../../components/ui/icons";
+import { AlertTriangleIcon, EuroIcon, FileTextIcon, TruckIcon } from "../../components/ui/icons";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { COSTO_COLORS, currentMonth, monthName } from "../../lib/finanzas";
@@ -84,6 +84,48 @@ export const GastosServiciosPage = () => {
               color="#a78bfa"
             />
           </div>
+
+          {data.combustibleRevisar.length > 0 && (
+            <section className="rounded-2xl border border-warning-500/40 bg-warning-500/[0.05] p-4 sm:p-5">
+              <h2 className="flex items-center gap-2 text-[15px] font-semibold text-warning-500">
+                <AlertTriangleIcon className="h-4 w-4" />
+                Combustible a auditar ({data.combustibleRevisar.length})
+              </h2>
+              <p className="mt-1 text-[12px] text-ink-300">
+                En estos servicios el combustible cargado a mano es casi el doble (o mas) de lo que suman los
+                comprobantes. Se cuentan los comprobantes; revisa si falta subir alguno o si el valor a mano
+                esta inflado. Ultimos 6 meses.
+              </p>
+              <ul className="mt-3 flex flex-col gap-1.5">
+                {data.combustibleRevisar.map((item) => (
+                  <li key={item.id}>
+                    <Link
+                      to={`/records/${item.id}`}
+                      state={{ backgroundLocation: location }}
+                      className="flex flex-wrap items-center gap-x-4 gap-y-0.5 rounded-lg bg-line/[0.06] px-3 py-2 text-[13px] transition-colors hover:bg-line/10"
+                    >
+                      <span className="font-medium text-ink-50">{item.codigo}</span>
+                      <span className="text-ink-400">{formatDate(item.fecha)}</span>
+                      <span className="min-w-0 truncate text-ink-300">
+                        {[item.cliente, item.driver].filter(Boolean).join(" - ")}
+                      </span>
+                      <span className="ml-auto flex items-center gap-3">
+                        <span className="text-ink-300">
+                          A mano <b className="text-warning-500">{formatCurrency(item.manual)}</b>
+                        </span>
+                        <span className="text-ink-300">
+                          Comprobantes{" "}
+                          <b className="text-ink-50">
+                            {formatCurrency(item.comprobantes)} ({item.cargas})
+                          </b>
+                        </span>
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
             <section className="glass-surface min-w-0 rounded-2xl p-2 sm:p-3">

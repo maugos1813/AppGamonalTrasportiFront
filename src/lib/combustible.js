@@ -38,3 +38,24 @@ export const saveLastUsed = ({ area, metodo }) => {
     // Sin almacenamiento: no pasa nada.
   }
 };
+
+// A que servicio se imputa cada carga (lo calcula el backend; ver combustibleMatching.service.js).
+// "Esperando servicio" no vence: se asigna sola cuando se carga un servicio que encaje.
+export const COMBUSTIBLE_ASIGNACIONES = {
+  AUTO: { label: "Asignada", pill: "bg-success-500/15 text-success-500", tone: "text-success-500" },
+  CONFIRMADO: { label: "Confirmada", pill: "bg-success-500/15 text-success-500", tone: "text-success-500" },
+  MANUAL: { label: "Asignada a mano", pill: "bg-success-500/15 text-success-500", tone: "text-success-500" },
+  SUGERIDO: { label: "Por confirmar", pill: "bg-warning-500/20 text-warning-500", tone: "text-warning-500" },
+  EN_ESPERA: { label: "Esperando servicio", pill: "bg-accent-500/20 text-accent-300", tone: "text-accent-300" },
+};
+
+export const COMBUSTIBLE_ASIGNACION_FILTER_OPTIONS = [
+  { value: "", label: "Todos" },
+  { value: "REVISAR", label: "Por revisar" },
+  { value: "SUGERIDO", label: "Por confirmar" },
+  { value: "EN_ESPERA", label: "Esperando servicio" },
+];
+
+// Hora actual de Roma ("HH:MM"): valor por defecto de la hora de la carga.
+export const romeNowHHMM = () =>
+  new Date().toLocaleTimeString("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { CombustibleForm } from "../../components/combustible/CombustibleForm";
+import { CombustibleServicioCard } from "../../components/combustible/CombustibleServicioCard";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
@@ -84,6 +85,20 @@ export const CombustibleDetailPage = () => {
       setFieldErrors(parsed.fieldErrors || {});
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Confirmar o cambiar el servicio sin abrir la edicion (OWNER/ADMIN).
+  const quickUpdate = async (fields) => {
+    setBusy(true);
+    setActionError("");
+    try {
+      setRegistro(await updateCombustibleRequest(id, fields));
+      refresh();
+    } catch (err) {
+      setActionError(parseApiError(err).message);
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -177,6 +192,7 @@ export const CombustibleDetailPage = () => {
             <GlassCard className="border-l-4" style={{ borderLeftColor: area.color }}>
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
                 <Fact label="Fecha">{formatDateOnly(registro.fecha)}</Fact>
+                <Fact label="Hora">{registro.horaCarga ?? "-"}</Fact>
                 <Fact label="Monto">{formatCurrency(registro.monto)}</Fact>
                 <Fact label="Método">{registro.metodo}</Fact>
                 <Fact label="Área">{area.label}</Fact>
@@ -184,6 +200,13 @@ export const CombustibleDetailPage = () => {
                 <Fact label="Chofer">{driverName}</Fact>
               </div>
             </GlassCard>
+
+            <CombustibleServicioCard
+              registro={registro}
+              isPrivileged={isPrivileged}
+              busy={busy}
+              onChange={quickUpdate}
+            />
 
             <GlassCard>
               <span className="mb-2 block text-[13px] font-medium text-ink-300">Comprobante de pago</span>
