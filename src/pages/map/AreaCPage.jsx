@@ -147,7 +147,7 @@ const AreaCRow = ({ entry, onSaved, onDelete }) => {
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-brand-green px-3 py-1.5 text-[12px] font-semibold text-brand-navy disabled:opacity-50"
+              className="rounded-lg bg-brand px-3 py-1.5 text-[12px] font-semibold text-brand-foreground disabled:opacity-50"
             >
               {saving ? "Guardando..." : "Guardar"}
             </button>

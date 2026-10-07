@@ -365,7 +365,7 @@ const NewServiceMenu = ({ areas, activeKey }) => {
         <button
           type="button"
           onClick={() => (active ? goTo(active) : setOpen((v) => !v))}
-          className="inline-flex items-center gap-2 rounded-l-full bg-brand-green py-2.5 pl-5 pr-4 text-[14px] font-semibold text-brand-navy transition-colors hover:bg-brand-green-light focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-green/40"
+          className="inline-flex items-center gap-2 rounded-l-full bg-brand py-2.5 pl-5 pr-4 text-[14px] font-semibold text-brand-foreground transition-colors hover:bg-brand-light focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/40"
         >
           <PlusIcon className="h-4 w-4" />
           Nuevo servicio
@@ -375,7 +375,7 @@ const NewServiceMenu = ({ areas, activeKey }) => {
           aria-label="Elegir el area del nuevo servicio"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
-          className="inline-flex items-center rounded-r-full border-l border-brand-navy/25 bg-brand-green px-3 text-brand-navy transition-colors hover:bg-brand-green-light focus:outline-none focus-visible:ring-4 focus-visible:ring-brand-green/40"
+          className="inline-flex items-center rounded-r-full border-l border-brand-foreground/25 bg-brand px-3 text-brand-foreground transition-colors hover:bg-brand-light focus:outline-none focus-visible:ring-4 focus-visible:ring-brand/40"
         >
           <ChevronDownIcon className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
         </button>

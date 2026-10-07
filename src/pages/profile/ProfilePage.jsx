@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import heroImage from "../../assets/login-hero.webp";
+import { AppearanceSection } from "../../components/profile/AppearanceSection";
 import { LocationSharingBlock } from "../../components/profile/LocationSharingBlock";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
@@ -22,6 +23,7 @@ import {
   KeyIcon,
   MailIcon,
   MapPinIcon,
+  PaletteIcon,
   PencilIcon,
   PhoneIcon,
   PlusIcon,
@@ -162,10 +164,11 @@ const InfoRow = ({ icon: Icon, label, value, href }) => (
 
 const HeaderFact = ({ icon: Icon, label, value }) => (
   <div className="flex items-start gap-3">
-    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-ink-300" />
+    {/* La cabecera siempre es una foto oscura: colores fijos claros, no los del tema. */}
+    <Icon className="mt-0.5 h-5 w-5 shrink-0 text-white/60" />
     <div className="min-w-0">
-      <span className="block text-[12px] text-ink-300">{label}</span>
-      <span className="block text-[14px] font-medium text-ink-50">{value}</span>
+      <span className="block text-[12px] text-white/65">{label}</span>
+      <span className="block text-[14px] font-medium text-white">{value}</span>
     </div>
   </div>
 );
@@ -624,10 +627,10 @@ export const ProfilePage = () => {
             <div className="relative shrink-0">
               <Avatar
                 user={user}
-                className="h-28 w-28 border-4 border-white/90 text-3xl sm:h-32 sm:w-32"
+                className="h-28 w-28 border-4 border-white/90 bg-white/15! text-3xl text-white! sm:h-32 sm:w-32"
               />
               <label
-                className="absolute bottom-1 right-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-brand-green text-brand-navy shadow-lg transition-colors hover:bg-brand-green-light"
+                className="absolute bottom-1 right-1 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-brand text-brand-foreground shadow-lg transition-colors hover:bg-brand-light"
                 title="Cambiar foto de perfil"
               >
                 {avatarUploading ? <Spinner className="h-4 w-4" /> : <CameraIcon className="h-4.5 w-4.5" />}
@@ -651,7 +654,7 @@ export const ProfilePage = () => {
                   {user?.estado === "ACTIVO" ? "Activo" : "Inactivo"}
                 </Badge>
               </div>
-              <p className="mt-1 text-[16px] font-medium text-accent-300">
+              <p className="mt-1 text-[16px] font-medium text-brand-bright">
                 {CARGO_LABELS[user?.cargo] ?? user?.cargo}
               </p>
               <p className="text-[14px] text-white/75">Gamonal Driver</p>
@@ -861,6 +864,10 @@ export const ProfilePage = () => {
                 Sin subir: {missingDocuments.map((tipo) => TIPO_DOCUMENTO_LABELS[tipo]).join(", ")}
               </p>
             )}
+          </Section>
+
+          <Section icon={PaletteIcon} title="Apariencia">
+            <AppearanceSection />
           </Section>
 
           <Section icon={ZapIcon} title="Acciones rapidas">

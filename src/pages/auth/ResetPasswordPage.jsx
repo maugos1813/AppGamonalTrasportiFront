@@ -49,7 +49,7 @@ export const ResetPasswordPage = () => {
     <AuthLayout title="Nueva contrasena" subtitle="Elige una nueva contrasena para tu cuenta"
       footer={
         <>
-          <Link to="/login" className="font-medium text-brand-green hover:text-brand-green-light">
+          <Link to="/login" className="font-medium text-brand hover:text-brand-light">
             Volver a iniciar sesion
           </Link>
         </>

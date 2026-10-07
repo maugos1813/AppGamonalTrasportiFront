@@ -78,7 +78,7 @@ export const MobileNavDrawer = ({ open, onClose, items, theme, onToggleTheme, on
           <div className="flex items-center gap-3 px-2">
             <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-full" />
             <span className="text-[16px] font-semibold text-sidebar-foreground">
-              Gamonal <span className="text-brand-green">Driver</span>
+              Gamonal <span className="text-sidebar-active">Driver</span>
             </span>
           </div>
 

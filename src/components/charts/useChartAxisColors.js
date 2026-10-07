@@ -1,20 +1,43 @@
 // Recharts necesita colores literales (no puede leer variables CSS via clases
-// Tailwind), asi que estos valores espejan --ink-400/--line de index.css para
-// cada tema.
-export const useChartAxisColors = (theme) =>
-  theme === "dark"
-    ? { tickColor: "#9db0d3", axisLineColor: "rgba(140,170,230,0.18)", cursorColor: "rgba(255,255,255,0.06)" }
-    : { tickColor: "#7d8494", axisLineColor: "rgba(10,22,40,0.12)", cursorColor: "rgba(10,22,40,0.05)" };
-
-// Espejo de --chart-1..5 de index.css, mas un tono neutro para "Otros" en
-// graficos categoricos (torta/dona).
-const CHART_PALETTE = {
-  dark: ["#2f8dff", "#22d3ee", "#a78bfa", "#ff8a1a", "#64748b"],
-  light: ["#e4643a", "#3c9c93", "#2b4a6b", "#e4b93f", "#e8a23d"],
+// Tailwind), asi que se leen de las variables del tema/paleta activos (ver
+// index.css). El argumento "theme" ya no se usa para elegir valores, pero los
+// componentes lo siguen pasando: sirve para que re-rendericen cuando cambia el
+// tema o la paleta (ThemeContext aplica las variables antes de re-renderizar).
+const cssVar = (name, fallback) => {
+  if (typeof document === "undefined") return fallback;
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return value || fallback;
 };
-const OTROS_COLOR = { dark: "#8ea3c9", light: "#7d8494" };
 
+const hexToRgba = (hex, alpha) => {
+  const m = /^#([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return hex;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+};
+
+export const useChartAxisColors = (theme) => {
+  const line = cssVar("--line", "#ffffff");
+  const isLightLine = line.toLowerCase() === "#ffffff";
+  return {
+    tickColor: cssVar("--ink-400", "#8ea3c9"),
+    axisLineColor: hexToRgba(line, isLightLine ? 0.16 : 0.12),
+    cursorColor: hexToRgba(line, isLightLine ? 0.06 : 0.05),
+  };
+};
+
+// Gris tenue para las barras que no son la destacada (ej. dias que no son hoy).
+export const useChartNeutral = (theme) => hexToRgba(cssVar("--ink-400", "#8ea3c9"), 0.4);
+
+// --chart-1..5 de index.css, mas el neutro para "Otros".
 export const useChartPalette = (theme) => {
-  const palette = CHART_PALETTE[theme] ?? CHART_PALETTE.dark;
-  return (index, isOtros) => (isOtros ? OTROS_COLOR[theme] ?? OTROS_COLOR.dark : palette[index % palette.length]);
+  const palette = [1, 2, 3, 4, 5].map((i) => cssVar(`--chart-${i}`, "#2f8dff"));
+  const otros = cssVar("--ink-400", "#8ea3c9");
+  return (index, isOtros) => (isOtros ? otros : palette[index % palette.length]);
 };
+
+// Color de marca de la paleta activa (series que en el diseño original eran verde).
+export const useBrandColor = (theme) => cssVar("--brand", "#22e093");
+
+// Etiquetas de valor sobre el grafico: el color de texto principal del tema.
+export const useChartLabelColor = (theme) => cssVar("--ink-50", "#f5f5f7");

@@ -10,7 +10,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { Avatar } from "../ui/Avatar";
-import { ChevronDownIcon, SearchIcon, WalletIcon } from "../ui/icons";
+import { ChevronDownIcon, ClockIcon, SearchIcon, WalletIcon } from "../ui/icons";
 import { MobileNavDrawer } from "./MobileNavDrawer";
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -224,7 +224,7 @@ const SidebarNavTab = ({ to, label, icon: Icon }) => (
       clsx(
         "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors",
         isActive
-          ? "bg-sidebar-accent font-semibold text-white before:absolute before:inset-y-2 before:-left-4 before:w-[3px] before:rounded-r-full before:bg-brand-green"
+          ? "bg-sidebar-accent font-semibold text-white before:absolute before:inset-y-2 before:-left-4 before:w-[3px] before:rounded-r-full before:bg-sidebar-active"
           : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
       )
     }
@@ -351,15 +351,25 @@ export const AppShell = () => {
             <Link to="/" className="flex items-center gap-3 px-2">
               <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-full" />
               <span className="text-[16px] font-semibold text-sidebar-foreground">
-                Gamonal <span className="text-brand-green">Driver</span>
+                Gamonal <span className="text-sidebar-active">Driver</span>
               </span>
             </Link>
 
             <nav className="mt-8 flex flex-col gap-1">
-              <SidebarNavTab to="/" label="Inicio" icon={HomeIcon} />
-              <SidebarNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
-              <SidebarNavTab to="/records" label="Registros" icon={ListIcon} />
-              <SidebarNavTab to="/finanzas" label="Finanzas" icon={WalletIcon} />
+              {isPrivileged ? (
+                <>
+                  <SidebarNavTab to="/" label="Inicio" icon={HomeIcon} />
+                  <SidebarNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
+                  <SidebarNavTab to="/records" label="Registros" icon={ListIcon} />
+                  <SidebarNavTab to="/finanzas" label="Finanzas" icon={WalletIcon} />
+                </>
+              ) : (
+                <>
+                  <SidebarNavTab to="/" label="Hoy" icon={HomeIcon} />
+                  <SidebarNavTab to="/mis-horas" label="Mis horas" icon={ClockIcon} />
+                  <SidebarNavTab to="/finanzas" label="Mis cargos" icon={WalletIcon} />
+                </>
+              )}
               {isPrivileged && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
               {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
               {isPrivileged && <SidebarNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
@@ -377,7 +387,7 @@ export const AppShell = () => {
                 clsx(
                   "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-[14px] font-medium transition-colors",
                   isActive
-                    ? "bg-sidebar-accent font-semibold text-white before:absolute before:inset-y-2 before:-left-4 before:w-[3px] before:rounded-r-full before:bg-brand-green"
+                    ? "bg-sidebar-accent font-semibold text-white before:absolute before:inset-y-2 before:-left-4 before:w-[3px] before:rounded-r-full before:bg-sidebar-active"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent/60 hover:text-sidebar-foreground"
                 )
               }
@@ -454,10 +464,20 @@ export const AppShell = () => {
       </div>
 
       <nav className="fixed inset-x-0 bottom-0 z-20 flex w-full items-stretch border-t border-sidebar-border bg-sidebar/95 backdrop-blur-2xl pb-[env(safe-area-inset-bottom)] sm:hidden">
-        <BottomNavTab to="/" label="Inicio" icon={HomeIcon} />
-        <BottomNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
-        <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
-        {!isPrivileged && <BottomNavTab to="/finanzas" label="Finanzas" icon={WalletIcon} />}
+        {isPrivileged ? (
+          <>
+            <BottomNavTab to="/" label="Inicio" icon={HomeIcon} />
+            <BottomNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
+            <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
+          </>
+        ) : (
+          <>
+            <BottomNavTab to="/" label="Hoy" icon={HomeIcon} />
+            <BottomNavTab to="/mis-horas" label="Mis horas" icon={ClockIcon} />
+            <BottomNavTab to="/finanzas" label="Mis cargos" icon={WalletIcon} />
+            <BottomNavTab to="/profile" label="Perfil" icon={UserIcon} />
+          </>
+        )}
         {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
         {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
       </nav>

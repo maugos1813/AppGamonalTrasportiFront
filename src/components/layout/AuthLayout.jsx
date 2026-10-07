@@ -39,7 +39,7 @@ const FeatureIcon = ({ children }) => (
 
 const Wordmark = ({ className }) => (
   <span className={className}>
-    Gamonal <span className="text-brand-green">Driver</span>
+    Gamonal <span className="text-sidebar-active">Driver</span>
   </span>
 );
 
@@ -65,7 +65,7 @@ export const AuthLayout = ({ children, title, subtitle, footer }) => (
             className={`text-[40px] font-semibold leading-[1.15] tracking-tight xl:text-5xl ${SHADOW}`}
           >
             Control total de tu flota,
-            <span className="block text-brand-green">en un solo lugar.</span>
+            <span className="block text-sidebar-active">en un solo lugar.</span>
           </h2>
           <p className={`mt-5 max-w-md text-[16px] leading-relaxed text-white/85 ${SHADOW}`}>
             Tecnología y seguimiento en tiempo real para que cada entrega salga bien.
@@ -74,7 +74,7 @@ export const AuthLayout = ({ children, title, subtitle, footer }) => (
           <ul className="mt-10 space-y-6">
             {FEATURES.map((feature) => (
               <li key={feature.title} className="flex items-start gap-4">
-                <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-[#050d1b]/60 text-brand-green backdrop-blur-sm">
+                <span className="mt-0.5 flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-[#050d1b]/60 text-sidebar-active backdrop-blur-sm">
                   <FeatureIcon>{feature.icon}</FeatureIcon>
                 </span>
                 <div className={SHADOW}>

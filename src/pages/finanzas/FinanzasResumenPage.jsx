@@ -142,7 +142,7 @@ export const FinanzasResumenPage = () => {
           <MonthSelector month={month} onChange={setMonth} />
         </div>
         <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
-          <KpiLink to="/finanzas/pagos">
+          <KpiLink to={isPrivileged ? "/finanzas/pagos" : "/mis-horas"}>
             <MancatoKpi
               icon={UsersIcon}
               label={isPrivileged ? "Pago a choferes" : "Mi pago del mes"}

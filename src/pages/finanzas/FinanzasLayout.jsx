@@ -1,7 +1,9 @@
 import clsx from "clsx";
+import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
 import { WalletIcon } from "../../components/ui/icons";
 import { useAuth } from "../../context/AuthContext";
+import { listHorasPendientesRequest } from "../../lib/horas.api";
 
 const tabClass = ({ isActive }) =>
   clsx(
@@ -18,6 +20,18 @@ export const FinanzasLayout = () => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
 
+  // Horas esperando aprobacion: se muestra como contador en la pestaña "Horas".
+  const [pendingCount, setPendingCount] = useState(0);
+  const refreshPendingCount = useCallback(() => {
+    if (!isPrivileged) return;
+    listHorasPendientesRequest("PENDIENTE")
+      .then((items) => setPendingCount(items.length))
+      .catch(() => {});
+  }, [isPrivileged]);
+  useEffect(() => {
+    refreshPendingCount();
+  }, [refreshPendingCount]);
+
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-start gap-3.5">
@@ -25,11 +39,13 @@ export const FinanzasLayout = () => {
           <WalletIcon className="h-6 w-6" />
         </span>
         <div>
-          <h1 className="text-[26px] font-semibold leading-tight text-ink-50">Finanzas Operativas</h1>
+          <h1 className="text-[26px] font-semibold leading-tight text-ink-50">
+            {isPrivileged ? "Finanzas Operativas" : "Mis cargos"}
+          </h1>
           <p className="mt-0.5 text-[14px] text-ink-300">
             {isPrivileged
               ? "Lo que se debe, lo que se gasta y lo que se paga a los choferes, en un solo lugar."
-              : "Tus pagos, multas, mancato pagamento y cargas de combustible."}
+              : "Tus multas, mancato pagamento y cargas de combustible."}
           </p>
         </div>
       </div>
@@ -41,9 +57,26 @@ export const FinanzasLayout = () => {
         <NavLink to="/finanzas" end className={tabClass}>
           Resumen
         </NavLink>
-        <NavLink to="/finanzas/pagos" className={tabClass}>
-          {isPrivileged ? "Pago a choferes" : "Mi pago"}
-        </NavLink>
+        {isPrivileged && (
+          <NavLink to="/finanzas/horas" className={tabClass}>
+            Horas
+            {pendingCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-warning-500/20 px-1.5 py-0.5 text-[11px] font-semibold text-warning-500">
+                {pendingCount}
+              </span>
+            )}
+          </NavLink>
+        )}
+        {isPrivileged && (
+          <NavLink to="/finanzas/pagos" className={tabClass}>
+            Pago a choferes
+          </NavLink>
+        )}
+        {isPrivileged && (
+          <NavLink to="/finanzas/paradas" className={tabClass}>
+            Paradas
+          </NavLink>
+        )}
         {isPrivileged && (
           <NavLink to="/finanzas/gastos" className={tabClass}>
             Gastos de servicios
@@ -60,7 +93,7 @@ export const FinanzasLayout = () => {
         </NavLink>
       </nav>
 
-      <Outlet />
+      <Outlet context={{ refreshPendingCount }} />
     </div>
   );
 };

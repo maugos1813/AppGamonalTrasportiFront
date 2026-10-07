@@ -35,18 +35,20 @@
      navy tenue en claro. Reemplaza los border-white/X, bg-white/X sueltos. */
   --color-line: var(--line);
 
-  /* Marca Express Dispatch: navy + yellow, fijos en ambos temas. */
-  --color-brand-navy: #0a1628;
-  --color-brand-yellow: #ffd000;
-  /* Verde de marca (logo Gamonal Driver): acento principal de botones y navegacion. */
-  --color-brand-green: #22e093;
-  --color-brand-green-light: #6ff2b8;
+  /* Color de marca (botones, links, acentos): por defecto el verde del logo
+     Gamonal Driver; cada paleta (ver bloques html[data-palette] mas abajo) lo
+     redefine. brand-foreground es el texto sobre un fondo brand y brand-bright
+     la version luminosa para fondos oscuros fijos (sidebar, panel del login). */
+  --color-brand: var(--brand);
+  --color-brand-light: var(--brand-light);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-bright: var(--brand-bright);
 
-  /* Sidebar: siempre navy oscuro, no cambia entre temas (igual que el pack). */
+  /* Sidebar: siempre oscuro (en ambos modos), el tinte lo da la paleta. */
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
-  --color-sidebar-active: var(--color-brand-green);
-  --color-sidebar-active-foreground: var(--color-brand-navy);
+  --color-sidebar-active: var(--brand-bright);
+  --color-sidebar-active-foreground: var(--brand-foreground);
   --color-sidebar-accent: var(--sidebar-accent);
   --color-sidebar-border: var(--sidebar-border);
 
@@ -102,6 +104,13 @@
   --ink-500: #9298a8;
 
   --line: #0a1628;
+
+  --brand: #22e093;
+  --brand-light: #6ff2b8;
+  --brand-foreground: #0a1628;
+  --brand-bright: #22e093;
+
+  --surface-border: #6ea0ff;
 
   --sidebar: #0a1628;
   --sidebar-foreground: #e8eaf0;
@@ -160,6 +169,13 @@
 
   --line: #ffffff;
 
+  --brand: #22e093;
+  --brand-light: #6ff2b8;
+  --brand-foreground: #0a1628;
+  --brand-bright: #22e093;
+
+  --surface-border: #6ea0ff;
+
   --sidebar: #07112a;
   --sidebar-foreground: #eef3fb;
   --sidebar-accent: #12305f;
@@ -196,6 +212,268 @@
   --glass-input-focus-bg: #10264d;
 }
 
+/* ------------------------------------------------------------------------
+   Paletas de color (Mi perfil > Apariencia). El modo claro/oscuro (clase
+   .light/.dark en <html>) y la paleta (atributo data-palette) son ejes
+   independientes: cada paleta redefine las mismas variables en sus dos
+   modos. "clasico" no necesita bloque: son los valores base de :root/.dark.
+   Los bloques oscuros van despues de los claros porque <html> tiene a la
+   vez :root y .dark y ambos selectores pesan igual.
+   Colores semanticos (estados, rojo/verde/naranja) no cambian de paleta.
+   ------------------------------------------------------------------------ */
+
+/* Oceano: #7BD5F5 #787FF6 #4ADEDE #1CA7EC #1F2F98 */
+html[data-palette="oceano"] {
+  --background: #f2f9fe;
+  --foreground: #0e1a55;
+  --popover: #ffffff;
+  --popover-foreground: #0e1a55;
+
+  --ink-50: #0e1a55;
+  --ink-100: #16246b;
+  --ink-200: #2b3a80;
+  --ink-300: #4f5d8c;
+  --ink-400: #6a77a3;
+  --ink-500: #8791b5;
+
+  --line: #1f2f98;
+  --surface-border: #1ca7ec;
+
+  --brand: #1f2f98;
+  --brand-light: #3347c4;
+  --brand-foreground: #ffffff;
+  --brand-bright: #4adede;
+
+  --sidebar: #0a1556;
+  --sidebar-foreground: #eaf3ff;
+  --sidebar-accent: #17287c;
+
+  --accent-600: #075d8f;
+  --accent-500: #0a77b5;
+  --accent-400: #0a77b5;
+  --accent-300: #2b97d0;
+
+  --chart-1: #1f2f98;
+  --chart-2: #1ca7ec;
+  --chart-3: #4adede;
+  --chart-4: #787ff6;
+  --chart-5: #7bd5f5;
+
+  --backdrop: rgba(10, 20, 80, 0.3);
+}
+
+html[data-palette="oceano"].dark {
+  --background: #050b2a;
+  --foreground: #f2f7ff;
+  --popover: #0f1c66;
+  --popover-foreground: #f2f7ff;
+
+  --ink-50: #ffffff;
+  --ink-100: #eaf3ff;
+  --ink-200: #cfe2fb;
+  --ink-300: #a9c3ee;
+  --ink-400: #839fd8;
+  --ink-500: #6079b8;
+
+  --line: #ffffff;
+  --surface-border: #7bd5f5;
+
+  --brand: #4adede;
+  --brand-light: #8cebeb;
+  --brand-foreground: #041033;
+  --brand-bright: #4adede;
+
+  --sidebar: #040924;
+  --sidebar-foreground: #eaf3ff;
+  --sidebar-accent: #121f78;
+
+  --accent-600: #1288c4;
+  --accent-500: #1ca7ec;
+  --accent-400: #52c0f2;
+  --accent-300: #7bd5f5;
+
+  --chart-1: #1ca7ec;
+  --chart-2: #4adede;
+  --chart-3: #787ff6;
+  --chart-4: #7bd5f5;
+  --chart-5: #5a68d0;
+
+  --backdrop: rgba(2, 5, 30, 0.65);
+
+  --glass-surface-bg: #0d1a5a;
+  --glass-surface-sm-bg: #0d1a5a;
+  --glass-input-bg: #091449;
+  --glass-input-focus-bg: #0f1f6a;
+}
+
+/* Aurora (pastel): #86E3CE #D0E6A5 #FFDD94 #FA897B #CCABD8 */
+html[data-palette="aurora"] {
+  --background: #f4fbf8;
+  --foreground: #17302c;
+  --popover: #ffffff;
+  --popover-foreground: #17302c;
+
+  --ink-50: #17302c;
+  --ink-100: #1f3d38;
+  --ink-200: #34524c;
+  --ink-300: #51706a;
+  --ink-400: #6c8984;
+  --ink-500: #889f9b;
+
+  --line: #17302c;
+  --surface-border: #4cc9ac;
+
+  --brand: #13806a;
+  --brand-light: #1ea386;
+  --brand-foreground: #ffffff;
+  --brand-bright: #86e3ce;
+
+  --sidebar: #0e2a2c;
+  --sidebar-foreground: #e8f6f2;
+  --sidebar-accent: #1a4244;
+
+  --accent-600: #6f3f86;
+  --accent-500: #8a55a3;
+  --accent-400: #8a55a3;
+  --accent-300: #a371bb;
+
+  --chart-1: #3fbf9f;
+  --chart-2: #f2c055;
+  --chart-3: #f2766a;
+  --chart-4: #b58bc7;
+  --chart-5: #a5cc6a;
+
+  --backdrop: rgba(10, 40, 40, 0.28);
+}
+
+html[data-palette="aurora"].dark {
+  --background: #07171a;
+  --foreground: #f1faf7;
+  --popover: #143337;
+  --popover-foreground: #f1faf7;
+
+  --ink-50: #ffffff;
+  --ink-100: #edf8f4;
+  --ink-200: #d3ebe3;
+  --ink-300: #aed0c6;
+  --ink-400: #86aaa0;
+  --ink-500: #648a82;
+
+  --line: #ffffff;
+  --surface-border: #86e3ce;
+
+  --brand: #86e3ce;
+  --brand-light: #b2f0e1;
+  --brand-foreground: #062a25;
+  --brand-bright: #86e3ce;
+
+  --sidebar: #051214;
+  --sidebar-foreground: #edf8f4;
+  --sidebar-accent: #123a3b;
+
+  --accent-600: #a77fbd;
+  --accent-500: #c093d3;
+  --accent-400: #ccabd8;
+  --accent-300: #ddc5e6;
+
+  --chart-1: #86e3ce;
+  --chart-2: #ffdd94;
+  --chart-3: #fa897b;
+  --chart-4: #ccabd8;
+  --chart-5: #d0e6a5;
+
+  --backdrop: rgba(0, 12, 12, 0.62);
+
+  --glass-surface-bg: #0f2a2d;
+  --glass-surface-sm-bg: #0f2a2d;
+  --glass-input-bg: #0b2023;
+  --glass-input-focus-bg: #11353a;
+}
+
+/* Crepusculo: #0B0742 #120C6E #5E72EB #FF9190 #FDC094 */
+html[data-palette="crepusculo"] {
+  --background: #f8f5ff;
+  --foreground: #150f4f;
+  --popover: #ffffff;
+  --popover-foreground: #150f4f;
+
+  --ink-50: #150f4f;
+  --ink-100: #1f1870;
+  --ink-200: #36308a;
+  --ink-300: #58528f;
+  --ink-400: #756fa6;
+  --ink-500: #908bb9;
+
+  --line: #120c6e;
+  --surface-border: #5e72eb;
+
+  --brand: #4558d6;
+  --brand-light: #5e72eb;
+  --brand-foreground: #ffffff;
+  --brand-bright: #ff9190;
+
+  --sidebar: #0b0742;
+  --sidebar-foreground: #f1eeff;
+  --sidebar-accent: #1b1585;
+
+  --accent-600: #3445b5;
+  --accent-500: #4a5ed8;
+  --accent-400: #4a5ed8;
+  --accent-300: #6b7ce6;
+
+  --chart-1: #5e72eb;
+  --chart-2: #ff9190;
+  --chart-3: #fdc094;
+  --chart-4: #120c6e;
+  --chart-5: #b68cf5;
+
+  --backdrop: rgba(11, 7, 66, 0.32);
+}
+
+html[data-palette="crepusculo"].dark {
+  --background: #080535;
+  --foreground: #f7f3ff;
+  --popover: #1a1480;
+  --popover-foreground: #f7f3ff;
+
+  --ink-50: #ffffff;
+  --ink-100: #f1eeff;
+  --ink-200: #dcd7fb;
+  --ink-300: #b8b2ee;
+  --ink-400: #928cd0;
+  --ink-500: #7069ab;
+
+  --line: #ffffff;
+  --surface-border: #8c9bf3;
+
+  --brand: #ff9190;
+  --brand-light: #ffb0af;
+  --brand-foreground: #2a0a30;
+  --brand-bright: #ff9190;
+
+  --sidebar: #060329;
+  --sidebar-foreground: #f1eeff;
+  --sidebar-accent: #1b1585;
+
+  --accent-600: #4658d1;
+  --accent-500: #5e72eb;
+  --accent-400: #8c9bf3;
+  --accent-300: #b0bbf8;
+
+  --chart-1: #5e72eb;
+  --chart-2: #ff9190;
+  --chart-3: #fdc094;
+  --chart-4: #9aa6f5;
+  --chart-5: #c785d8;
+
+  --backdrop: rgba(4, 2, 30, 0.68);
+
+  --glass-surface-bg: #150f68;
+  --glass-surface-sm-bg: #150f68;
+  --glass-input-bg: #0f0a52;
+  --glass-input-focus-bg: #1a1480;
+}
+
 @layer base {
   * {
     -webkit-tap-highlight-color: transparent;
@@ -225,7 +503,7 @@
     background: var(--glass-surface-bg);
     backdrop-filter: blur(28px) saturate(180%);
     -webkit-backdrop-filter: blur(28px) saturate(180%);
-    border: 1px solid color-mix(in srgb, #6ea0ff 18%, transparent);
+    border: 1px solid color-mix(in srgb, var(--surface-border) 18%, transparent);
     box-shadow: var(--shadow-glass);
   }
 
@@ -233,7 +511,7 @@
     background: var(--glass-surface-sm-bg);
     backdrop-filter: blur(16px) saturate(160%);
     -webkit-backdrop-filter: blur(16px) saturate(160%);
-    border: 1px solid color-mix(in srgb, #6ea0ff 16%, transparent);
+    border: 1px solid color-mix(in srgb, var(--surface-border) 16%, transparent);
     box-shadow: var(--shadow-glass-sm);
   }
 

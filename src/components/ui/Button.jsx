@@ -17,7 +17,7 @@ export const Button = ({
       "inline-flex w-full items-center justify-center gap-2 rounded-full px-5 py-3 text-[15px] font-medium transition-all duration-200 focus:outline-none focus-visible:ring-4",
       "disabled:cursor-not-allowed disabled:opacity-60",
       variant === "primary" &&
-        "bg-brand-green font-semibold text-brand-navy hover:bg-brand-green-light focus-visible:ring-brand-green/40 active:scale-[0.98]",
+        "bg-brand font-semibold text-brand-foreground hover:bg-brand-light focus-visible:ring-brand/40 active:scale-[0.98]",
       variant === "ghost" &&
         "glass-surface-sm text-ink-50 hover:bg-line/10 focus-visible:ring-line/20 active:scale-[0.98]",
       variant === "danger" &&

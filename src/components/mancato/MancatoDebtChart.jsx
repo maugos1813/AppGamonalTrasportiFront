@@ -1,9 +1,7 @@
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useTheme } from "../../context/ThemeContext";
 import { formatCurrency } from "../../lib/format";
-import { useChartAxisColors } from "../charts/useChartAxisColors";
-
-const COLOR = "#22e093";
+import { useBrandColor, useChartAxisColors } from "../charts/useChartAxisColors";
 
 const compact = (value) => (Math.abs(value) >= 1000 ? `${Math.round(value / 1000)}k` : `${Math.round(value)}`);
 
@@ -23,6 +21,7 @@ const DebtTooltip = ({ active, payload, label, valueLabel }) => {
 export const MancatoDebtChart = ({ data, valueLabel = "Por pagar" }) => {
   const { theme } = useTheme();
   const { tickColor, axisLineColor } = useChartAxisColors(theme);
+  const COLOR = useBrandColor(theme);
 
   return (
     <ResponsiveContainer width="100%" height="100%">

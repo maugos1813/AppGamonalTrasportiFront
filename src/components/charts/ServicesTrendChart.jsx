@@ -1,7 +1,7 @@
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useTheme } from "../../context/ThemeContext";
 import { ChartTooltip } from "./ChartTooltip";
-import { useChartAxisColors } from "./useChartAxisColors";
+import { useChartAxisColors, useChartLabelColor } from "./useChartAxisColors";
 
 const LINE_COLOR = "#f59e0b";
 
@@ -28,7 +28,7 @@ const TrendDot = ({ cx, cy, payload, value, index, labelColor }) => {
 export const ServicesTrendChart = ({ data }) => {
   const { theme } = useTheme();
   const { tickColor, axisLineColor, cursorColor } = useChartAxisColors(theme);
-  const labelColor = theme === "dark" ? "#f5f5f7" : "#1a2030";
+  const labelColor = useChartLabelColor(theme);
 
   return (
     <ResponsiveContainer width="100%" height="100%">

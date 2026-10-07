@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { CerrarServicioModal } from "../../components/horas/CerrarServicioModal";
+import { HorasEstadoChip } from "../../components/horas/HorasEstadoChip";
+import { RecepcionPaqueteCard } from "../../components/horas/RecepcionPaqueteCard";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ClientAutocomplete } from "../../components/ui/ClientAutocomplete";
@@ -38,8 +41,98 @@ import {
   updateRecordRequest,
   uploadRecordFileRequest,
 } from "../../lib/records.api";
+import { formatHours } from "../../lib/horas";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
+
+// Jornada declarada por el chofer (inicio/fin, espera, pausa) y su estado de aprobacion. El chofer
+// puede cargarla o corregirla mientras no este aprobada; la oficina las revisa en Finanzas > Horas.
+const JornadaOfService = ({ record, isChofer, onOpenHours }) => {
+  const j = record.jornada ?? {};
+  const delivered = ["CONSEGNATO", "RITIRATO", "IN_CONSEGNA"].includes(record.estado);
+  const canLoad = isChofer && delivered && j.estado !== "APROBADAS" && j.estado !== "PENDIENTE";
+  const canEdit = isChofer && j.estado === "PENDIENTE";
+  return (
+    <div className="mt-6 border-t border-line/10 pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">Horas trabajadas</h3>
+        <HorasEstadoChip estado={j.estado} />
+      </div>
+      {j.estado ? (
+        <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {j.inicio && <InfoRow label="Inicio" value={formatRomeDateTime(j.inicio)} />}
+          {j.fin && <InfoRow label="Fin" value={formatRomeDateTime(j.fin)} />}
+          <InfoRow label="Dia / noche" value={`${formatHours(j.horasDia)} / ${formatHours(j.horasNoche)}`} />
+          <InfoRow label="Espera" value={`${j.esperaMin} min`} />
+          <InfoRow label="Pausa no trabajada" value={`${j.pausaMin} min`} />
+        </div>
+      ) : (
+        <p className="mt-2 text-[13px] text-ink-400">El chofer todavia no cargo sus horas.</p>
+      )}
+      {j.nota && (
+        <p className="mt-3 rounded-lg bg-line/5 px-3 py-2 text-[12px] text-ink-200">
+          <b className="text-ink-50">Nota del responsable:</b> {j.nota}
+        </p>
+      )}
+      {(canLoad || canEdit) && (
+        <Button className="mt-3 sm:w-auto sm:px-5 sm:py-2 sm:text-[13px]" onClick={onOpenHours}>
+          {j.estado === "DEVUELTAS" ? "Corregir horas" : canEdit ? "Editar horas enviadas" : "Cargar horas"}
+        </Button>
+      )}
+    </div>
+  );
+};
+
+// Traspaso entre choferes: quien termino el servicio (si el chofer asignado no pudo) o de quien se
+// recibio. Mientras falta la hora de recepcion, el chofer (o la oficina) puede completarla desde aca.
+const TraspasoOfService = ({ record, isChofer, onChanged }) => {
+  const { relevo, origen } = record;
+  if (!relevo && !origen) return null;
+  const name = (p) => (p ? `${p.nombre} ${p.apellido}` : "otro chofer");
+
+  return (
+    <div className="mt-6 rounded-xl border border-accent-500/30 bg-accent-500/5 px-4 py-3">
+      <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">Traspaso entre choferes</h3>
+      {relevo && (
+        <p className="mt-1.5 text-[14px] text-ink-100">
+          Lo termino <b>{name(relevo.chofer)}</b>
+          {relevo.traspasoHora
+            ? `, que recibio el paquete el ${formatRomeDateTime(relevo.traspasoHora)} (Roma).`
+            : ". Todavia no indico a que hora recibio el paquete: su parte queda pendiente."}{" "}
+          <Link to={`/records/${relevo.recordId}`} className="font-medium text-accent-400 hover:text-accent-300">
+            Ver su servicio &rarr;
+          </Link>
+        </p>
+      )}
+      {origen && (
+        <>
+          <p className="mt-1.5 text-[14px] text-ink-100">
+            Recibido de <b>{name(origen.chofer)}</b> (servicio{" "}
+            <Link to={`/records/${origen.recordId}`} className="font-medium text-accent-400 hover:text-accent-300">
+              {origen.codigo}
+            </Link>
+            ).{" "}
+            {record.traspasoHora
+              ? `Recibio el paquete el ${formatRomeDateTime(record.traspasoHora)} (Roma).`
+              : "Falta indicar a que hora se recibio el paquete."}
+          </p>
+          {!record.traspasoHora && (
+            <RecepcionPaqueteCard
+              record={record}
+              onDone={onChanged}
+              className="mt-3 border-t border-line/10 pt-3"
+            />
+          )}
+        </>
+      )}
+      {isChofer && relevo && (
+        <p className="mt-1 text-[12px] text-ink-400">
+          Tu jornada no termina al entregar el paquete: termina cuando vuelves al lugar de espera.
+        </p>
+      )}
+    </div>
+  );
+};
 
 // Peajes (mancato pagamento) que el sistema asigno a este servicio, con cuantos fueron de ida y
 // de vuelta. Un servicio puede tener varios en cada tramo.
@@ -183,6 +276,9 @@ const toFormState = (record) => ({
   codigo: record.codigo ?? "",
   clientId: record.client?.id ?? "",
   driverId: record.driver?.id ?? "",
+  // Traspaso: otro chofer termino el servicio (ver Record.servicioOrigenId en el backend).
+  otroChoferTermino: Boolean(record.relevo),
+  choferRelevoId: record.relevo?.driverId ?? "",
   vehicleId: record.vehicle?.id ?? "",
   aplicativo: record.aplicativo ?? "",
   extrasPiazzaZona: record.extrasPiazzaZona ?? "",
@@ -332,6 +428,7 @@ export const RecordDetailPage = () => {
 
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
+  const [showHours, setShowHours] = useState(false);
 
   const load = useCallback(() => {
     setLoadError("");
@@ -374,7 +471,10 @@ export const RecordDetailPage = () => {
     setSaveError("");
     setSaveSuccess(false);
 
-    const fieldsToSubmit = isChofer ? OPERATIONAL_FIELDS : [...OPERATIONAL_FIELDS, ...OWNER_FIELDS];
+    const HOURS_TOTALS = ["horasDia", "horasNoche", "tiempoEspera"];
+    const fieldsToSubmit = isChofer
+      ? OPERATIONAL_FIELDS.filter((field) => !HOURS_TOTALS.includes(field))
+      : [...OPERATIONAL_FIELDS, ...OWNER_FIELDS];
 
     const payload = Object.fromEntries(
       fieldsToSubmit
@@ -384,6 +484,17 @@ export const RecordDetailPage = () => {
         ])
         .filter(([, value]) => value !== "" && value !== undefined)
     );
+
+    // Traspaso: solo si cambio respecto de lo guardado.
+    if (!isChofer && !record.origen) {
+      if (form.otroChoferTermino && !form.choferRelevoId) {
+        setSaveError("Selecciona el chofer que termino el servicio");
+        setSaving(false);
+        return;
+      }
+      const wanted = form.otroChoferTermino ? form.choferRelevoId : null;
+      if (wanted !== (record.relevo?.driverId ?? null)) payload.choferRelevoId = wanted;
+    }
 
     // Fecha retiro: solo la oficina; "" la borra, asi que se manda aunque este vacia (pero
     // solo si cambio, para no disparar re-evaluaciones de mancatos de balde).
@@ -519,9 +630,22 @@ export const RecordDetailPage = () => {
           uploading={uploading}
           uploadError={uploadError}
           onUpload={handleUpload}
+          onOpenHours={() => setShowHours(true)}
+          onReload={load}
         />
       )}
     </div>
+
+    {showHours && (
+      <CerrarServicioModal
+        record={record}
+        onClose={() => setShowHours(false)}
+        onDone={() => {
+          load();
+          refreshRecords();
+        }}
+      />
+    )}
 
     <ConfirmModal
       open={showDeleteConfirm}
@@ -550,6 +674,8 @@ const RecordSummaryView = ({
   uploading,
   uploadError,
   onUpload,
+  onOpenHours,
+  onReload,
 }) => {
   const [copyCostsFeedback, setCopyCostsFeedback] = useState("");
   const onCopyCosts = () => {
@@ -625,6 +751,8 @@ const RecordSummaryView = ({
         )}
       </div>
 
+      <TraspasoOfService record={record} isChofer={isChofer} onChanged={onReload} />
+
       <MancatosOfService mancatos={record.mancatos} />
 
       <div className="mt-6 border-t border-line/10 pt-6">
@@ -649,6 +777,8 @@ const RecordSummaryView = ({
           )}
         </div>
       </div>
+
+      <JornadaOfService record={record} isChofer={isChofer} onOpenHours={onOpenHours} />
 
       {!isChofer && (
         <div className="mt-6 border-t border-line/10 pt-6">
@@ -783,7 +913,7 @@ const RecordEditForm = ({
       </h2>
       <p className="mt-1 text-[13px] text-ink-300">
         {isChofer
-          ? "Kilometros reales, horas trabajadas, tiempo de espera y comentarios del servicio."
+          ? "Kilometros reales y comentarios del servicio. Tus horas se cargan con el boton Cargar horas."
           : "Modifica cualquier dato del servicio, incluidos los planificados y economicos."}
       </p>
 
@@ -808,14 +938,54 @@ const RecordEditForm = ({
                 onChange={(clientId) => setField("clientId", clientId)}
                 onClientCreated={(client) => setClients((prev) => [...prev, client])}
               />
-              <SearchableSelect
-                id="driverId"
-                label="Chofer"
-                placeholder="Escribe para buscar un chofer"
-                options={driverOptions}
-                value={form.driverId}
-                onChange={(v) => setField("driverId", v)}
-              />
+              <div className="flex flex-col gap-3">
+                <SearchableSelect
+                  id="driverId"
+                  label="Chofer"
+                  placeholder="Escribe para buscar un chofer"
+                  options={driverOptions}
+                  value={form.driverId}
+                  onChange={(v) => setField("driverId", v)}
+                />
+                {record.origen ? (
+                  <p className="text-[12px] text-ink-400">
+                    Servicio recibido de{" "}
+                    {record.origen.chofer ? `${record.origen.chofer.nombre} ${record.origen.chofer.apellido}` : "otro chofer"}{" "}
+                    (continuacion de {record.origen.codigo}).
+                  </p>
+                ) : (
+                  <>
+                    <label className="flex w-fit items-center gap-2 text-[14px] text-ink-200">
+                      <input
+                        type="checkbox"
+                        checked={form.otroChoferTermino}
+                        onChange={(e) => {
+                          setField("otroChoferTermino", e.target.checked);
+                          if (!e.target.checked) setField("choferRelevoId", "");
+                        }}
+                        className="h-4 w-4 rounded border-line/20 bg-transparent accent-accent-500"
+                      />
+                      ¿Otro chofer termino el servicio?
+                    </label>
+                    {form.otroChoferTermino && (
+                      <div>
+                        <SearchableSelect
+                          id="choferRelevoId"
+                          label="Chofer que termino el servicio"
+                          placeholder="Escribe para buscar un chofer"
+                          options={driverOptions.filter((o) => o.value !== form.driverId)}
+                          value={form.choferRelevoId}
+                          onChange={(v) => setField("choferRelevoId", v)}
+                        />
+                        <p className="mt-1.5 text-[12px] text-ink-400">
+                          Al guardar, a ese chofer le llega un aviso y tiene que indicar a que hora recibio el
+                          paquete. Hasta entonces su parte queda pendiente.
+                        </p>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
               <SearchableSelect
                 id="vehicleId"
                 label="Vehiculo"
@@ -909,6 +1079,12 @@ const RecordEditForm = ({
           onChange={handleChange("kilometrosReales")}
         />
 
+        {!isChofer && (
+        <div>
+        <p className="mb-2 text-[12px] text-ink-400">
+          Horas a mano: si cambias estos totales quedan aprobadas. Lo normal es que el chofer las cargue y
+          se aprueben en Finanzas &gt; Horas.
+        </p>
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <TextField
             id="horasDia"
@@ -938,6 +1114,8 @@ const RecordEditForm = ({
             onChange={handleChange("tiempoEspera")}
           />
         </div>
+        </div>
+        )}
 
         <Textarea
           id="comentarios"

@@ -39,9 +39,17 @@ const nf = (value) => Number(value).toLocaleString("es-AR", { maximumFractionDig
 // Texto de como se calculo el pago de un servicio: "147 km x 10 EUR/100 km", "3,5 h x 10 EUR"...
 export const payCalcText = (item, reglas) => {
   const parts = [];
-  if (item.modo === "HORAS") parts.push(`${nf(item.horas)} h x ${nf(reglas.horaEur)} EUR`);
+  if (item.modo === "HORAS") {
+    const horas = [];
+    if (item.horasDia > 0) horas.push(`${nf(item.horasDia)} h dia x ${nf(reglas.horaDiaEur)} EUR`);
+    if (item.horasNoche > 0) horas.push(`${nf(item.horasNoche)} h noche x ${nf(reglas.horaNocheEur)} EUR`);
+    parts.push(horas.join(" + "));
+  }
   else if (item.kmFuente === "SIN_DATO") parts.push("sin kilometros cargados");
   else parts.push(`${nf(item.km)} km x ${nf(reglas.cada100KmEur)} EUR/100 km`);
   if (item.esperaHoras > 0) parts.push(`+ ${nf(item.esperaHoras)} h de espera x ${nf(reglas.esperaHoraEur)} EUR`);
   return parts.join(" ");
 };
+
+// Tarifas por defecto (espejo de config/payRates.js) para estimar antes de consultar al servidor.
+export const PAY_RULES_FALLBACK = { horaDiaEur: 10, horaNocheEur: 12, cada100KmEur: 10, esperaHoraEur: 10 };

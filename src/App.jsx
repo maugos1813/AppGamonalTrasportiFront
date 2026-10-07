@@ -87,6 +87,11 @@ const FinanzasResumenPage = lazy(() =>
 const PagosChoferesPage = lazy(() =>
   import("./pages/finanzas/PagosChoferesPage").then((m) => ({ default: m.PagosChoferesPage })),
 );
+const HorasAprobacionPage = lazy(() =>
+  import("./pages/finanzas/HorasAprobacionPage").then((m) => ({ default: m.HorasAprobacionPage })),
+);
+const ParadasPage = lazy(() => import("./pages/finanzas/ParadasPage").then((m) => ({ default: m.ParadasPage })));
+const MisHorasPage = lazy(() => import("./pages/horas/MisHorasPage").then((m) => ({ default: m.MisHorasPage })));
 const GastosServiciosPage = lazy(() =>
   import("./pages/finanzas/GastosServiciosPage").then((m) => ({ default: m.GastosServiciosPage })),
 );
@@ -157,6 +162,7 @@ function App() {
             <Route element={<AppShell />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/resumen" element={<DailySummaryPage />} />
+              <Route path="/mis-horas" element={<MisHorasPage />} />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/records" element={<RecordsListPage />} />
               <Route path="/records/extras-piazza" element={<RecordsListPage section="extras-piazza" />} />
@@ -175,6 +181,8 @@ function App() {
               <Route path="/finanzas" element={<FinanzasLayout />}>
                 <Route index element={<FinanzasResumenPage />} />
                 <Route path="pagos" element={<PagosChoferesPage />} />
+                <Route path="horas" element={<HorasAprobacionPage />} />
+                <Route path="paradas" element={<ParadasPage />} />
                 <Route path="gastos" element={<GastosServiciosPage />} />
                 <Route path="mancato" element={<MancatoPagamentoPage />} />
                 <Route path="mancato/new" element={<NewMancatoPage />} />

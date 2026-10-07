@@ -1,11 +1,9 @@
 import { Bar, BarChart, Cell, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useTheme } from "../../context/ThemeContext";
 import { ChartTooltip } from "./ChartTooltip";
-import { useChartAxisColors } from "./useChartAxisColors";
+import { useChartAxisColors, useChartNeutral } from "./useChartAxisColors";
 
 const TODAY_COLOR = "#f59e0b";
-const OTHER_COLOR_DARK = "#3a3a3f";
-const OTHER_COLOR_LIGHT = "#d4d8e0";
 
 // Mini grafico de barras por dia (ultimos 7 dias) - inspirado en la tarjeta "Total
 // sales" de la referencia que paso el usuario: solo la barra de hoy resaltada, el
@@ -13,7 +11,7 @@ const OTHER_COLOR_LIGHT = "#d4d8e0";
 export const ServicesWeekBarChart = ({ data }) => {
   const { theme } = useTheme();
   const { tickColor, axisLineColor, cursorColor } = useChartAxisColors(theme);
-  const otherColor = theme === "dark" ? OTHER_COLOR_DARK : OTHER_COLOR_LIGHT;
+  const otherColor = useChartNeutral(theme);
 
   return (
     <ResponsiveContainer width="100%" height="100%">

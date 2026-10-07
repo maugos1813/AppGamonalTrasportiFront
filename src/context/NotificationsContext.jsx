@@ -91,6 +91,31 @@ const buildChoferAlerts = async () => {
     });
   });
 
+  // Servicios que otro chofer no pudo terminar y se le asignaron: falta la hora de recepcion.
+  records
+    .filter((r) => r.origen && !r.traspasoHora && r.estado !== "ANNULLATO")
+    .forEach((record) => {
+      const from = record.origen.chofer ? `${record.origen.chofer.nombre} ${record.origen.chofer.apellido}` : "otro chofer";
+      list.push({
+        id: `traspaso-${record.id}`,
+        severity: "urgent",
+        message: `Se te asigno el servicio ${record.origen.codigo} que dejo ${from}. Indica a que hora recibiste el paquete: hasta entonces queda pendiente.`,
+        link: `/records/${record.id}`,
+      });
+    });
+
+  // Horas que el responsable devolvio para corregir.
+  records
+    .filter((r) => r.jornada?.estado === "DEVUELTAS")
+    .forEach((record) => {
+      list.push({
+        id: `horas-devueltas-${record.id}`,
+        severity: "warning",
+        message: `Tus horas del servicio ${record.codigo} fueron devueltas: ${record.jornada.nota ?? "corrigelas"}.`,
+        link: `/records/${record.id}`,
+      });
+    });
+
   const current = computeCurrentService(records);
   if (current?.vehicle?.id) {
     try {

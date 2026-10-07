@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { MonthSelector } from "../../components/finanzas/MonthSelector";
 import { MancatoKpi } from "../../components/mancato/MancatoKpi";
 import { Alert } from "../../components/ui/Alert";
@@ -18,6 +18,7 @@ import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
 import { COSTO_COLORS, currentMonth, kmSourceLabel, payCalcText } from "../../lib/finanzas";
 import { getPagosChoferesRequest } from "../../lib/finanzas.api";
+import { HorasEstadoChip } from "../../components/horas/HorasEstadoChip";
 import { formatCurrency, formatDate, formatKm } from "../../lib/format";
 
 const AVATAR_COLORS = ["#ff3b57", "#ff8a1a", "#2f8dff", "#a78bfa", "#22d3ee"];
@@ -39,10 +40,11 @@ const RulesCard = ({ reglas }) => (
   <div className="glass-surface-sm flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl px-5 py-3 text-[13px] text-ink-300">
     <span className="font-semibold text-ink-50">Como se calcula</span>
     <span>
-      Con horas cargadas: <b className="text-ink-50">{formatCurrency(reglas.horaEur)}</b> por hora
+      Horas aprobadas: dia <b className="text-ink-50">{formatCurrency(reglas.horaDiaEur)}</b>/h (07:00-18:59), noche{" "}
+      <b className="text-ink-50">{formatCurrency(reglas.horaNocheEur)}</b>/h (19:00-06:59)
     </span>
     <span>
-      Sin horas: <b className="text-ink-50">{formatCurrency(reglas.cada100KmEur)}</b> cada 100 km
+      Sin horas aprobadas: <b className="text-ink-50">{formatCurrency(reglas.cada100KmEur)}</b> cada 100 km
     </span>
     <span>
       Espera: <b className="text-ink-50">{formatCurrency(reglas.esperaHoraEur)}</b> por hora, se suma
@@ -77,6 +79,7 @@ const ServiceList = ({ servicios, reglas, location }) =>
             </span>
           </div>
           <div className="min-w-0 text-[12px] text-ink-300">
+            <HorasEstadoChip estado={s.horasEstado} className="mr-1.5" />
             {payCalcText(s, reglas)}
             {s.modo === "KM" && s.kmFuente !== "SIN_DATO" && (
               <span className="ml-1.5 rounded bg-line/10 px-1.5 py-0.5 text-[10px] text-ink-400">
@@ -140,6 +143,7 @@ const DriverRow = ({ driver, month, reglas, location }) => {
             {driver.km > 0 && ` - ${formatKm(driver.km)}`}
             {driver.horas > 0 && ` - ${nf(driver.horas)} h`}
             {driver.esperaHoras > 0 && ` - ${nf(driver.esperaHoras)} h de espera`}
+            {driver.horasPorAprobar > 0 && ` - ${driver.horasPorAprobar} con horas por aprobar`}
           </span>
         </div>
         {hasDeduction && (
@@ -186,6 +190,7 @@ export const PagosChoferesPage = () => {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    if (!isPrivileged) return undefined;
     let cancelled = false;
     setData(null);
     getPagosChoferesRequest({ month })
@@ -201,7 +206,10 @@ export const PagosChoferesPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [month]);
+  }, [month, isPrivileged]);
+
+  // El chofer ve su pago dentro de "Mis horas".
+  if (!isPrivileged) return <Navigate to="/mis-horas" replace />;
 
   const sinDato = data ? data.porChofer.reduce((sum, c) => sum + c.serviciosSinDato, 0) : 0;
   const me = data && !isPrivileged ? data.porChofer[0] : null;
