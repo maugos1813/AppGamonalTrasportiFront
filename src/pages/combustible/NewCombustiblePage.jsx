@@ -1,35 +1,30 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
-import { MultaForm } from "../../components/multas/MultaForm";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { CombustibleForm } from "../../components/combustible/CombustibleForm";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
-import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { createMultaRequest } from "../../lib/multas.api";
+import { createCombustibleRequest } from "../../lib/combustible.api";
 
-export const NewMultaPage = () => {
+export const NewCombustiblePage = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
-  const { refresh } = useDataRefresh("multas");
+  const { refresh } = useDataRefresh("combustible");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
-
-  // Cargar multas es solo de la oficina; el chofer solo las consulta.
-  if (user?.cargo !== "OWNER" && user?.cargo !== "ADMIN") return <Navigate to="/finanzas/multas" replace />;
 
   const handleSubmit = async (fields, files) => {
     setSubmitting(true);
     setError("");
     setFieldErrors({});
     try {
-      const multa = await createMultaRequest(fields, files);
+      const registro = await createCombustibleRequest(fields, files);
       refresh();
       // Se preserva backgroundLocation (ver App.jsx) para que el detalle tambien se
       // muestre como overlay sobre la lista.
-      navigate(`/finanzas/multas/${multa.id}`, {
+      navigate(`/finanzas/combustible/${registro.id}`, {
         replace: true,
         state: { backgroundLocation: location.state?.backgroundLocation },
       });
@@ -43,23 +38,23 @@ export const NewMultaPage = () => {
   };
 
   return (
-    <SlideOverPanel closeTo="/finanzas/multas">
+    <SlideOverPanel closeTo="/finanzas/combustible">
       <div className="flex flex-col gap-6">
         <div>
-          <Link to="/finanzas/multas" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
-            &larr; Multas
+          <Link to="/finanzas/combustible" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
+            &larr; Registro Combustible
           </Link>
         </div>
 
         <div>
-          <h1 className="text-[24px] font-semibold text-ink-50">Nueva multa</h1>
+          <h1 className="text-[24px] font-semibold text-ink-50">Nueva carga de combustible</h1>
           <p className="mt-1 text-[14px] text-ink-300">
-            Carga los datos del verbale y sube la foto o el PDF de la multa.
+            Sube la foto del comprobante y completa los datos. Podras corregirlos hasta el final del dia.
           </p>
         </div>
 
         <GlassCard>
-          <MultaForm
+          <CombustibleForm
             mode="create"
             onSubmit={handleSubmit}
             submitting={submitting}

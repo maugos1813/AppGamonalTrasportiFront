@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MancatoBadge } from "../../components/mancato/MancatoBadge";
 import { MancatoForm } from "../../components/mancato/MancatoForm";
+import { MancatoServicioCard } from "../../components/mancato/MancatoServicioCard";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
@@ -158,7 +159,7 @@ export const MancatoDetailPage = () => {
     try {
       await deleteMancatoRequest(id);
       refresh();
-      navigate("/mancato-pagamento", { replace: true });
+      navigate("/finanzas/mancato", { replace: true });
     } catch (err) {
       setActionError(parseApiError(err).message);
       setBusy(false);
@@ -167,7 +168,7 @@ export const MancatoDetailPage = () => {
 
   if (loadError) {
     return (
-      <SlideOverPanel closeTo="/mancato-pagamento">
+      <SlideOverPanel closeTo="/finanzas/mancato">
         <Alert>{loadError}</Alert>
       </SlideOverPanel>
     );
@@ -175,7 +176,7 @@ export const MancatoDetailPage = () => {
 
   if (!mancato) {
     return (
-      <SlideOverPanel closeTo="/mancato-pagamento">
+      <SlideOverPanel closeTo="/finanzas/mancato">
         <PageLoader />
       </SlideOverPanel>
     );
@@ -187,10 +188,10 @@ export const MancatoDetailPage = () => {
   const canUploadComprobante = canEdit;
 
   return (
-    <SlideOverPanel closeTo="/mancato-pagamento">
+    <SlideOverPanel closeTo="/finanzas/mancato">
       <div className="flex flex-col gap-6">
         <div>
-          <Link to="/mancato-pagamento" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
+          <Link to="/finanzas/mancato" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
             &larr; Mancato Pagamento
           </Link>
         </div>
@@ -245,6 +246,7 @@ export const MancatoDetailPage = () => {
             <GlassCard className={clsx("border-l-4", estado.edge)}>
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
                 <Fact label="Fecha">{formatDateOnly(mancato.fecha)}</Fact>
+                <Fact label="Hora del tránsito">{mancato.horaTransito ?? "-"}</Fact>
                 <Fact label="Vence">{formatDateOnly(mancato.fechaVencimiento)}</Fact>
                 <Fact label="Costo">{formatCurrency(mancato.costo)}</Fact>
                 <Fact label="Targa">{mancato.targa}</Fact>
@@ -275,6 +277,13 @@ export const MancatoDetailPage = () => {
                 </div>
               )}
             </GlassCard>
+
+            <MancatoServicioCard
+              mancato={mancato}
+              isPrivileged={isPrivileged}
+              busy={busy}
+              onChange={(fields) => quickUpdate(fields)}
+            />
 
             <GlassCard>
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">

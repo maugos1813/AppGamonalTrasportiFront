@@ -1,9 +1,8 @@
 import clsx from "clsx";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useLocation, useSearchParams } from "react-router-dom";
-import { MancatoBadge } from "../../components/mancato/MancatoBadge";
+import { Link, useLocation } from "react-router-dom";
+import { CombustibleSidebar } from "../../components/combustible/CombustibleSidebar";
 import { MancatoKpi } from "../../components/mancato/MancatoKpi";
-import { MancatoSidebar } from "../../components/mancato/MancatoSidebar";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { PageLoader } from "../../components/ui/PageLoader";
@@ -13,47 +12,36 @@ import { TextField } from "../../components/ui/TextField";
 import {
   CalendarIcon,
   ChevronDownIcon,
-  ClockIcon,
   DotsIcon,
   EuroIcon,
-  FileTextIcon,
   FilterIcon,
+  FuelIcon,
   PlusIcon,
   RefreshIcon,
   SearchIcon,
+  TruckIcon,
   UsersIcon,
 } from "../../components/ui/icons";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { formatCurrency, formatDateOnly } from "../../lib/format";
-import { ASIGNACION_FILTER_OPTIONS, MANCATO_ASIGNACIONES, MANCATO_ESTADOS } from "../../lib/mancato";
+import { AREA_OPTIONS, COMBUSTIBLE_AREAS } from "../../lib/combustible";
 import {
-  getMancatoStatsRequest,
-  getMancatoSummaryRequest,
-  listMancatosRequest,
-  updateMancatoRequest,
-} from "../../lib/mancato.api";
+  getCombustibleStatsRequest,
+  getCombustibleSummaryRequest,
+  listCombustibleMetodosRequest,
+  listCombustibleRequest,
+} from "../../lib/combustible.api";
+import { formatCurrency, formatDateOnly } from "../../lib/format";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const PAGE_SIZE = 20;
 
-const EMPTY_FILTERS = {
-  estado: "",
-  driverId: "",
-  targa: "",
-  from: "",
-  to: "",
-  fueraDePlazo: false,
-  asignacion: "",
-  q: "",
-  orden: "",
-};
+const EMPTY_FILTERS = { area: "", driverId: "", targa: "", metodo: "", from: "", to: "", q: "", orden: "" };
 
 const ORDEN_OPTIONS = [
-  { value: "", label: "Mas urgentes" },
-  { value: "recientes", label: "Mas recientes" },
+  { value: "", label: "Mas recientes" },
   { value: "antiguos", label: "Mas antiguos" },
   { value: "monto", label: "Mayor monto" },
 ];
@@ -83,30 +71,15 @@ const useDebounced = (value, ms) => {
 // Columnas de la tabla (escritorio). El chofer no ve la columna "Chofer": todo es suyo.
 const gridCols = (showDriver) =>
   showDriver
-    ? "lg:grid-cols-[116px_minmax(0,1.25fr)_minmax(0,1.1fr)_96px_110px_132px_36px]"
-    : "lg:grid-cols-[116px_minmax(0,1.2fr)_96px_110px_132px_36px]";
+    ? "lg:grid-cols-[110px_minmax(0,1.2fr)_minmax(0,1fr)_minmax(0,1fr)_110px_36px]"
+    : "lg:grid-cols-[110px_minmax(0,1fr)_minmax(0,1fr)_110px_36px]";
 
-const plazoParts = (m) => {
-  if (m.estado === "PAGADO") {
-    return {
-      top: m.pagadoAt ? `Pagado ${formatDateOnly(m.pagadoAt)}` : "Pagado",
-      bottom: m.pagadoFueraDePlazo ? "fuera de plazo" : "a tiempo",
-      tone: m.pagadoFueraDePlazo ? "text-warning-500" : "text-success-500",
-    };
-  }
-  const dias = m.diasRestantes;
-  const top = `Vence ${formatDateOnly(m.fechaVencimiento)}`;
-  if (dias < 0) {
-    return { top, bottom: `hace ${-dias} ${-dias === 1 ? "dia" : "dias"}`, tone: "text-danger-500" };
-  }
-  if (dias === 0) return { top, bottom: "hoy", tone: "text-danger-500" };
-  return { top, bottom: `en ${dias} ${dias === 1 ? "dia" : "dias"}`, tone: dias <= 3 ? "text-warning-500" : "text-ink-400" };
-};
+const formatRomeTime = (value) =>
+  new Date(value).toLocaleTimeString("es-AR", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hour12: false });
 
 // Menu "..." de cada fila: acciones rapidas sin abrir el detalle.
-const RowMenu = ({ mancato, isPrivileged, location, onChanged }) => {
+const RowMenu = ({ registro, location }) => {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
   const ref = useRef(null);
 
   useEffect(() => {
@@ -123,19 +96,6 @@ const RowMenu = ({ mancato, isPrivileged, location, onChanged }) => {
     };
   }, [open]);
 
-  const togglePagado = async () => {
-    setBusy(true);
-    try {
-      await updateMancatoRequest(mancato.id, { pagado: String(!mancato.pagado) });
-      onChanged();
-    } catch {
-      // El detalle muestra el error con mas contexto; aca solo se cierra el menu.
-    } finally {
-      setBusy(false);
-      setOpen(false);
-    }
-  };
-
   const itemClass =
     "flex w-full items-center gap-2 px-3 py-2 text-left text-[13px] text-ink-50 transition-colors hover:bg-line/10";
 
@@ -148,26 +108,17 @@ const RowMenu = ({ mancato, isPrivileged, location, onChanged }) => {
         onClick={() => setOpen((prev) => !prev)}
         className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-300 transition-colors hover:bg-line/10 hover:text-ink-50"
       >
-        {busy ? <Spinner className="h-4 w-4" /> : <DotsIcon className="h-5 w-5" />}
+        <DotsIcon className="h-5 w-5" />
       </button>
       {open && (
-        <div className="glass-surface absolute right-0 top-9 z-30 w-52 overflow-hidden rounded-xl bg-background py-1 shadow-xl">
-          <Link
-            to={`/finanzas/mancato/${mancato.id}`}
-            state={{ backgroundLocation: location }}
-            className={itemClass}
-          >
+        <div className="glass-surface absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-xl bg-background py-1 shadow-xl">
+          <Link to={`/finanzas/combustible/${registro.id}`} state={{ backgroundLocation: location }} className={itemClass}>
             Ver detalle
           </Link>
-          {mancato.sitioWeb && !mancato.pagado && (
-            <a href={mancato.sitioWeb} target="_blank" rel="noreferrer noopener" className={itemClass}>
-              Pagar en el sitio web
+          {registro.comprobante && (
+            <a href={registro.comprobante.url} target="_blank" rel="noreferrer noopener" className={itemClass}>
+              Ver comprobante
             </a>
-          )}
-          {isPrivileged && (
-            <button type="button" onClick={togglePagado} disabled={busy} className={itemClass}>
-              {mancato.pagado ? "Reabrir (marcar pendiente)" : "Marcar como pagado"}
-            </button>
           )}
         </div>
       )}
@@ -175,38 +126,25 @@ const RowMenu = ({ mancato, isPrivileged, location, onChanged }) => {
   );
 };
 
-// Servicio al que pertenece el peaje, o por que todavia no tiene (ver MancatoServicioCard).
-const ServicioTag = ({ mancato }) => {
-  const info = MANCATO_ASIGNACIONES[mancato.asignacion];
-  if (mancato.asignacion === "AUTO" || mancato.asignacion === "CONFIRMADO" || mancato.asignacion === "MANUAL") {
-    return mancato.servicio ? (
-      <span className="block truncate text-[11px] text-ink-400">Servicio {mancato.servicio.codigo}</span>
-    ) : null;
-  }
-  return <span className={clsx("block text-[11px] font-medium", info.tone)}>{info.label}</span>;
-};
-
-const MancatoRow = ({ mancato, showDriver, vehicle, location, isPrivileged, onChanged }) => {
-  const estado = MANCATO_ESTADOS.find((e) => e.value === mancato.estado);
-  const plazo = plazoParts(mancato);
-  const driverName = mancato.driver ? `${mancato.driver.nombre} ${mancato.driver.apellido}` : "Sin chofer";
+const CombustibleRow = ({ registro, area, showDriver, vehicle, location }) => {
+  const driverName = registro.driver ? `${registro.driver.nombre} ${registro.driver.apellido}` : "Sin chofer";
 
   return (
     <div className="relative">
       <Link
-        to={`/finanzas/mancato/${mancato.id}`}
+        to={`/finanzas/combustible/${registro.id}`}
         state={{ backgroundLocation: location }}
+        style={{ borderLeftColor: area.color }}
         className={clsx(
           "grid grid-cols-1 gap-2 rounded-xl border-l-4 px-4 py-3 pr-14 transition-colors hover:bg-line/[0.07] lg:items-center lg:gap-3",
-          estado.edge,
           gridCols(showDriver),
           "lg:rounded-lg lg:border-l-0 lg:border-b lg:border-b-line/10 lg:py-2.5 lg:pr-4"
         )}
       >
-        {/* Fecha + numero */}
+        {/* Fecha + hora de registro */}
         <div className="min-w-0">
-          <span className="block text-[13px] font-medium text-ink-50">{formatDateOnly(mancato.fecha)}</span>
-          <span className="block truncate text-[12px] text-ink-400">#{mancato.numero}</span>
+          <span className="block text-[13px] font-medium text-ink-50">{formatDateOnly(registro.fecha)}</span>
+          <span className="block truncate text-[12px] text-ink-400">cargado {formatRomeTime(registro.registradoAt)}</span>
         </div>
 
         {/* Chofer */}
@@ -218,12 +156,7 @@ const MancatoRow = ({ mancato, showDriver, vehicle, location, isPrivileged, onCh
             >
               {initials(driverName)}
             </span>
-            <div className="min-w-0">
-              <span className="block truncate text-[13px] font-medium text-ink-50">{driverName}</span>
-              {mancato.fueraDePlazo && (
-                <span className="block text-[11px] font-medium text-danger-500">Fuera de plazo</span>
-              )}
-            </div>
+            <span className="block truncate text-[13px] font-medium text-ink-50">{driverName}</span>
           </div>
         )}
 
@@ -231,42 +164,32 @@ const MancatoRow = ({ mancato, showDriver, vehicle, location, isPrivileged, onCh
         <div className="min-w-0">
           <span className="block truncate text-[13px] text-ink-50">{vehicle?.modelo ?? "-"}</span>
           <span className="block text-[12px] text-ink-400 underline decoration-ink-500/50 underline-offset-2">
-            {mancato.targa}
+            {registro.targa}
           </span>
-          {!showDriver && mancato.fueraDePlazo && (
-            <span className="block text-[11px] font-medium text-danger-500">Fuera de plazo</span>
-          )}
-          <ServicioTag mancato={mancato} />
         </div>
+
+        {/* Gasolinera */}
+        <span className="min-w-0 truncate text-[13px] text-ink-50">{registro.metodo}</span>
 
         {/* Monto */}
-        <span className="text-[14px] font-semibold text-ink-50 lg:pr-3 lg:text-right">{formatCurrency(mancato.costo)}</span>
-
-        {/* Estado */}
-        <div>
-          <MancatoBadge mancato={mancato} />
-        </div>
-
-        {/* Plazo */}
-        <div className="min-w-0">
-          <span className="block text-[13px] text-ink-50">{plazo.top}</span>
-          <span className={clsx("block text-[12px] font-medium", plazo.tone)}>{plazo.bottom}</span>
-        </div>
+        <span className="text-[14px] font-semibold text-ink-50 lg:pr-3 lg:text-right">
+          {formatCurrency(registro.monto)}
+        </span>
 
         <span className="hidden lg:block" aria-hidden="true" />
       </Link>
 
       <div className="absolute right-3 top-3 lg:inset-y-0 lg:flex lg:items-center">
-        <RowMenu mancato={mancato} isPrivileged={isPrivileged} location={location} onChanged={onChanged} />
+        <RowMenu registro={registro} location={location} />
       </div>
     </div>
   );
 };
 
-// Acordeon de un estado: el encabezado muestra cantidad y total (viene del resumen, sin
+// Acordeon de un area: el encabezado muestra cantidad y total (viene del resumen, sin
 // traer filas); la tabla se pide recien al abrirlo y de a PAGE_SIZE.
-const EstadoAccordion = ({
-  estado,
+const AreaAccordion = ({
+  area,
   summary,
   params,
   version,
@@ -274,10 +197,7 @@ const EstadoAccordion = ({
   showDriver,
   vehiclesByTarga,
   location,
-  isPrivileged,
-  onChanged,
 }) => {
-  const info = MANCATO_ESTADOS.find((e) => e.value === estado);
   // Mientras el usuario no lo toque, abre o cierra solo segun haya resultados; si lo toca,
   // se respeta su eleccion.
   const [userOpen, setUserOpen] = useState(null);
@@ -292,7 +212,7 @@ const EstadoAccordion = ({
     }
     let cancelled = false;
     setList((prev) => ({ ...prev, loading: true, error: "" }));
-    listMancatosRequest({ ...params, estado, page: 1, pageSize: PAGE_SIZE })
+    listCombustibleRequest({ ...params, area: area.value, page: 1, pageSize: PAGE_SIZE })
       .then((data) => {
         if (!cancelled) {
           setList({ items: data.items, total: data.total, page: 1, loading: false, error: "" });
@@ -305,13 +225,18 @@ const EstadoAccordion = ({
       cancelled = true;
     };
     // paramsKey resume params: evita re-pedir por un objeto nuevo con el mismo contenido.
-  }, [open, paramsKey, version, estado]);
+  }, [open, paramsKey, version, area.value]);
 
   const loadMore = async () => {
     const nextPage = list.page + 1;
     setList((prev) => ({ ...prev, loading: true, error: "" }));
     try {
-      const data = await listMancatosRequest({ ...params, estado, page: nextPage, pageSize: PAGE_SIZE });
+      const data = await listCombustibleRequest({
+        ...params,
+        area: area.value,
+        page: nextPage,
+        pageSize: PAGE_SIZE,
+      });
       setList((prev) => ({
         items: [...(prev.items ?? []), ...data.items],
         total: data.total,
@@ -329,7 +254,10 @@ const EstadoAccordion = ({
 
   // focus-within: la seccion con un menu abierto sube por encima de las de abajo.
   return (
-    <section className={clsx("glass-surface relative rounded-2xl border-l-4 focus-within:z-20", info.edge)}>
+    <section
+      style={{ borderLeftColor: area.color }}
+      className="glass-surface relative rounded-2xl border-l-4 focus-within:z-20"
+    >
       <button
         type="button"
         onClick={() => setUserOpen(!open)}
@@ -339,9 +267,9 @@ const EstadoAccordion = ({
           open ? "rounded-t-2xl" : "rounded-2xl"
         )}
       >
-        <span className={clsx("h-2.5 w-2.5 shrink-0 rounded-full", info.dot)} />
-        <span className="text-[16px] font-semibold text-ink-50">{info.plural}</span>
-        <span className={clsx("rounded-full px-2.5 py-0.5 text-[12px] font-semibold", info.pill)}>
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: area.color }} />
+        <span className="text-[16px] font-semibold text-ink-50">{area.label}</span>
+        <span className="rounded-full bg-line/10 px-2.5 py-0.5 text-[12px] font-semibold text-ink-200">
           {summary.count}
         </span>
         <span className="ml-auto text-[15px] font-semibold text-ink-50">{formatCurrency(summary.total)}</span>
@@ -361,9 +289,7 @@ const EstadoAccordion = ({
           )}
 
           {list.items?.length === 0 && (
-            <p className="px-3 py-4 text-[14px] text-ink-400">
-              No hay mancato pagamento {info.label.toLowerCase()}.
-            </p>
+            <p className="px-3 py-4 text-[14px] text-ink-400">No hay cargas en {area.label}.</p>
           )}
 
           {list.items?.length > 0 && (
@@ -372,30 +298,27 @@ const EstadoAccordion = ({
                 <span className={headerClass}>Fecha</span>
                 {showDriver && <span className={headerClass}>Chofer</span>}
                 <span className={headerClass}>Vehiculo</span>
-                <span className={clsx(headerClass, "lg:pr-3 text-right")}>Monto</span>
-                <span className={headerClass}>Estado</span>
-                <span className={headerClass}>Plazo</span>
+                <span className={headerClass}>Gasolinera</span>
+                <span className={clsx(headerClass, "text-right lg:pr-3")}>Monto</span>
                 <span />
               </div>
 
               <div className="flex flex-col gap-2 lg:gap-0">
-                {list.items.map((mancato) => (
-                  <MancatoRow
-                    key={mancato.id}
-                    mancato={mancato}
+                {list.items.map((registro) => (
+                  <CombustibleRow
+                    key={registro.id}
+                    registro={registro}
+                    area={area}
                     showDriver={showDriver}
-                    vehicle={vehiclesByTarga.get(mancato.targa)}
+                    vehicle={vehiclesByTarga.get(registro.targa)}
                     location={location}
-                    isPrivileged={isPrivileged}
-                    onChanged={onChanged}
                   />
                 ))}
               </div>
 
               <div className="mt-2 flex flex-col items-center justify-between gap-2 px-3 sm:flex-row">
                 <span className="text-[12px] text-ink-400">
-                  Mostrando {list.items.length} de {list.total}{" "}
-                  {list.total === 1 ? "aviso" : "avisos"}
+                  Mostrando {list.items.length} de {list.total} {list.total === 1 ? "carga" : "cargas"}
                 </span>
                 {remaining > 0 && (
                   <Button
@@ -416,24 +339,18 @@ const EstadoAccordion = ({
   );
 };
 
-export const MancatoPagamentoPage = () => {
+export const CombustiblePage = () => {
   const { user } = useAuth();
   const location = useLocation();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  const { version, refresh } = useDataRefresh("mancato");
-  const [searchParams] = useSearchParams();
-  const asignacionParam = searchParams.get("asignacion");
+  const { version } = useDataRefresh("combustible");
 
-  // Los avisos de "Atencion requerida" (Finanzas) llegan con ?asignacion=... para abrir la
-  // lista ya filtrada.
-  const [filters, setFilters] = useState(() => ({ ...EMPTY_FILTERS, asignacion: asignacionParam ?? "" }));
-  useEffect(() => {
-    if (asignacionParam !== null) setFilters((prev) => ({ ...prev, asignacion: asignacionParam }));
-  }, [asignacionParam]);
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
   // En celular arrancan cerrados (ocupan media pantalla); en escritorio, abiertos.
   const [filtersOpen, setFiltersOpen] = useState(() => window.innerWidth >= 1024);
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
+  const [metodos, setMetodos] = useState([]);
   const [summary, setSummary] = useState(null);
   const [stats, setStats] = useState(null);
   const [error, setError] = useState("");
@@ -447,6 +364,11 @@ export const MancatoPagamentoPage = () => {
     }
   }, [isPrivileged]);
 
+  // Se vuelve a pedir tras cada alta/edicion: puede haber una gasolinera nueva.
+  useEffect(() => {
+    listCombustibleMetodosRequest().then(setMetodos).catch(() => {});
+  }, [version]);
+
   const vehiclesByTarga = useMemo(
     () => new Map(vehicles.map((v) => [v.targa.replace(/\s+/g, "").toUpperCase(), v])),
     [vehicles]
@@ -454,35 +376,41 @@ export const MancatoPagamentoPage = () => {
 
   const setFilter = (field, value) => setFilters((prev) => ({ ...prev, [field]: value }));
 
-  // Los filtros que mueven numeros (resumen, KPIs, grafico). El estado y el orden solo
+  // Los filtros que mueven numeros (resumen, KPIs, grafico). El area y el orden solo
   // cambian que acordeones se ven y como se ordenan las filas.
   const rawParams = useMemo(
     () => ({
       q: filters.q.trim() || undefined,
       driverId: filters.driverId || undefined,
       targa: filters.targa.trim() || undefined,
+      metodo: filters.metodo.trim() || undefined,
       from: filters.from || undefined,
       to: filters.to || undefined,
-      fueraDePlazo: filters.fueraDePlazo ? "true" : undefined,
-      asignacion: filters.asignacion || undefined,
     }),
-    [filters.q, filters.driverId, filters.targa, filters.from, filters.to, filters.fueraDePlazo, filters.asignacion]
+    [filters.q, filters.driverId, filters.targa, filters.metodo, filters.from, filters.to]
   );
   const params = useDebounced(rawParams, 350);
   const paramsKey = JSON.stringify(params);
   const listParams = useMemo(() => ({ ...params, orden: filters.orden || undefined }), [params, filters.orden]);
 
+  // El resumen y los acordeones respetan el rango de fechas; las estadisticas del
+  // encabezado siempre miran por mes, asi que no lo reciben.
+  const statsParams = useMemo(() => {
+    const { from: _from, to: _to, ...rest } = params;
+    return rest;
+  }, [params]);
+  const statsKey = JSON.stringify(statsParams);
+
   const activeFilterCount =
-    Object.values(params).filter(Boolean).length + (filters.estado ? 1 : 0) + (filters.orden ? 1 : 0);
+    Object.values(params).filter(Boolean).length + (filters.area ? 1 : 0) + (filters.orden ? 1 : 0);
   const hasActiveFilters = activeFilterCount > 0;
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([getMancatoSummaryRequest(params), getMancatoStatsRequest(params)])
-      .then(([summaryData, statsData]) => {
+    getCombustibleSummaryRequest(params)
+      .then((data) => {
         if (!cancelled) {
-          setSummary(summaryData);
-          setStats(statsData);
+          setSummary(data);
           setError("");
         }
       })
@@ -495,19 +423,32 @@ export const MancatoPagamentoPage = () => {
     // paramsKey resume params (ver arriba).
   }, [paramsKey, version]);
 
+  useEffect(() => {
+    let cancelled = false;
+    getCombustibleStatsRequest(statsParams)
+      .then((data) => {
+        if (!cancelled) setStats(data);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(parseApiError(err).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+    // statsKey resume statsParams (ver arriba).
+  }, [statsKey, version]);
+
   const clearFilters = () => setFilters(EMPTY_FILTERS);
 
-  const visibleEstados = MANCATO_ESTADOS.filter((e) => !filters.estado || e.value === filters.estado);
+  const visibleAreas = COMBUSTIBLE_AREAS.filter((a) => !filters.area || a.value === filters.area);
+  // Sin filtros abre solo la primera area con cargas; con filtros, todas las que tengan
+  // resultados (asi se ve de una que encontro la busqueda).
+  const firstWithData = summary ? COMBUSTIBLE_AREAS.find((a) => summary[a.value].count > 0)?.value : null;
   const driverOptions = [
     { value: "", label: "Todos" },
     ...drivers.map((d) => ({ value: d.id, label: `${d.nombre} ${d.apellido}` })),
   ];
-  const estadoOptions = [
-    { value: "", label: "Todos" },
-    ...MANCATO_ESTADOS.map((e) => ({ value: e.value, label: e.label })),
-  ];
-
-  const antiguedad = stats ? Math.round(stats.antiguedadMediaDias) : 0;
+  const areaOptions = [{ value: "", label: "Todas" }, ...AREA_OPTIONS];
 
   return (
     <div className="flex flex-col gap-6">
@@ -515,8 +456,8 @@ export const MancatoPagamentoPage = () => {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <p className="max-w-xl text-[14px] text-ink-300">
               {isPrivileged
-                ? "Controla los avisos de pago omitido de toda la flota. Cada uno se puede pagar hasta el dia 15 posterior a su fecha."
-                : "Tus avisos de pago omitido. Cada uno se puede pagar hasta el dia 15 posterior a su fecha."}
+                ? "Controla las cargas de combustible de toda la flota, separadas por area."
+                : "Tus cargas de combustible. Sube el comprobante apenas cargues."}
             </p>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
@@ -540,17 +481,17 @@ export const MancatoPagamentoPage = () => {
               className="min-w-0 flex-1 bg-transparent text-ink-50 outline-none"
             />
           </div>
-          <Link to="/finanzas/mancato/new" state={{ backgroundLocation: location }}>
+          <Link to="/finanzas/combustible/new" state={{ backgroundLocation: location }}>
             <Button className="w-full sm:w-auto sm:px-6">
               <PlusIcon className="h-4 w-4" />
-              Nuevo registro
+              Cargar combustible
             </Button>
           </Link>
         </div>
       </div>
 
       <Alert>{error}</Alert>
-      {!summary && !error && <PageLoader />}
+      {(!summary || !stats) && !error && <PageLoader />}
 
       {summary && stats && (
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -559,46 +500,50 @@ export const MancatoPagamentoPage = () => {
             <div className="grid grid-cols-2 gap-3 sm:gap-4 2xl:grid-cols-4">
               <MancatoKpi
                 icon={EuroIcon}
-                label="Total por pagar"
-                value={formatCurrency(stats.totalPorPagar)}
-                deltaPct={stats.totalPorPagarDeltaPct}
+                label={`Gasto de ${stats.mesLabel}`}
+                value={formatCurrency(stats.totalMes)}
+                deltaPct={stats.totalMesDeltaPct}
                 deltaLabel="vs. mes anterior"
-                detail="Vencidos y pendientes"
-                color="#ff3b57"
+                detail="Lo que va del mes"
+                color="#22e093"
               />
               <MancatoKpi
-                icon={FileTextIcon}
-                label="Avisos por pagar"
-                value={stats.avisosAbiertos}
-                detail={`de ${stats.avisosTotales} totales`}
+                icon={FuelIcon}
+                label="Cargas del mes"
+                value={stats.cargasMes}
+                detail={stats.cargasMes === 1 ? "carga registrada" : "cargas registradas"}
+                color="#2f8dff"
+              />
+              <MancatoKpi
+                icon={TruckIcon}
+                label="Promedio por carga"
+                value={formatCurrency(stats.promedioPorCarga)}
+                deltaPct={stats.promedioPorCargaDeltaPct}
+                deltaLabel="vs. mes anterior"
+                detail="Monto medio de cada carga"
                 color="#ff8a1a"
               />
               {isPrivileged ? (
                 <MancatoKpi
                   icon={UsersIcon}
-                  label="Choferes con deuda"
-                  value={stats.choferesConDeuda}
+                  label="Choferes que cargaron"
+                  value={stats.choferesQueCargaron}
                   detail={`de ${stats.totalChoferes ?? 0} choferes`}
                   color="#a78bfa"
                 />
               ) : (
                 <MancatoKpi
-                  icon={UsersIcon}
-                  label="Vencen en 3 dias"
-                  value={stats.recomendacion.porVencer3Dias}
-                  detail="Pagalos a tiempo"
+                  icon={FuelIcon}
+                  label="Gasolinera frecuente"
+                  value={stats.gasolineraTop?.nombre ?? "-"}
+                  detail={
+                    stats.gasolineraTop
+                      ? `${stats.gasolineraTop.count} ${stats.gasolineraTop.count === 1 ? "carga" : "cargas"} este mes`
+                      : "Sin cargas este mes"
+                  }
                   color="#a78bfa"
                 />
               )}
-              <MancatoKpi
-                icon={ClockIcon}
-                label="Antiguedad media"
-                value={`${antiguedad} ${antiguedad === 1 ? "dia" : "dias"}`}
-                deltaPct={stats.antiguedadMediaDeltaPct}
-                deltaLabel="vs. mes anterior"
-                detail="Desde la fecha del aviso"
-                color="#22d3ee"
-              />
             </div>
 
             {/* Filtros */}
@@ -636,18 +581,18 @@ export const MancatoPagamentoPage = () => {
                   id="filtro-q"
                   label="Buscar"
                   icon={SearchIcon}
-                  placeholder="Numero, targa, chofer o comentario"
+                  placeholder="Targa, gasolinera o chofer"
                   value={filters.q}
                   onChange={(e) => setFilter("q", e.target.value)}
                   className="min-w-[240px] flex-[2_1_260px]"
                 />
-                <div className="min-w-[150px] flex-[1_1_150px]">
+                <div className="min-w-[170px] flex-[1_1_170px]">
                   <Select
-                    id="filtro-estado"
-                    label="Estado"
-                    options={estadoOptions}
-                    value={filters.estado}
-                    onChange={(e) => setFilter("estado", e.target.value)}
+                    id="filtro-area"
+                    label="Área"
+                    options={areaOptions}
+                    value={filters.area}
+                    onChange={(e) => setFilter("area", e.target.value)}
                   />
                 </div>
                 {isPrivileged && (
@@ -666,28 +611,33 @@ export const MancatoPagamentoPage = () => {
                     id="filtro-targa"
                     label="Targa"
                     placeholder="Ej. AB123CD"
-                    list="mancato-filtro-targas"
+                    list="combustible-filtro-targas"
                     autoComplete="off"
                     value={filters.targa}
                     onChange={(e) => setFilter("targa", e.target.value.toUpperCase())}
                   />
-                  <datalist id="mancato-filtro-targas">
+                  <datalist id="combustible-filtro-targas">
                     {vehicles.map((v) => (
                       <option key={v.id} value={v.targa} />
                     ))}
                   </datalist>
                 </div>
-                {isPrivileged && (
-                  <div className="min-w-[170px] flex-[1_1_170px]">
-                    <Select
-                      id="filtro-asignacion"
-                      label="Servicio"
-                      options={ASIGNACION_FILTER_OPTIONS}
-                      value={filters.asignacion}
-                      onChange={(e) => setFilter("asignacion", e.target.value)}
-                    />
-                  </div>
-                )}
+                <div className="min-w-[150px] flex-[1_1_150px]">
+                  <TextField
+                    id="filtro-metodo"
+                    label="Gasolinera"
+                    placeholder="Ej. Eni"
+                    list="combustible-filtro-metodos"
+                    autoComplete="off"
+                    value={filters.metodo}
+                    onChange={(e) => setFilter("metodo", e.target.value)}
+                  />
+                  <datalist id="combustible-filtro-metodos">
+                    {metodos.map((m) => (
+                      <option key={m.nombre} value={m.nombre} />
+                    ))}
+                  </datalist>
+                </div>
                 <div className="min-w-[150px] flex-[1_1_150px]">
                   <Select
                     id="filtro-orden"
@@ -697,47 +647,31 @@ export const MancatoPagamentoPage = () => {
                     onChange={(e) => setFilter("orden", e.target.value)}
                   />
                 </div>
-                <label className="flex min-w-[210px] flex-[1_1_210px] cursor-pointer items-center gap-2.5 rounded-xl glass-input px-4 py-3 text-[14px] text-ink-50">
-                  <input
-                    type="checkbox"
-                    checked={filters.fueraDePlazo}
-                    onChange={(e) => setFilter("fueraDePlazo", e.target.checked)}
-                    className="h-4 w-4 accent-[var(--danger-500)]"
-                  />
-                  Registrados fuera de plazo
-                </label>
               </div>
             </div>
 
-            {/* Acordeones por estado */}
+            {/* Acordeones por area */}
             <div className="flex flex-col gap-4">
-              {visibleEstados.map((estado) => (
-                <EstadoAccordion
+              {visibleAreas.map((area) => (
+                <AreaAccordion
                   // Al activar/desactivar filtros se reinicia la eleccion manual del usuario.
-                  key={`${estado.value}-${hasActiveFilters ? "f" : "n"}`}
-                  estado={estado.value}
-                  summary={summary[estado.value]}
+                  key={`${area.value}-${hasActiveFilters ? "f" : "n"}`}
+                  area={area}
+                  summary={summary[area.value]}
                   params={listParams}
                   version={version}
                   defaultOpen={
-                    summary[estado.value].count > 0 && (hasActiveFilters || estado.value !== "PAGADO")
+                    summary[area.value].count > 0 && (hasActiveFilters || area.value === firstWithData)
                   }
                   showDriver={isPrivileged}
                   vehiclesByTarga={vehiclesByTarga}
                   location={location}
-                  isPrivileged={isPrivileged}
-                  onChanged={refresh}
                 />
               ))}
             </div>
           </div>
 
-          <MancatoSidebar
-            stats={stats}
-            summary={summary}
-            isPrivileged={isPrivileged}
-            onSeeDetails={(estado) => setFilter("estado", estado)}
-          />
+          <CombustibleSidebar stats={stats} isPrivileged={isPrivileged} />
         </div>
       )}
     </div>

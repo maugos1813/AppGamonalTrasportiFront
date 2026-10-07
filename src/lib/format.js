@@ -81,6 +81,37 @@ export const toDateTimeInputValue = (value) => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+// Igual, pero con la hora de pared de Roma (la operacion es ahi) sin importar la zona del
+// navegador: para campos que el backend interpreta como hora de Roma (ej. Fecha retiro).
+export const toRomeDateTimeInputValue = (value) => {
+  if (!value) return "";
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Rome",
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).formatToParts(new Date(value));
+  const get = (type) => parts.find((p) => p.type === type).value;
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+};
+
+// "12/10/2026 08:40" en hora de Roma.
+export const formatRomeDateTime = (value) => {
+  if (!value) return "-";
+  return new Date(value).toLocaleString("es-AR", {
+    timeZone: "Europe/Rome",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};
+
 // Convierte un ISO date a "yyyy-MM-dd" para <input type="date">.
 export const toDateInputValue = (value) => {
   if (!value) return "";

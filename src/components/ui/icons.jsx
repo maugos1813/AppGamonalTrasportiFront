@@ -337,3 +337,16 @@ export const GavelIcon = (props) => (
     <path d="m14 4 6 6M12 6l6 6-3 3-6-6 3-3ZM9 12l-5 5 3 3 5-5M4 21h8" />
   </Svg>
 );
+
+export const FuelIcon = (props) => (
+  <Svg {...props}>
+    <path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M6 8h6M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V9l-3-3" />
+  </Svg>
+);
+
+export const WalletIcon = (props) => (
+  <Svg {...props}>
+    <path d="M3 7a2 2 0 0 1 2-2h12v4M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1V10a1 1 0 0 0-1-1H5a2 2 0 0 1-2-2Z" />
+    <circle cx="16.5" cy="14" r="1" />
+  </Svg>
+);

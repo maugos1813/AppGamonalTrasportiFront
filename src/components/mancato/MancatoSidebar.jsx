@@ -23,28 +23,39 @@ const hashColor = (name) =>
 
 // Deuda por chofer (OWNER/ADMIN) o por estado (chofer): nombre, cantidad, importe y una
 // barra proporcional al mayor.
-export const DebtSummary = ({ rows, total, unit = ["aviso", "avisos"], title = "Resumen de deudas" }) => {
+export const DebtSummary = ({
+  rows,
+  total,
+  unit = ["aviso", "avisos"],
+  title = "Resumen de deudas",
+  totalLabel = "Total por pagar",
+  emptyText = "No hay deuda abierta.",
+  icon = ReceiptIcon,
+}) => {
   const max = Math.max(...rows.map((r) => r.total), 1);
   return (
     <PanelShell
-      icon={ReceiptIcon}
+      icon={icon}
       title={title}
       aside={
         <span className="text-right text-[11px] text-ink-400">
-          Total por pagar
+          {totalLabel}
           <span className="block text-[15px] font-semibold text-ink-50">{formatCurrency(total)}</span>
         </span>
       }
     >
       {rows.length === 0 ? (
-        <p className="py-4 text-[13px] text-ink-400">No hay deuda abierta.</p>
+        <p className="py-4 text-[13px] text-ink-400">{emptyText}</p>
       ) : (
         <ul className="flex flex-col gap-4">
           {rows.map((row, index) => (
             <li key={row.key} className="flex items-start gap-3">
               <span
                 className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[12px] font-semibold text-white"
-                style={{ backgroundColor: row.color ?? (row.isOtros ? "#64748b" : hashColor(row.label)) }}
+                style={{
+                  backgroundColor: row.color ?? (row.isOtros ? "#64748b" : hashColor(row.label)),
+                  color: row.fg,
+                }}
               >
                 {row.isOtros ? "…" : initials(row.label)}
               </span>
@@ -76,10 +87,16 @@ export const DebtSummary = ({ rows, total, unit = ["aviso", "avisos"], title = "
   );
 };
 
-export const Evolution = ({ serie, deltaPct }) => (
+export const Evolution = ({
+  serie,
+  deltaPct,
+  title = "Evolucion de la deuda",
+  valueLabel = "Por pagar",
+  note = "Deuda sin pagar al cierre de cada mes. La variacion compara el mes en curso con el anterior.",
+}) => (
   <PanelShell
     icon={TrendIcon}
-    title="Evolucion de la deuda"
+    title={title}
     aside={
       deltaPct != null && (
         <span
@@ -95,11 +112,9 @@ export const Evolution = ({ serie, deltaPct }) => (
     }
   >
     <div className="h-[170px]">
-      <MancatoDebtChart data={serie} />
+      <MancatoDebtChart data={serie} valueLabel={valueLabel} />
     </div>
-    <p className="mt-2 text-[11px] text-ink-400">
-      Deuda sin pagar al cierre de cada mes. La variacion compara el mes en curso con el anterior.
-    </p>
+    <p className="mt-2 text-[11px] text-ink-400">{note}</p>
   </PanelShell>
 );
 

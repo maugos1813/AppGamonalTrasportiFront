@@ -24,7 +24,7 @@ export const NewMancatoPage = () => {
       refresh();
       // Se preserva backgroundLocation (ver App.jsx) para que el detalle tambien se
       // muestre como overlay sobre la lista.
-      navigate(`/mancato-pagamento/${mancato.id}`, {
+      navigate(`/finanzas/mancato/${mancato.id}`, {
         replace: true,
         state: { backgroundLocation: location.state?.backgroundLocation },
       });
@@ -38,10 +38,10 @@ export const NewMancatoPage = () => {
   };
 
   return (
-    <SlideOverPanel closeTo="/mancato-pagamento">
+    <SlideOverPanel closeTo="/finanzas/mancato">
       <div className="flex flex-col gap-6">
         <div>
-          <Link to="/mancato-pagamento" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
+          <Link to="/finanzas/mancato" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
             &larr; Mancato Pagamento
           </Link>
         </div>

@@ -157,7 +157,7 @@ export const MultaDetailPage = () => {
     try {
       await deleteMultaRequest(id);
       refresh();
-      navigate("/multas", { replace: true });
+      navigate("/finanzas/multas", { replace: true });
     } catch (err) {
       setActionError(parseApiError(err).message);
       setBusy(false);
@@ -166,7 +166,7 @@ export const MultaDetailPage = () => {
 
   if (loadError) {
     return (
-      <SlideOverPanel closeTo="/multas">
+      <SlideOverPanel closeTo="/finanzas/multas">
         <Alert>{loadError}</Alert>
       </SlideOverPanel>
     );
@@ -174,7 +174,7 @@ export const MultaDetailPage = () => {
 
   if (!multa) {
     return (
-      <SlideOverPanel closeTo="/multas">
+      <SlideOverPanel closeTo="/finanzas/multas">
         <PageLoader />
       </SlideOverPanel>
     );
@@ -184,10 +184,10 @@ export const MultaDetailPage = () => {
   const quien = quienPagaLabel(multa);
 
   return (
-    <SlideOverPanel closeTo="/multas">
+    <SlideOverPanel closeTo="/finanzas/multas">
       <div className="flex flex-col gap-6">
         <div>
-          <Link to="/multas" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
+          <Link to="/finanzas/multas" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
             &larr; Multas
           </Link>
         </div>

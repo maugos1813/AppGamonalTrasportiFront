@@ -37,3 +37,11 @@ export const updateMancatoRequest = (id, fields, files) =>
   api.patch(`${BASE}/${id}`, toFormData(fields, files)).then((res) => res.data.data.mancato);
 
 export const deleteMancatoRequest = (id) => api.delete(`${BASE}/${id}`);
+
+// Servicios del vehiculo cerca del transito, para elegir a mano a cual pertenece (OWNER/ADMIN).
+export const listMancatoCandidatesRequest = (id) =>
+  api.get(`${BASE}/${id}/candidatos`).then((res) => res.data.data.candidatos);
+
+// Vuelve a evaluar los mancatos que la oficina no fijo a mano. Devuelve { revisados, cambiados }.
+export const rematchMancatosRequest = () =>
+  api.post(`${BASE}/reasignar`).then((res) => res.data.data.resultado);

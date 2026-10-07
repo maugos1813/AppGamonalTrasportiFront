@@ -30,6 +30,7 @@ const INITIAL_FORM = {
   estado: "IN_SOSPESO",
   fechaServicio: "",
   eta: "",
+  fechaRetiro: "",
   descripcion: "",
   comentarios: "",
   ciudad: "",
@@ -236,6 +237,15 @@ export const NewDhlAbServiceRecordPage = () => {
               onChange={handleChange("fechaServicio")}
               error={fieldErrors.fechaServicio?.[0]}
               required
+            />
+
+            <TextField
+              id="fechaRetiro"
+              label="Fecha retiro (hora de Roma)"
+              type="datetime-local"
+              value={form.fechaRetiro}
+              onChange={handleChange("fechaRetiro")}
+              error={fieldErrors.fechaRetiro?.[0]}
             />
 
             <TextField

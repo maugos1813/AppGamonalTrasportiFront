@@ -69,6 +69,27 @@ const NewMancatoPage = lazy(() =>
 const MancatoDetailPage = lazy(() =>
   import("./pages/mancato/MancatoDetailPage").then((m) => ({ default: m.MancatoDetailPage })),
 );
+const CombustiblePage = lazy(() =>
+  import("./pages/combustible/CombustiblePage").then((m) => ({ default: m.CombustiblePage })),
+);
+const NewCombustiblePage = lazy(() =>
+  import("./pages/combustible/NewCombustiblePage").then((m) => ({ default: m.NewCombustiblePage })),
+);
+const CombustibleDetailPage = lazy(() =>
+  import("./pages/combustible/CombustibleDetailPage").then((m) => ({ default: m.CombustibleDetailPage })),
+);
+const FinanzasLayout = lazy(() =>
+  import("./pages/finanzas/FinanzasLayout").then((m) => ({ default: m.FinanzasLayout })),
+);
+const FinanzasResumenPage = lazy(() =>
+  import("./pages/finanzas/FinanzasResumenPage").then((m) => ({ default: m.FinanzasResumenPage })),
+);
+const PagosChoferesPage = lazy(() =>
+  import("./pages/finanzas/PagosChoferesPage").then((m) => ({ default: m.PagosChoferesPage })),
+);
+const GastosServiciosPage = lazy(() =>
+  import("./pages/finanzas/GastosServiciosPage").then((m) => ({ default: m.GastosServiciosPage })),
+);
 const MultasPage = lazy(() => import("./pages/multas/MultasPage").then((m) => ({ default: m.MultasPage })));
 const NewMultaPage = lazy(() => import("./pages/multas/NewMultaPage").then((m) => ({ default: m.NewMultaPage })));
 const MultaDetailPage = lazy(() =>
@@ -82,6 +103,12 @@ const VehiclesPage = lazy(() => import("./pages/vehicles/VehiclesPage").then((m)
 // hay backgroundLocation (entrada directa por URL, o un link que no la pasa, ej. desde
 // el Dashboard o el Mapa), esas mismas paginas se siguen sirviendo ahi como pagina
 // completa, exactamente como antes de este cambio.
+// /multas/123 -> /finanzas/multas/123 (conserva lo que sigue y la query).
+const LegacyRedirect = ({ from, to }) => {
+  const location = useLocation();
+  return <Navigate to={`${to}${location.pathname.slice(from.length)}${location.search}`} replace />;
+};
+
 const OverlayRoutes = () => (
   <Suspense fallback={<PageLoader />}>
     <Routes>
@@ -94,10 +121,12 @@ const OverlayRoutes = () => (
         <Route path="/choferes/:id" element={<DriverDetailPage />} />
         <Route path="/vehiculos/new" element={<NewVehiclePage />} />
         <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
-        <Route path="/mancato-pagamento/new" element={<NewMancatoPage />} />
-        <Route path="/mancato-pagamento/:id" element={<MancatoDetailPage />} />
-        <Route path="/multas/new" element={<NewMultaPage />} />
-        <Route path="/multas/:id" element={<MultaDetailPage />} />
+        <Route path="/finanzas/mancato/new" element={<NewMancatoPage />} />
+        <Route path="/finanzas/mancato/:id" element={<MancatoDetailPage />} />
+        <Route path="/finanzas/multas/new" element={<NewMultaPage />} />
+        <Route path="/finanzas/multas/:id" element={<MultaDetailPage />} />
+        <Route path="/finanzas/combustible/new" element={<NewCombustiblePage />} />
+        <Route path="/finanzas/combustible/:id" element={<CombustibleDetailPage />} />
       </Route>
     </Routes>
   </Suspense>
@@ -143,12 +172,24 @@ function App() {
               <Route path="/vehiculos" element={<VehiclesPage />} />
               <Route path="/vehiculos/new" element={<NewVehiclePage />} />
               <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
-              <Route path="/mancato-pagamento" element={<MancatoPagamentoPage />} />
-              <Route path="/mancato-pagamento/new" element={<NewMancatoPage />} />
-              <Route path="/mancato-pagamento/:id" element={<MancatoDetailPage />} />
-              <Route path="/multas" element={<MultasPage />} />
-              <Route path="/multas/new" element={<NewMultaPage />} />
-              <Route path="/multas/:id" element={<MultaDetailPage />} />
+              <Route path="/finanzas" element={<FinanzasLayout />}>
+                <Route index element={<FinanzasResumenPage />} />
+                <Route path="pagos" element={<PagosChoferesPage />} />
+                <Route path="gastos" element={<GastosServiciosPage />} />
+                <Route path="mancato" element={<MancatoPagamentoPage />} />
+                <Route path="mancato/new" element={<NewMancatoPage />} />
+                <Route path="mancato/:id" element={<MancatoDetailPage />} />
+                <Route path="multas" element={<MultasPage />} />
+                <Route path="multas/new" element={<NewMultaPage />} />
+                <Route path="multas/:id" element={<MultaDetailPage />} />
+                <Route path="combustible" element={<CombustiblePage />} />
+                <Route path="combustible/new" element={<NewCombustiblePage />} />
+                <Route path="combustible/:id" element={<CombustibleDetailPage />} />
+              </Route>
+              {/* Las rutas de antes de Finanzas Operativas siguen funcionando (enlaces viejos, APK). */}
+              <Route path="/mancato-pagamento/*" element={<LegacyRedirect from="/mancato-pagamento" to="/finanzas/mancato" />} />
+              <Route path="/multas/*" element={<LegacyRedirect from="/multas" to="/finanzas/multas" />} />
+              <Route path="/combustible/*" element={<LegacyRedirect from="/combustible" to="/finanzas/combustible" />} />
               <Route path="/mapa" element={<MapPage />} />
               <Route path="/mapa/area-c" element={<AreaCPage />} />
               <Route path="/control-flota" element={<ControlFlotaPage />} />

@@ -24,7 +24,13 @@ import {
   ZONA_LABELS,
   ZONA_OPTIONS,
 } from "../../lib/constants";
-import { formatCurrency, formatDateTime, toDateTimeInputValue } from "../../lib/format";
+import {
+  formatCurrency,
+  formatDateTime,
+  formatRomeDateTime,
+  toDateTimeInputValue,
+  toRomeDateTimeInputValue,
+} from "../../lib/format";
 import {
   deleteRecordRequest,
   getRecordRequest,
@@ -34,6 +40,50 @@ import {
 } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
+
+// Peajes (mancato pagamento) que el sistema asigno a este servicio, con cuantos fueron de ida y
+// de vuelta. Un servicio puede tener varios en cada tramo.
+const MancatosOfService = ({ mancatos }) => {
+  const location = useLocation();
+  if (!mancatos || mancatos.length === 0) return null;
+  const ida = mancatos.filter((m) => m.tramo === "IDA").length;
+  const vuelta = mancatos.filter((m) => m.tramo === "VUELTA").length;
+  const total = mancatos.reduce((sum, m) => sum + m.costo, 0);
+
+  return (
+    <div className="mt-6 border-t border-line/10 pt-6">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">
+          Peajes (mancato pagamento)
+        </h3>
+        <span className="text-[12px] text-ink-400">
+          {mancatos.length} {mancatos.length === 1 ? "peaje" : "peajes"} - {ida} de ida, {vuelta} de vuelta -{" "}
+          {formatCurrency(total)}
+        </span>
+      </div>
+      <ul className="flex flex-col gap-1.5">
+        {mancatos.map((m) => (
+          <li key={m.id}>
+            <Link
+              to={`/finanzas/mancato/${m.id}`}
+              state={{ backgroundLocation: location }}
+              className="flex flex-wrap items-center gap-x-3 gap-y-0.5 rounded-lg bg-line/[0.06] px-3 py-2 text-[13px] transition-colors hover:bg-line/10"
+            >
+              <span className="font-medium text-ink-50">#{m.numero}</span>
+              <span className="text-ink-300">{formatRomeDateTime(m.fechaHoraTransito)}</span>
+              {m.tramo && (
+                <span className="rounded-full bg-line/10 px-2 py-0.5 text-[11px] text-ink-200">
+                  {m.tramo === "IDA" ? "Ida" : "Vuelta"}
+                </span>
+              )}
+              <span className="ml-auto font-semibold text-ink-50">{formatCurrency(m.costo)}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
 const OPERATIONAL_FIELDS = [
   "estado",
@@ -92,6 +142,9 @@ const toFormState = (record) => ({
   ciudad: record.ciudad ?? "",
   fechaServicio: toDateTimeInputValue(record.fechaServicio),
   eta: toDateTimeInputValue(record.eta),
+  // Hora de pared de Roma (el backend la interpreta asi); no entra en OWNER_FIELDS porque ""
+  // significa "borrar" y se maneja aparte en handleSave.
+  fechaRetiro: toRomeDateTimeInputValue(record.fechaRetiro),
   kilometros: record.kilometros ?? "",
   precioKm: record.precioKm ?? "",
   areaC: record.areaC ?? "",
@@ -278,6 +331,12 @@ export const RecordDetailPage = () => {
         ])
         .filter(([, value]) => value !== "" && value !== undefined)
     );
+
+    // Fecha retiro: solo la oficina; "" la borra, asi que se manda aunque este vacia (pero
+    // solo si cambio, para no disparar re-evaluaciones de mancatos de balde).
+    if (!isChofer && form.fechaRetiro !== toRomeDateTimeInputValue(record.fechaRetiro)) {
+      payload.fechaRetiro = form.fechaRetiro;
+    }
 
     try {
       const updated = await updateRecordRequest(id, payload);
@@ -487,6 +546,10 @@ const RecordSummaryView = ({
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <InfoRow label="Fecha de servicio" value={formatDateTime(record.fechaServicio)} />
+        <InfoRow
+          label="Fecha retiro"
+          value={record.fechaRetiro ? `${formatRomeDateTime(record.fechaRetiro)} (Roma)` : "Sin cargar"}
+        />
         <InfoRow label="ETA" value={formatDateTime(record.eta)} />
         <InfoRow
           label="Vehiculo"
@@ -508,6 +571,8 @@ const RecordSummaryView = ({
           />
         )}
       </div>
+
+      <MancatosOfService mancatos={record.mancatos} />
 
       <div className="mt-6 border-t border-line/10 pt-6">
         <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
@@ -741,6 +806,13 @@ const RecordEditForm = ({
                 type="datetime-local"
                 value={form.fechaServicio}
                 onChange={handleChange("fechaServicio")}
+              />
+              <TextField
+                id="fechaRetiro"
+                label="Fecha retiro (hora de Roma)"
+                type="datetime-local"
+                value={form.fechaRetiro}
+                onChange={handleChange("fechaRetiro")}
               />
               <TextField
                 id="eta"

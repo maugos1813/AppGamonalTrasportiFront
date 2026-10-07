@@ -159,7 +159,7 @@ const RowMenu = ({ multa, isPrivileged, location, onChanged }) => {
       </button>
       {open && (
         <div className="glass-surface absolute right-0 top-9 z-30 w-56 overflow-hidden rounded-xl bg-background py-1 shadow-xl">
-          <Link to={`/multas/${multa.id}`} state={{ backgroundLocation: location }} className={itemClass}>
+          <Link to={`/finanzas/multas/${multa.id}`} state={{ backgroundLocation: location }} className={itemClass}>
             Ver detalle
           </Link>
           {isPrivileged && (
@@ -197,7 +197,7 @@ const MultaRow = ({ multa, showDriver, vehicle, location, isPrivileged, onChange
   return (
     <div className="relative">
       <Link
-        to={`/multas/${multa.id}`}
+        to={`/finanzas/multas/${multa.id}`}
         state={{ backgroundLocation: location }}
         className={clsx(
           "grid grid-cols-1 gap-2 rounded-xl border-l-4 px-4 py-3 pr-14 transition-colors hover:bg-line/[0.07] lg:items-center lg:gap-3",
@@ -515,19 +515,11 @@ export const MultasPage = () => {
     <div className="flex flex-col gap-6">
       {/* Encabezado */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex items-start gap-3.5">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-warning-500/15 text-warning-500 ring-1 ring-warning-500/30">
-            <GavelIcon className="h-6 w-6" />
-          </span>
-          <div>
-            <h1 className="text-[26px] font-semibold leading-tight text-ink-50">Multas</h1>
-            <p className="mt-0.5 text-[14px] text-ink-300">
+        <p className="max-w-xl text-[14px] text-ink-300">
               {isPrivileged
                 ? "Controla las multas de la flota: vencimientos, pagos y lo que hay que descontar a los choferes."
                 : "Tus multas: estado, vencimiento y si se te va a descontar."}
             </p>
-          </div>
-        </div>
 
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <div className="glass-surface-sm flex items-center gap-2 rounded-xl px-3 py-2 text-[13px] text-ink-300">
@@ -551,7 +543,7 @@ export const MultasPage = () => {
             />
           </div>
           {isPrivileged && (
-            <Link to="/multas/new" state={{ backgroundLocation: location }}>
+            <Link to="/finanzas/multas/new" state={{ backgroundLocation: location }}>
               <Button className="w-full sm:w-auto sm:px-6">
                 <PlusIcon className="h-4 w-4" />
                 Nueva multa

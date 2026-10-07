@@ -972,7 +972,7 @@ export const computeMultaAlerts = (data, isPrivileged) => {
       id: `multa-vencida-${item.id}`,
       severity: "urgent",
       message: `La multa ${item.numeroVerbale} (${item.targa}${who(item)}) vencio hace ${plural(dias, "dia", "dias")} - ${formatCurrency(item.costo)}.`,
-      link: `/multas/${item.id}`,
+      link: `/finanzas/multas/${item.id}`,
     });
   });
   const vencidasRestantes = data.vencidas.count - data.vencidas.items.length;
@@ -981,7 +981,7 @@ export const computeMultaAlerts = (data, isPrivileged) => {
       id: "multas-vencidas-mas",
       severity: "urgent",
       message: `Hay ${plural(vencidasRestantes, "multa vencida mas", "multas vencidas mas")}.`,
-      link: "/multas",
+      link: "/finanzas/multas",
     });
   }
 
@@ -991,7 +991,7 @@ export const computeMultaAlerts = (data, isPrivileged) => {
       id: `multa-por-vencer-${item.id}`,
       severity: item.diasRestantes <= 2 ? "urgent" : "warning",
       message: `La multa ${item.numeroVerbale} (${item.targa}${who(item)}) ${cuando} - ${formatCurrency(item.costo)}.`,
-      link: `/multas/${item.id}`,
+      link: `/finanzas/multas/${item.id}`,
     });
   });
   const porVencerRestantes = data.porVencer.count - data.porVencer.items.length;
@@ -1000,7 +1000,7 @@ export const computeMultaAlerts = (data, isPrivileged) => {
       id: "multas-por-vencer-mas",
       severity: "warning",
       message: `Hay ${plural(porVencerRestantes, "multa mas que vence", "multas mas que vencen")} en los proximos 7 dias.`,
-      link: "/multas",
+      link: "/finanzas/multas",
     });
   }
 
@@ -1010,7 +1010,7 @@ export const computeMultaAlerts = (data, isPrivileged) => {
       id: `multas-descuento-${data.aDescontar.count}`,
       severity: "reminder",
       message: `Faltan descontar ${formatCurrency(data.aDescontar.total)} a los choferes (${plural(data.aDescontar.count, "multa", "multas")}).`,
-      link: "/multas",
+      link: "/finanzas/multas",
     });
   }
 

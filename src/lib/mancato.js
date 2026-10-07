@@ -71,3 +71,44 @@ export const parseCosto = (text) => {
   const value = Number(String(text ?? "").trim().replace(",", "."));
   return Number.isFinite(value) && value > 0 ? value : null;
 };
+
+// A que servicio pertenece cada peaje y en que punto esta esa asignacion. El backend lo
+// calcula (ver mancatoMatching.service.js): el chofer suele subir el peaje antes de que la
+// oficina cargue el servicio, asi que "Esperando servicio" es un estado normal y se resuelve
+// solo cuando el servicio aparece.
+export const MANCATO_ASIGNACIONES = {
+  AUTO: { label: "Asignado", pill: "bg-success-500/15 text-success-500", tone: "text-success-500" },
+  CONFIRMADO: { label: "Confirmado", pill: "bg-success-500/15 text-success-500", tone: "text-success-500" },
+  MANUAL: { label: "Asignado a mano", pill: "bg-success-500/15 text-success-500", tone: "text-success-500" },
+  SUGERIDO: { label: "Por confirmar", pill: "bg-warning-500/20 text-warning-500", tone: "text-warning-500" },
+  EN_ESPERA: { label: "Esperando servicio", pill: "bg-accent-500/20 text-accent-300", tone: "text-accent-300" },
+  FUERA_DE_HORARIO: {
+    label: "Fuera del horario laboral",
+    pill: "bg-line/15 text-ink-300",
+    tone: "text-ink-300",
+  },
+};
+
+export const ASIGNACION_FILTER_OPTIONS = [
+  { value: "", label: "Todos" },
+  { value: "REVISAR", label: "Por revisar" },
+  { value: "SUGERIDO", label: "Por confirmar" },
+  { value: "EN_ESPERA", label: "Esperando servicio" },
+  { value: "FUERA_DE_HORARIO", label: "Fuera del horario laboral" },
+];
+
+export const TRAMO_LABELS = { IDA: "Ida", VUELTA: "Vuelta" };
+
+// "12/10/2026 08:40" (hora de Roma) a partir de la fecha del aviso y su hora.
+export const formatTransito = (mancato) => {
+  if (!mancato.fechaHoraTransito) return null;
+  return new Date(mancato.fechaHoraTransito).toLocaleString("es-AR", {
+    timeZone: "Europe/Rome",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+};

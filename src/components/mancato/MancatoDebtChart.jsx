@@ -7,20 +7,20 @@ const COLOR = "#22e093";
 
 const compact = (value) => (Math.abs(value) >= 1000 ? `${Math.round(value / 1000)}k` : `${Math.round(value)}`);
 
-const DebtTooltip = ({ active, payload, label }) => {
+const DebtTooltip = ({ active, payload, label, valueLabel }) => {
   if (!active || !payload?.length) return null;
   return (
     <div className="glass-surface-sm rounded-lg px-3 py-2 text-[13px]">
       <div className="mb-0.5 font-semibold text-ink-50">{label}</div>
       <div className="text-ink-300">
-        Por pagar: <span className="font-medium text-ink-50">{formatCurrency(payload[0].value)}</span>
+        {valueLabel}: <span className="font-medium text-ink-50">{formatCurrency(payload[0].value)}</span>
       </div>
     </div>
   );
 };
 
 // Deuda abierta (sin pagar) al cierre de cada mes. data: [{ label, value }].
-export const MancatoDebtChart = ({ data }) => {
+export const MancatoDebtChart = ({ data, valueLabel = "Por pagar" }) => {
   const { theme } = useTheme();
   const { tickColor, axisLineColor } = useChartAxisColors(theme);
 
@@ -48,7 +48,7 @@ export const MancatoDebtChart = ({ data }) => {
           tickFormatter={compact}
           allowDecimals={false}
         />
-        <Tooltip content={<DebtTooltip />} />
+        <Tooltip content={<DebtTooltip valueLabel={valueLabel} />} />
         <Area
           type="monotone"
           dataKey="value"

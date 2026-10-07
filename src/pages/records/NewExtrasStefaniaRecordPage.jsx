@@ -28,6 +28,7 @@ const INITIAL_FORM = {
   descripcion: "",
   fechaServicio: "",
   eta: "",
+  fechaRetiro: "",
   estado: "IN_SOSPESO",
   kilometros: "",
   precioKm: "",
@@ -217,6 +218,15 @@ export const NewExtrasStefaniaRecordPage = () => {
               onChange={handleChange("fechaServicio")}
               error={fieldErrors.fechaServicio?.[0]}
               required
+            />
+
+            <TextField
+              id="fechaRetiro"
+              label="Fecha retiro (hora de Roma)"
+              type="datetime-local"
+              value={form.fechaRetiro}
+              onChange={handleChange("fechaRetiro")}
+              error={fieldErrors.fechaRetiro?.[0]}
             />
 
             <TextField
