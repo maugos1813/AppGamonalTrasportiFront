@@ -42,3 +42,11 @@ export const suggestMultaDriverRequest = (targa, fecha) =>
 
 // Para la campanita: vencidas, por vencer (7 dias) y descuentos pendientes.
 export const listMultaAlertsRequest = () => api.get(`${BASE}/alertas`).then((res) => res.data.data.alerts);
+
+// El chofer sube el comprobante de una multa que paga el mismo: queda "por confirmar" hasta que la
+// oficina la marque como pagada.
+export const uploadMyMultaComprobanteRequest = (id, file) => {
+  const formData = new FormData();
+  formData.append("comprobante", file);
+  return api.post(`${BASE}/${id}/comprobante-chofer`, formData).then((res) => res.data.data.multa);
+};

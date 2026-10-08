@@ -3,12 +3,15 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { MancatoForm } from "../../components/mancato/MancatoForm";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
+import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { createMancatoRequest } from "../../lib/mancato.api";
 
 export const NewMancatoPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const location = useLocation();
   const { refresh } = useDataRefresh("mancato");
   const [submitting, setSubmitting] = useState(false);
@@ -47,9 +50,13 @@ export const NewMancatoPage = () => {
         </div>
 
         <div>
-          <h1 className="text-[24px] font-semibold text-ink-50">Nuevo Mancato Pagamento</h1>
+          <h1 className="text-[24px] font-semibold text-ink-50">
+            {isPrivileged ? "Nuevo Mancato Pagamento" : "Subir mancato pagamento"}
+          </h1>
           <p className="mt-1 text-[14px] text-ink-300">
-            Se puede pagar hasta el dia 15 posterior a la fecha, como dice el aviso.
+            {isPrivileged
+              ? "Se puede pagar hasta el dia 15 posterior a la fecha, como dice el aviso."
+              : "Sube la foto del aviso y copia sus datos. De lo demas se encarga la empresa."}
           </p>
         </div>
 

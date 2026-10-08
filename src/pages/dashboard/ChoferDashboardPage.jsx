@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { MancatoBanner } from "../../components/chofer/MancatoBanner";
+import { ResumenServiciosCard } from "../../components/chofer/ResumenServiciosCard";
+import { ServiciosActualesCard } from "../../components/chofer/ServiciosActualesCard";
 import { CerrarServicioModal } from "../../components/horas/CerrarServicioModal";
 import { HorasEstadoChip } from "../../components/horas/HorasEstadoChip";
 import { RecepcionPaqueteCard } from "../../components/horas/RecepcionPaqueteCard";
@@ -7,12 +10,9 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { PageLoader } from "../../components/ui/PageLoader";
-import { Spinner } from "../../components/ui/Spinner";
-import { StatCard } from "../../components/ui/StatCard";
 import { Switch } from "../../components/ui/Switch";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { RECORD_STATUS_LABELS, RECORD_STATUS_TONE } from "../../lib/constants";
 import { computeCurrentServices, computeMyServiceCounts } from "../../lib/dashboardStats";
 import { formatDateTime } from "../../lib/format";
 import { needsHours } from "../../lib/horas";
@@ -31,16 +31,6 @@ const isToday = (value) => {
   return (
     d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
   );
-};
-
-// Solo el color de texto del estado, sin fondo ni borde (se usa en el resumen simple).
-const STATUS_TEXT_TONE = {
-  pendiente: "text-status-pendiente",
-  "in-corso": "text-status-in-corso",
-  consegnato: "text-status-consegnato",
-  ritirato: "text-status-ritirato",
-  rischedulato: "text-status-rischedulato",
-  annullato: "text-status-annullato",
 };
 
 export const ChoferDashboardPage = () => {
@@ -127,7 +117,7 @@ export const ChoferDashboardPage = () => {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {user?.area === "EXTRAS_PIAZZA" && (
         <GlassCard>
           <Alert>{reperibilidadError}</Alert>
@@ -152,82 +142,16 @@ export const ChoferDashboardPage = () => {
         </GlassCard>
       )}
 
-      <GlassCard>
-        <h2 className="text-[17px] font-medium text-ink-50">Mis servicios de hoy y proximos</h2>
+      <ServiciosActualesCard
+        services={currentServices}
+        openingId={openingId}
+        uploadingId={uploadingId}
+        errors={uploadErrors}
+        onClose={openClose}
+        onUpload={handleUpload}
+      />
 
-        {currentServices.length === 0 ? (
-          <p className="mt-4 text-[14px] text-ink-300">
-            No tienes servicios en curso ni pendientes.
-          </p>
-        ) : (
-          <div className="mt-4 flex flex-col divide-y divide-line/10">
-            {currentServices.map((service) => (
-              <div key={service.id} className="py-4 first:pt-0 last:pb-0">
-                <p className="text-[13px] text-ink-200">
-                  <span className="font-medium text-ink-50">
-                    {service.codigo} — {service.destinazione}
-                  </span>{" "}
-                  <span className={STATUS_TEXT_TONE[RECORD_STATUS_TONE[service.estado]]}>
-                    ({RECORD_STATUS_LABELS[service.estado] || service.estado})
-                  </span>
-                </p>
-                {service.origen && (
-                  <p className="mt-1 text-[12px] font-medium text-accent-400">
-                    Recibido de{" "}
-                    {service.origen.chofer ? `${service.origen.chofer.nombre} ${service.origen.chofer.apellido}` : "otro chofer"}
-                    {service.traspasoHora ? ` a las ${formatDateTime(service.traspasoHora)}` : " - falta indicar la hora de recepcion"}
-                  </p>
-                )}
-                {service.relevo && (
-                  <p className="mt-1 text-[12px] font-medium text-accent-400">
-                    Lo termina {service.relevo.chofer.nombre} {service.relevo.chofer.apellido}
-                    {service.relevo.traspasoHora ? ` (recibio el paquete a las ${formatDateTime(service.relevo.traspasoHora)})` : ""}
-                  </p>
-                )}
-                <p className="mt-1 text-[12px] text-ink-400">
-                  Cliente: {service.client?.nombre ?? "-"} &middot;{" "}
-                  {service.fechaRetiro
-                    ? `Retiro: ${formatDateTime(service.fechaRetiro)}`
-                    : `Fecha: ${formatDateTime(service.fechaServicio)}`}{" "}
-                  &middot; ETA: {formatDateTime(service.eta)} &middot; Vehiculo:{" "}
-                  {service.vehicle?.targa ?? "-"} - {service.vehicle?.modelo ?? ""}
-                </p>
-
-                <Alert>{uploadErrors[service.id]}</Alert>
-
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <Button
-                    onClick={openClose(service.id)}
-                    loading={openingId === service.id}
-                    disabled={Boolean(service.origen) && !service.traspasoHora}
-                    className="sm:w-auto sm:px-5 sm:py-2 sm:text-[13px]"
-                  >
-                    Terminar servicio
-                  </Button>
-
-                  <label className="flex cursor-pointer items-center gap-2 rounded-full glass-surface-sm px-5 py-2 text-[13px] font-medium text-ink-50 hover:bg-line/10">
-                    {uploadingId === service.id ? <Spinner className="h-3.5 w-3.5" /> : "Subir evidencia"}
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      className="hidden"
-                      onChange={handleUpload(service.id)}
-                      disabled={uploadingId === service.id}
-                    />
-                  </label>
-
-                  <Link
-                    to={`/records/${service.id}`}
-                    className="text-[13px] font-medium text-accent-400 hover:text-accent-300"
-                  >
-                    Ver detalle completo &rarr;
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </GlassCard>
+      <ResumenServiciosCard counts={myServiceCounts} />
 
       {pendingHours.length > 0 && (
         <GlassCard>
@@ -268,39 +192,7 @@ export const ChoferDashboardPage = () => {
         </GlassCard>
       )}
 
-      <GlassCard>
-        <h2 className="text-[17px] font-medium text-ink-50">Mis servicios</h2>
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Hoy" value={myServiceCounts.hoy} tone="blue" />
-          <StatCard label="Pendientes" value={myServiceCounts.pendientes} tone="amber" />
-          <StatCard label="Completados" value={myServiceCounts.completados} tone="green" />
-          <StatCard label="Cancelados" value={myServiceCounts.cancelados} tone="red" />
-        </div>
-        <Link
-          to="/records"
-          className="mt-4 inline-block text-[13px] font-medium text-accent-400 hover:text-accent-300"
-        >
-          Ver historial completo &rarr;
-        </Link>
-      </GlassCard>
-
-      <GlassCard>
-        <h2 className="text-[17px] font-medium text-ink-50">¿Pasaste un peaje sin pagar?</h2>
-        <p className="mt-1 text-[13px] text-ink-300">
-          Sube el aviso de mancato pagamento apenas lo recibas: asi se asigna a tu servicio y no se te pasa el plazo.
-        </p>
-        <div className="mt-3 flex flex-wrap gap-4">
-          <Link
-            to="/finanzas/mancato/new"
-            className="text-[13px] font-semibold text-accent-400 hover:text-accent-300"
-          >
-            Subir mancato pagamento &rarr;
-          </Link>
-          <Link to="/mis-horas" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
-            Ver mis horas y mi pago &rarr;
-          </Link>
-        </div>
-      </GlassCard>
+      <MancatoBanner />
 
       {closing && (
         <CerrarServicioModal

@@ -23,6 +23,7 @@ import {
   RefreshIcon,
   SearchIcon,
 } from "../../components/ui/icons";
+import { MultasChoferPage } from "./MultasChoferPage";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
@@ -239,6 +240,9 @@ const MultaRow = ({ multa, showDriver, vehicle, location, isPrivileged, onChange
         {/* Estado */}
         <div>
           <MancatoBadge mancato={multa} />
+          {multa.comprobantePendiente && (
+            <span className="mt-1 block text-[11px] font-medium text-accent-300">Comprobante por confirmar</span>
+          )}
         </div>
 
         {/* Vencimiento */}
@@ -421,7 +425,7 @@ const EstadoAccordion = ({
   );
 };
 
-export const MultasPage = () => {
+const MultasOficinaPage = () => {
   const { user } = useAuth();
   const location = useLocation();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
@@ -729,4 +733,11 @@ export const MultasPage = () => {
       )}
     </div>
   );
+};
+
+// El chofer ve sus multas de forma simple; la oficina, el panel de gestion.
+export const MultasPage = () => {
+  const { user } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  return isPrivileged ? <MultasOficinaPage /> : <MultasChoferPage />;
 };

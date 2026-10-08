@@ -1,7 +1,8 @@
 import clsx from "clsx";
 import { useCallback, useEffect, useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { WalletIcon } from "../../components/ui/icons";
+import { TruckArt } from "../../components/chofer/illustrations";
+import { FuelIcon, ReceiptIcon, ShieldIcon, WalletIcon } from "../../components/ui/icons";
 import { useAuth } from "../../context/AuthContext";
 import { listHorasPendientesRequest } from "../../lib/horas.api";
 
@@ -16,6 +17,71 @@ const tabClass = ({ isActive }) =>
 // Contenedor de "Finanzas Operativas": titulo, pestañas y, debajo, la pestaña activa.
 // Las rutas viven bajo /finanzas (ver App.jsx); los detalles y altas de cada modulo se
 // abren encima de la pestaña como panel lateral.
+const GridIcon = (props) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" {...props}>
+    <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+    <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+    <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
+  </svg>
+);
+
+const choferTabClass = ({ isActive }) =>
+  clsx(
+    "relative flex flex-1 items-center justify-center gap-1 whitespace-nowrap px-1.5 py-3.5 text-[12px] font-medium transition-colors sm:gap-2 sm:px-3.5 sm:text-[13px] min-w-0",
+    isActive
+      ? "text-ink-50 after:absolute after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-full after:bg-brand"
+      : "text-ink-300 hover:text-ink-50"
+  );
+
+// Cabecera y pestañas de "Mis cargos" (chofer): tarjeta con ilustracion y pestañas con icono.
+const ChoferHeader = () => (
+  <div className="flex flex-col gap-4">
+    <section className="glass-surface relative overflow-hidden rounded-3xl p-4 sm:p-6">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-6 top-0 h-36 w-72 text-accent-400 opacity-[0.3] [mask-image:linear-gradient(to_left,black_35%,transparent)] sm:opacity-40"
+      >
+        <TruckArt className="h-full w-full" />
+      </div>
+      <div className="relative flex items-center gap-4">
+        <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-accent-500/15 text-accent-400 ring-1 ring-accent-500/30">
+          <WalletIcon className="h-7 w-7" />
+        </span>
+        <div>
+          <h1 className="text-[28px] font-semibold leading-tight text-ink-50">Mis cargos</h1>
+          <p className="mt-0.5 max-w-sm text-[14px] text-ink-200">
+            Consulta tus multas, cargos de combustible, pagos de peajes y mas.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <nav
+      aria-label="Secciones de mis cargos"
+      className="glass-surface-sm flex overflow-x-auto rounded-2xl"
+    >
+      <NavLink to="/finanzas" end className={choferTabClass}>
+        <GridIcon className="h-[18px] w-[18px]" />
+        Resumen
+      </NavLink>
+      <NavLink to="/finanzas/combustible" className={choferTabClass}>
+        <FuelIcon className="h-[18px] w-[18px]" />
+        Combustible
+      </NavLink>
+      <NavLink to="/finanzas/mancato" className={choferTabClass}>
+        <ReceiptIcon className="h-[18px] w-[18px]" />
+        <span className="sm:hidden">Mancato</span>
+        <span className="hidden sm:inline">Mancato Pagamento</span>
+      </NavLink>
+      <NavLink to="/finanzas/multas" className={choferTabClass}>
+        <ShieldIcon className="h-[18px] w-[18px]" />
+        Multas
+      </NavLink>
+    </nav>
+  </div>
+);
+
 export const FinanzasLayout = () => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
@@ -31,6 +97,15 @@ export const FinanzasLayout = () => {
   useEffect(() => {
     refreshPendingCount();
   }, [refreshPendingCount]);
+
+  if (!isPrivileged) {
+    return (
+      <div className="flex flex-col gap-5">
+        <ChoferHeader />
+        <Outlet context={{ refreshPendingCount }} />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">

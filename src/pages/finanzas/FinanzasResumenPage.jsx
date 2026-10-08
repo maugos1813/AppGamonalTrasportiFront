@@ -25,6 +25,7 @@ import { parseApiError } from "../../lib/api";
 import { COSTO_COLORS, currentMonth, monthName } from "../../lib/finanzas";
 import { getFinanzasResumenRequest } from "../../lib/finanzas.api";
 import { formatCurrency } from "../../lib/format";
+import { ResumenChoferPage } from "./ResumenChoferPage";
 
 const TONE = {
   danger: { dot: "bg-danger-500 shadow-[0_0_6px_var(--danger-500)]", edge: "border-l-danger-500" },
@@ -47,7 +48,7 @@ const SectionTitle = ({ children, hint }) => (
   </div>
 );
 
-export const FinanzasResumenPage = () => {
+const ResumenOficinaPage = () => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
   const mancatoRefresh = useDataRefresh("mancato").version;
@@ -252,4 +253,11 @@ export const FinanzasResumenPage = () => {
       </div>
     </div>
   );
+};
+
+// El chofer ve su propio resumen (sin el costo para la empresa); la oficina, el de Finanzas.
+export const FinanzasResumenPage = () => {
+  const { user } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  return isPrivileged ? <ResumenOficinaPage /> : <ResumenChoferPage />;
 };

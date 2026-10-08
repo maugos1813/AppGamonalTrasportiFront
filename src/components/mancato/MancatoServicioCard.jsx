@@ -48,12 +48,14 @@ export const MancatoServicioCard = ({ mancato, isPrivileged, busy, onChange }) =
           Servicio
         </h2>
         <span className="flex flex-wrap items-center gap-1.5">
-          {mancato.tramo && (
+          {isPrivileged && mancato.tramo && (
             <span className="rounded-full bg-line/10 px-2.5 py-1 text-[12px] font-medium text-ink-200">
               {TRAMO_LABELS[mancato.tramo]}
             </span>
           )}
-          <span className={clsx("rounded-full px-2.5 py-1 text-[12px] font-medium", info.pill)}>{info.label}</span>
+          {isPrivileged && (
+            <span className={clsx("rounded-full px-2.5 py-1 text-[12px] font-medium", info.pill)}>{info.label}</span>
+          )}
         </span>
       </div>
 
@@ -82,16 +84,18 @@ export const MancatoServicioCard = ({ mancato, isPrivileged, busy, onChange }) =
         </Link>
       ) : (
         <p className="mt-3 text-[14px] text-ink-300">
-          {mancato.asignacion === "EN_ESPERA"
+          {!isPrivileged
+            ? "La empresa lo asignará a tu servicio."
+            : mancato.asignacion === "EN_ESPERA"
             ? "Todavía no hay un servicio de este vehículo que concuerde. Cuando la oficina cargue el servicio (con su Fecha de retiro) se asignará solo."
             : "Este peaje no pertenece a ningún servicio."}
         </p>
       )}
 
-      {mancato.asignacionMotivo && (
+      {isPrivileged && mancato.asignacionMotivo && (
         <p className={clsx("mt-2 text-[12px]", info.tone)}>{mancato.asignacionMotivo}</p>
       )}
-      {mancato.asignacion === "EN_ESPERA" && mancato.esperaHasta && (
+      {isPrivileged && mancato.asignacion === "EN_ESPERA" && mancato.esperaHasta && (
         <p className="mt-1 text-[12px] text-ink-400">
           Si no aparece un servicio antes del {formatDateTime(mancato.esperaHasta)}, pasa a "Fuera del horario
           laboral" (y se asigna igual si el servicio se carga más tarde).

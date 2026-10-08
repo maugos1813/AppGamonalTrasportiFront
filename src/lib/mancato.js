@@ -112,3 +112,12 @@ export const formatTransito = (mancato) => {
     hour12: false,
   });
 };
+
+// El sitio web de pago es texto libre: solo se vuelve enlace si es una direccion http(s) (o empieza con
+// "www."); si no, se muestra como texto. Evita enlaces "javascript:" y similares.
+export const sitioWebHref = (text) => {
+  const value = (text ?? "").trim();
+  if (/^https?:\/\/\S+$/i.test(value)) return value;
+  if (/^www\.\S+$/i.test(value)) return `https://${value}`;
+  return null;
+};

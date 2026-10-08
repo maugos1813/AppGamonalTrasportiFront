@@ -67,3 +67,24 @@ export const anticipacionText = (permiso) => {
 };
 
 export const PERMISO_ESTADO_RANK = { PENDIENTE: 0, APROBADO: 1, RECHAZADO: 2 };
+
+// Variante "pro" de la celda (calendario del chofer): fondo oscuro con borde fino, y borde de color
+// segun el estado.
+const PRO_BORDER = {
+  TRABAJADO: "border-success-500/50",
+  NO_TRABAJADO: "border-danger-500/40",
+  JUSTIFICADO: "border-warning-500/50",
+  PERMISO_PENDIENTE: "border-dashed border-warning-500",
+  DESCANSO: "border-[#8b5cf6]/50",
+  PROGRAMADO: "border-accent-400/40",
+};
+
+export const diaCellClassPro = (dia, selected, isToday) =>
+  clsx(
+    "relative flex aspect-[1/0.92] w-full flex-col items-center justify-center rounded-xl border text-[15px] transition-colors hover:brightness-110 sm:aspect-[1/0.62]",
+    // Neutro solo para los dias sin estado de color (si no, pisaria el fondo/borde del estado).
+    PRO_BORDER[dia.estado] ? PRO_BORDER[dia.estado] : "border-line/10 bg-line/[0.04] text-ink-100",
+    DIA_ESTADOS[dia.estado].cell,
+    isToday && "ring-2 ring-success-500 ring-offset-0",
+    selected && "outline outline-2 outline-offset-2 outline-ink-50"
+  );

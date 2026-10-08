@@ -433,7 +433,16 @@ export const AppShell = () => {
               title="Abrir menu"
               className="flex items-center gap-3"
             >
-              <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-xl" />
+              <img
+                src={logo}
+                alt="Gamonal Driver"
+                className={clsx("h-10 w-10 shrink-0", isPrivileged ? "rounded-xl" : "rounded-full")}
+              />
+              {!isPrivileged && (
+                <span className="text-[20px] font-semibold text-ink-50">
+                  Gamonal <span className="text-brand">Driver</span>
+                </span>
+              )}
             </button>
 
             <div className="flex items-center gap-2">

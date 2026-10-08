@@ -2,6 +2,7 @@ import clsx from "clsx";
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { MancatoBadge } from "../../components/mancato/MancatoBadge";
+import { MultaChoferCard } from "../../components/chofer/MultaChoferCard";
 import { MultaForm } from "../../components/multas/MultaForm";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -80,7 +81,7 @@ const Attachment = ({ title, file, emptyText, action }) => (
   </div>
 );
 
-export const MultaDetailPage = () => {
+const MultaOficinaDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -205,6 +206,16 @@ export const MultaDetailPage = () => {
 
         <Alert>{actionError}</Alert>
 
+        {multa.comprobantePendiente && (
+          <div className="flex items-start gap-2.5 rounded-xl bg-accent-500/10 px-4 py-3 text-[13px] text-ink-50">
+            <CheckCircleIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-400" />
+            <span>
+              El chofer subio su comprobante de pago el {formatRomeDateTime(multa.comprobanteChoferAt)}. Revisalo y, si
+              esta bien, marca la multa como pagada.
+            </span>
+          </div>
+        )}
+
         {multa.estado === "VENCIDO" && (
           <div className="flex items-start gap-2.5 rounded-xl bg-danger-500/10 px-4 py-3 text-[13px] text-danger-500">
             <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
@@ -252,7 +263,7 @@ export const MultaDetailPage = () => {
                       "inline-flex rounded-full px-2.5 py-1 text-[13px] font-medium",
                       quien.tone === "warning" && "bg-warning-500/20 text-warning-500",
                       quien.tone === "success" && "bg-success-500/15 text-success-500",
-                      quien.tone === "neutral" && "bg-ink-500/15 text-ink-300"
+                      quien.tone === "neutral" && "bg-ink-500/15 text-ink-300",
                     )}
                   >
                     {multa.quienPaga === "CHOFER_PAGO" ? "Si, pago el chofer" : quien.text}
@@ -277,8 +288,14 @@ export const MultaDetailPage = () => {
               <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <Attachment title="Multa (foto o PDF)" file={multa.multa} emptyText="Sin archivo" />
                 <Attachment
-                  title="Comprobante de pago"
-                  file={multa.comprobante}
+                  title={
+                    multa.comprobante
+                      ? "Comprobante de pago"
+                      : multa.comprobanteChofer
+                        ? "Comprobante del chofer"
+                        : "Comprobante de pago"
+                  }
+                  file={multa.comprobante ?? multa.comprobanteChofer}
                   emptyText="Todavia no se subio el comprobante"
                   action={
                     isPrivileged && (
@@ -365,4 +382,48 @@ export const MultaDetailPage = () => {
       />
     </SlideOverPanel>
   );
+};
+
+// Detalle simple para el chofer: la misma tarjeta de su lista.
+const MultaChoferDetail = () => {
+  const { id } = useParams();
+  const { refresh } = useDataRefresh("multas");
+  const [multa, setMulta] = useState(null);
+  const [error, setError] = useState("");
+
+  const load = () =>
+    getMultaRequest(id)
+      .then(setMulta)
+      .catch((err) => setError(parseApiError(err).message));
+
+  useEffect(() => {
+    load();
+  }, [id]);
+
+  return (
+    <SlideOverPanel closeTo="/finanzas/multas">
+      <div className="flex flex-col gap-5">
+        <Link to="/finanzas/multas" className="text-[13px] font-medium text-accent-400 hover:text-accent-300">
+          &larr; Multas
+        </Link>
+        <Alert>{error}</Alert>
+        {!multa && !error && <PageLoader />}
+        {multa && (
+          <MultaChoferCard
+            multa={multa}
+            onChanged={() => {
+              refresh();
+              load();
+            }}
+          />
+        )}
+      </div>
+    </SlideOverPanel>
+  );
+};
+
+export const MultaDetailPage = () => {
+  const { user } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  return isPrivileged ? <MultaOficinaDetail /> : <MultaChoferDetail />;
 };

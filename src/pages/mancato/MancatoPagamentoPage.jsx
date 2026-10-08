@@ -23,11 +23,12 @@ import {
   SearchIcon,
   UsersIcon,
 } from "../../components/ui/icons";
+import { MancatoChoferPage } from "./MancatoChoferPage";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { formatCurrency, formatDateOnly } from "../../lib/format";
-import { ASIGNACION_FILTER_OPTIONS, MANCATO_ASIGNACIONES, MANCATO_ESTADOS } from "../../lib/mancato";
+import { ASIGNACION_FILTER_OPTIONS, MANCATO_ASIGNACIONES, MANCATO_ESTADOS, sitioWebHref } from "../../lib/mancato";
 import {
   getMancatoStatsRequest,
   getMancatoSummaryRequest,
@@ -159,8 +160,8 @@ const RowMenu = ({ mancato, isPrivileged, location, onChanged }) => {
           >
             Ver detalle
           </Link>
-          {mancato.sitioWeb && !mancato.pagado && (
-            <a href={mancato.sitioWeb} target="_blank" rel="noreferrer noopener" className={itemClass}>
+          {sitioWebHref(mancato.sitioWeb) && !mancato.pagado && (
+            <a href={sitioWebHref(mancato.sitioWeb)} target="_blank" rel="noreferrer noopener" className={itemClass}>
               Pagar en el sitio web
             </a>
           )}
@@ -416,7 +417,7 @@ const EstadoAccordion = ({
   );
 };
 
-export const MancatoPagamentoPage = () => {
+const MancatoOficinaPage = () => {
   const { user } = useAuth();
   const location = useLocation();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
@@ -742,4 +743,11 @@ export const MancatoPagamentoPage = () => {
       )}
     </div>
   );
+};
+
+// El chofer solo sube sus avisos; la oficina controla pagos, plazos y estados.
+export const MancatoPagamentoPage = () => {
+  const { user } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  return isPrivileged ? <MancatoOficinaPage /> : <MancatoChoferPage />;
 };

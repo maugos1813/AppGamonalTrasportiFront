@@ -51,7 +51,9 @@ export const MancatoForm = ({ mode, mancato, onSubmit, onCancel, submitting, err
   const [localErrors, setLocalErrors] = useState({});
 
   useEffect(() => {
-    listVehiclesRequest().then(setVehicles).catch(() => {});
+    listVehiclesRequest()
+      .then(setVehicles)
+      .catch(() => {});
     if (isPrivileged) {
       listUsersRequest()
         .then((users) => setDrivers(users.filter((u) => u.estado === "ACTIVO")))
@@ -97,9 +99,6 @@ export const MancatoForm = ({ mode, mancato, onSubmit, onCancel, submitting, err
     if (!normalizeTarga(form.targa)) next.targa = "La targa es obligatoria";
     if (isPrivileged && !form.driverId) next.driverId = "Elige el chofer";
     if (parseCosto(form.costo) == null) next.costo = "Ingresa un importe mayor a 0 (ej. 37,50)";
-    if (form.sitioWeb.trim() && !/^https?:\/\/\S+$/i.test(form.sitioWeb.trim())) {
-      next.sitioWeb = "Debe empezar con http:// o https://";
-    }
     if (!isEdit && !foto) next.foto = "Sube la foto del mancato pagamento";
     setLocalErrors(next);
     if (Object.keys(next).length > 0) return;
@@ -130,23 +129,25 @@ export const MancatoForm = ({ mode, mancato, onSubmit, onCancel, submitting, err
     <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
       <Alert>{error}</Alert>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-xl glass-surface-sm px-4 py-3">
-        <span className="text-[13px] text-ink-300">Estado</span>
-        <span
-          className={clsx(
-            "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium",
-            estadoInfo.pill
-          )}
-        >
-          <span className={clsx("h-1.5 w-1.5 rounded-full", estadoInfo.dot)} />
-          {estadoInfo.label}
-        </span>
-        <span className="text-[12px] text-ink-400">
-          {isEdit && isPrivileged
-            ? "Se calcula solo; puedes marcarlo como pagado abajo."
-            : "Se calcula solo: queda Pagado al subir el comprobante de pago."}
-        </span>
-      </div>
+      {isPrivileged && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl glass-surface-sm px-4 py-3">
+          <span className="text-[13px] text-ink-300">Estado</span>
+          <span
+            className={clsx(
+              "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium",
+              estadoInfo.pill,
+            )}
+          >
+            <span className={clsx("h-1.5 w-1.5 rounded-full", estadoInfo.dot)} />
+            {estadoInfo.label}
+          </span>
+          <span className="text-[12px] text-ink-400">
+            {isEdit && isPrivileged
+              ? "Se calcula solo; puedes marcarlo como pagado abajo."
+              : "Se calcula solo: queda Pagado al subir el comprobante de pago."}
+          </span>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
         <TextField
@@ -221,19 +222,21 @@ export const MancatoForm = ({ mode, mancato, onSubmit, onCancel, submitting, err
           </span>
         </div>
 
-        <div>
-          <TextField
-            id="fechaVencimiento"
-            label="Fecha de vencimiento"
-            value={formatDay(vencimientoDay)}
-            disabled
-            readOnly
-          />
-          <span className="mt-1.5 flex items-center gap-1.5 text-[12px] text-ink-400">
-            <ClockIcon className="h-3.5 w-3.5 shrink-0" />
-            La calcula el sistema: se puede pagar hasta el dia {MANCATO_PLAZO_DIAS} posterior a la fecha.
-          </span>
-        </div>
+        {isPrivileged && (
+          <div>
+            <TextField
+              id="fechaVencimiento"
+              label="Fecha de vencimiento"
+              value={formatDay(vencimientoDay)}
+              disabled
+              readOnly
+            />
+            <span className="mt-1.5 flex items-center gap-1.5 text-[12px] text-ink-400">
+              <ClockIcon className="h-3.5 w-3.5 shrink-0" />
+              La calcula el sistema: se puede pagar hasta el dia {MANCATO_PLAZO_DIAS} posterior a la fecha.
+            </span>
+          </div>
+        )}
 
         <TextField
           id="costo"
@@ -246,16 +249,21 @@ export const MancatoForm = ({ mode, mancato, onSubmit, onCancel, submitting, err
           error={err("costo")}
         />
 
-        <TextField
-          id="sitioWeb"
-          label="Sitio web de pago"
-          type="url"
-          placeholder="https://..."
-          className="sm:col-span-2"
-          value={form.sitioWeb}
-          onChange={(e) => setField("sitioWeb", e.target.value)}
-          error={err("sitioWeb")}
-        />
+        <div className="sm:col-span-2">
+          <TextField
+            id="sitioWeb"
+            label="Sitio web de pago"
+            placeholder="Direccion web o donde se paga"
+            value={form.sitioWeb}
+            onChange={(e) => setField("sitioWeb", e.target.value)}
+            error={err("sitioWeb")}
+          />
+          {!isPrivileged && (
+            <span className="mt-1.5 block text-[12px] text-ink-400">
+              Donde dice el aviso que se paga (direccion web u otra indicacion). Escribelo como figura; es opcional.
+            </span>
+          )}
+        </div>
 
         <FileField
           id="foto"
@@ -268,21 +276,25 @@ export const MancatoForm = ({ mode, mancato, onSubmit, onCancel, submitting, err
           error={err("foto")}
         />
 
-        <FileField
-          id="comprobante"
-          label="Comprobante de pago"
-          hint="Al subirlo queda como Pagado"
-          file={comprobante}
-          onChange={setComprobante}
-          existing={mancato?.comprobante}
-          error={err("comprobante")}
-        />
+        {isPrivileged && (
+          <FileField
+            id="comprobante"
+            label="Comprobante de pago"
+            hint="Al subirlo queda como Pagado"
+            file={comprobante}
+            onChange={setComprobante}
+            existing={mancato?.comprobante}
+            error={err("comprobante")}
+          />
+        )}
 
         <div className="sm:col-span-2">
           <Textarea
             id="comentarios"
-            label="Comentarios"
-            placeholder="Ej. donde se pago, que paso, etc."
+            label={isPrivileged ? "Comentarios" : "Comentarios (opcional)"}
+            placeholder={
+              isPrivileged ? "Ej. donde se pago, que paso, etc." : "Algo que la oficina deba saber (opcional)"
+            }
             maxLength={1000}
             value={form.comentarios}
             onChange={(e) => setField("comentarios", e.target.value)}
@@ -319,7 +331,7 @@ export const MancatoForm = ({ mode, mancato, onSubmit, onCancel, submitting, err
           </Button>
         )}
         <Button type="submit" className="sm:w-auto sm:px-8" loading={submitting}>
-          {isEdit ? "Guardar cambios" : "Registrar mancato pagamento"}
+          {isEdit ? "Guardar cambios" : isPrivileged ? "Registrar mancato pagamento" : "Subir mancato pagamento"}
         </Button>
       </div>
     </form>

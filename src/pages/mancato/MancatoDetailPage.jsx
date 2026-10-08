@@ -24,7 +24,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { formatCurrency, formatDateOnly } from "../../lib/format";
-import { MANCATO_ESTADO_BY_VALUE } from "../../lib/mancato";
+import { MANCATO_ESTADO_BY_VALUE, sitioWebHref } from "../../lib/mancato";
 import { deleteMancatoRequest, getMancatoRequest, updateMancatoRequest } from "../../lib/mancato.api";
 
 // Fecha y hora siempre en hora de Roma (la operacion es ahi), sin importar donde se mire.
@@ -204,21 +204,21 @@ export const MancatoDetailPage = () => {
               {mancato.driver && ` - ${mancato.driver.nombre} ${mancato.driver.apellido}`}
             </p>
           </div>
-          <MancatoBadge mancato={mancato} plazo className="text-[13px]" />
+          {isPrivileged && <MancatoBadge mancato={mancato} plazo className="text-[13px]" />}
         </div>
 
         <Alert>{actionError}</Alert>
 
-        {mancato.fueraDePlazo && (
+        {isPrivileged && mancato.fueraDePlazo && (
           <div className="flex items-start gap-2.5 rounded-xl bg-danger-500/10 px-4 py-3 text-[13px] text-danger-500">
             <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
             <span>
-              Se registro en el sistema {mancato.diasTarde}{" "}
-              {mancato.diasTarde === 1 ? "dia" : "dias"} despues de la fecha de vencimiento.
+              Se registro en el sistema {mancato.diasTarde} {mancato.diasTarde === 1 ? "dia" : "dias"} despues de la
+              fecha de vencimiento.
             </span>
           </div>
         )}
-        {mancato.pagadoFueraDePlazo && (
+        {isPrivileged && mancato.pagadoFueraDePlazo && (
           <div className="flex items-start gap-2.5 rounded-xl bg-warning-500/10 px-4 py-3 text-[13px] text-warning-500">
             <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />
             <span>Se pago despues de la fecha de vencimiento.</span>
@@ -243,11 +243,11 @@ export const MancatoDetailPage = () => {
           </GlassCard>
         ) : (
           <>
-            <GlassCard className={clsx("border-l-4", estado.edge)}>
+            <GlassCard className={clsx(isPrivileged && ["border-l-4", estado.edge])}>
               <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
                 <Fact label="Fecha">{formatDateOnly(mancato.fecha)}</Fact>
                 <Fact label="Hora del tránsito">{mancato.horaTransito ?? "-"}</Fact>
-                <Fact label="Vence">{formatDateOnly(mancato.fechaVencimiento)}</Fact>
+                {isPrivileged && <Fact label="Vence">{formatDateOnly(mancato.fechaVencimiento)}</Fact>}
                 <Fact label="Costo">{formatCurrency(mancato.costo)}</Fact>
                 <Fact label="Targa">{mancato.targa}</Fact>
                 <Fact label="Chofer">
@@ -255,15 +255,19 @@ export const MancatoDetailPage = () => {
                 </Fact>
                 <Fact label="Sitio web">
                   {mancato.sitioWeb ? (
-                    <a
-                      href={mancato.sitioWeb}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="inline-flex items-center gap-1.5 text-accent-400 hover:text-accent-300"
-                    >
-                      Pagar
-                      <ExternalLinkIcon className="h-4 w-4" />
-                    </a>
+                    sitioWebHref(mancato.sitioWeb) ? (
+                      <a
+                        href={sitioWebHref(mancato.sitioWeb)}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                        className="inline-flex items-center gap-1.5 break-all text-accent-400 hover:text-accent-300"
+                      >
+                        {isPrivileged ? "Pagar" : "Abrir enlace"}
+                        <ExternalLinkIcon className="h-4 w-4 shrink-0" />
+                      </a>
+                    ) : (
+                      <span className="break-words">{mancato.sitioWeb}</span>
+                    )
                   ) : (
                     "-"
                   )}
@@ -286,28 +290,30 @@ export const MancatoDetailPage = () => {
             />
 
             <GlassCard>
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+              <div className={clsx("grid grid-cols-1 gap-5", isPrivileged && "sm:grid-cols-2")}>
                 <Attachment title="Foto del mancato pagamento" file={mancato.foto} emptyText="Sin foto" />
-                <Attachment
-                  title="Comprobante de pago"
-                  file={mancato.comprobante}
-                  emptyText="Todavia no se subio el comprobante"
-                  action={
-                    canUploadComprobante && (
-                      <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full glass-input px-3 py-1 text-[12px] font-medium text-ink-50 hover:bg-line/10">
-                        {busy ? <Spinner className="h-3.5 w-3.5" /> : <CameraIcon className="h-3.5 w-3.5" />}
-                        {mancato.comprobante ? "Reemplazar" : "Subir comprobante"}
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp,application/pdf"
-                          className="hidden"
-                          onChange={handleComprobante}
-                          disabled={busy}
-                        />
-                      </label>
-                    )
-                  }
-                />
+                {isPrivileged && (
+                  <Attachment
+                    title="Comprobante de pago"
+                    file={mancato.comprobante}
+                    emptyText="Todavia no se subio el comprobante"
+                    action={
+                      canUploadComprobante && (
+                        <label className="inline-flex cursor-pointer items-center gap-1.5 rounded-full glass-input px-3 py-1 text-[12px] font-medium text-ink-50 hover:bg-line/10">
+                          {busy ? <Spinner className="h-3.5 w-3.5" /> : <CameraIcon className="h-3.5 w-3.5" />}
+                          {mancato.comprobante ? "Reemplazar" : "Subir comprobante"}
+                          <input
+                            type="file"
+                            accept="image/jpeg,image/png,image/webp,application/pdf"
+                            className="hidden"
+                            onChange={handleComprobante}
+                            disabled={busy}
+                          />
+                        </label>
+                      )
+                    }
+                  />
+                )}
               </div>
             </GlassCard>
 
@@ -316,11 +322,11 @@ export const MancatoDetailPage = () => {
               <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                 <Fact label="Registrado el">{formatRomeDateTime(mancato.registradoAt)}</Fact>
                 <Fact label="Registrado por">
-                  {mancato.registradoPor
-                    ? `${mancato.registradoPor.nombre} ${mancato.registradoPor.apellido}`
-                    : "-"}
+                  {mancato.registradoPor ? `${mancato.registradoPor.nombre} ${mancato.registradoPor.apellido}` : "-"}
                 </Fact>
-                {mancato.pagadoAt && <Fact label="Pagado el">{formatRomeDateTime(mancato.pagadoAt)}</Fact>}
+                {isPrivileged && mancato.pagadoAt && (
+                  <Fact label="Pagado el">{formatRomeDateTime(mancato.pagadoAt)}</Fact>
+                )}
               </div>
               <p className="mt-3 text-[12px] text-ink-400">
                 La fecha y hora de registro las guarda el sistema y no se pueden editar.

@@ -34,6 +34,7 @@ export const usePushNotifications = () => {
       if (type === "gps-respaldo") navigate("/");
       else if (type === "gps") navigate("/finanzas/paradas");
       else if (type === "permiso") navigate(user?.cargo === "CHOFER" ? "/calendario" : "/permisos");
+      else if (type === "multa") navigate("/finanzas/multas");
       else if (type === "horas") navigate(user?.cargo === "CHOFER" ? "/mis-horas" : "/finanzas/horas");
       else navigate("/mapa");
     };
