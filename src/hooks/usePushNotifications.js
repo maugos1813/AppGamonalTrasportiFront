@@ -29,7 +29,14 @@ export const usePushNotifications = () => {
     // Al tocar la notificacion (app cerrada, en segundo plano o abierta), la lleva
     // directo al Mapa - ahi se ven tanto la seccion Area C como el historial de
     // exceso de velocidad (Control de Flota).
-    const onTap = () => navigate("/mapa");
+    const onTap = (action) => {
+      const type = action?.notification?.data?.type;
+      if (type === "gps-respaldo") navigate("/");
+      else if (type === "gps") navigate("/finanzas/paradas");
+      else if (type === "permiso") navigate(user?.cargo === "CHOFER" ? "/calendario" : "/permisos");
+      else if (type === "horas") navigate(user?.cargo === "CHOFER" ? "/mis-horas" : "/finanzas/horas");
+      else navigate("/mapa");
+    };
 
     PushNotifications.addListener("registration", onRegistration);
     PushNotifications.addListener("registrationError", () => {});

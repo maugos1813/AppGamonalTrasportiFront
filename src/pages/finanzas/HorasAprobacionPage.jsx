@@ -12,7 +12,9 @@ import { Textarea } from "../../components/ui/Textarea";
 import { parseApiError } from "../../lib/api";
 import { formatCurrency, formatDate, formatRomeDateTime, toRomeDateTimeInputValue } from "../../lib/format";
 import { formatHours } from "../../lib/horas";
-import { listHorasPendientesRequest, recalcParadasRequest, reviewHorasRequest } from "../../lib/horas.api";
+import { listHorasPendientesRequest, recalcParadasRequest, recalcEstimacionRequest, reviewHorasRequest } from "../../lib/horas.api";
+import { GpsEstadoBanner } from "../../components/gps/GpsEstadoBanner";
+import { fuenteLabel } from "../../lib/gps";
 import { PARADA_CLASES, formatDuration, mapsLink, romeHHMM } from "../../lib/paradas";
 
 const Fact = ({ label, children }) => (
@@ -27,12 +29,16 @@ const Fact = ({ label, children }) => (
 const ParadasBlock = ({ recordId, paradas, calculadasAt, hasJornada, onUpdate }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
   const recalc = async () => {
     setLoading(true);
     setError("");
+    setInfo("");
     try {
-      onUpdate(await recalcParadasRequest(recordId));
+      const result = await recalcParadasRequest(recordId);
+      if (result.gpsError) setInfo(`No hay datos de GPS (${result.gpsError}). Abajo se muestra la estimacion por ruta.`);
+      onUpdate(result);
     } catch (err) {
       setError(parseApiError(err).message);
     } finally {
@@ -65,7 +71,8 @@ const ParadasBlock = ({ recordId, paradas, calculadasAt, hasJornada, onUpdate })
         </button>
       </div>
       <Alert>{error}</Alert>
-      {!calculadasAt && !error && (
+      {info && <p className="mt-1.5 text-[12px] text-warning-500">{info}</p>}
+      {!calculadasAt && !error && !info && (
         <p className="mt-1.5 text-[12px] text-ink-400">
           Todavia no se calcularon. Se calculan solas al enviar el chofer sus horas; si no aparecen en unos
           segundos, usa &quot;Calcular ahora&quot;.
@@ -91,6 +98,11 @@ const ParadasBlock = ({ recordId, paradas, calculadasAt, hasJornada, onUpdate })
               >
                 {PARADA_CLASES[p.clase]?.label ?? p.clase}
               </span>
+              {fuenteLabel(p.fuente) && (
+                <span className="shrink-0 rounded-full bg-warning-500/15 px-2 py-0.5 text-[10px] font-semibold text-warning-500" title="Calculada con el GPS del celular del chofer: menos precisa que la del vehiculo">
+                  {fuenteLabel(p.fuente)}
+                </span>
+              )}
               <span className="min-w-0 flex-1 truncate text-ink-400">{p.motivo}</span>
               <a
                 href={mapsLink(p.lat, p.lng)}
@@ -197,6 +209,93 @@ const FinGpsBlock = ({ gps, declaredFin, declaredStart, finFueraDeBase, onApplyC
   );
 };
 
+// Estimacion por ruta (sin GPS del vehiculo ni del celular): hora de retiro + paradas + retorno. Es una
+// referencia razonable para contrastar lo declarado, no un dato medido.
+const EstimacionBlock = ({ recordId, estimacion, declaredMin, onUpdate, onApplyEnd }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const recalc = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      onUpdate(await recalcEstimacionRequest(recordId));
+    } catch (err) {
+      setError(parseApiError(err).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const Row = ({ label, children }) => (
+    <div className="flex flex-wrap gap-x-2 text-[12px]">
+      <span className="w-[150px] shrink-0 text-ink-400">{label}</span>
+      <span className="min-w-0 flex-1 text-ink-100">{children}</span>
+    </div>
+  );
+
+  const e = estimacion;
+  const diff = e && declaredMin != null ? Math.round(declaredMin - e.totalMin) : null;
+  const off = diff != null && (diff > e.totalMin * 0.25 + 45 || (diff < -e.totalMin * 0.25 && diff < -45));
+
+  return (
+    <div className="mt-4 rounded-xl glass-surface-sm p-3.5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-[13px] font-semibold text-ink-50">
+          Estimacion por ruta <span className="font-normal text-ink-400">(sin GPS)</span>
+        </span>
+        <button type="button" onClick={recalc} disabled={loading} className="text-[12px] font-medium text-accent-400 hover:text-accent-300 disabled:opacity-50">
+          {loading ? "Calculando..." : e ? "Recalcular" : "Calcular estimacion"}
+        </button>
+      </div>
+      <Alert>{error}</Alert>
+      {!e && !error && (
+        <p className="mt-1.5 text-[12px] text-ink-400">
+          Sin datos de GPS. Se puede estimar el tiempo con la hora de retiro, las paradas del servicio y el retorno.
+        </p>
+      )}
+      {e && (
+        <div className="mt-2 flex flex-col gap-1.5">
+          <Row label="Retiro">
+            {romeHHMM(e.inicioAt)} en {e.salida}
+            {e.inicioInferido && <span className="text-warning-500"> (deducido de la ETA: falta la hora de retiro)</span>}
+          </Row>
+          <Row label="Hasta la entrega final">
+            conduccion {formatDuration(e.conduccionIdaMin)}
+            {e.distanciaIdaKm != null && ` (${e.distanciaIdaKm} km)`} + {e.paradas} {e.paradas === 1 ? "parada" : "paradas"} (
+            {formatDuration(e.paradasMin)}) &rarr; ultima entrega ~<b>{romeHHMM(e.ultimaEntregaAt)}</b>
+          </Row>
+          <Row label="Retorno">
+            a {e.retorno.nombre}: {formatDuration(e.conduccionVueltaMin)}
+            {e.rutaFuente === "estimada" ? " (estimado en linea recta)" : ""}
+          </Row>
+          <Row label="Descansos supuestos">{e.descansosMin > 0 ? formatDuration(e.descansosMin) : "ninguno (trayecto corto)"}</Row>
+          <Row label="Total estimado">
+            <b>{formatDuration(e.totalMin)}</b> &rarr; fin ~<b>{romeHHMM(e.finEstimadoAt)}</b>
+            {declaredMin != null && (
+              <span className={off ? "text-warning-500" : "text-success-500"}>
+                {" "}
+                (declarado {formatDuration(Math.round(declaredMin))} sin la espera
+                {off ? `, ${diff > 0 ? `${formatDuration(diff)} de mas` : `${formatDuration(-diff)} de menos`}` : ", dentro de lo razonable"})
+              </span>
+            )}
+          </Row>
+          <p className="mt-1 text-[11px] text-ink-400">
+            Tiempo de ruta con un {Math.round((e.factorTrafico - 1) * 100)}% de recargo por trafico, {e.minPorParada ?? 10}{" "}
+            min por parada y un descanso de {e.descansoMin ?? 30} min cada {formatDuration(e.descansoCadaMin ?? 270)} de
+            conduccion. No cambia el pago: es una referencia para revisar.
+          </p>
+          {off && (
+            <button type="button" onClick={onApplyEnd} className="self-start text-[12px] font-medium text-accent-400 hover:text-accent-300">
+              Aplicar el fin estimado
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // Una jornada enviada por un chofer: lo declarado, avisos para mirar dos veces y las tres salidas
 // (aprobar tal cual, ajustar y aprobar, o devolver con un motivo).
 const ReviewCard = ({ item, onReviewed }) => {
@@ -213,6 +312,7 @@ const ReviewCard = ({ item, onReviewed }) => {
   const [paradas, setParadas] = useState(item.paradas ?? []);
   const [calculadasAt, setCalculadasAt] = useState(item.paradasCalculadasAt);
   const [gps, setGps] = useState(item.gpsFin);
+  const [estimacion, setEstimacion] = useState(item.estimacionRuta);
   const [avisos, setAvisos] = useState(item.avisos);
   const declaredFin = j.declaradas?.fin ?? j.fin;
   const declaredStart = j.declaradas?.inicio ?? j.inicio;
@@ -321,8 +421,30 @@ const ReviewCard = ({ item, onReviewed }) => {
           setCalculadasAt(result.paradasCalculadasAt);
           setGps(result.gpsFin);
           setAvisos(result.avisos);
+          if (result.estimacionRuta) setEstimacion(result.estimacionRuta);
         }}
       />
+
+      {hasJornada && !calculadasAt && (
+        <EstimacionBlock
+          recordId={item.id}
+          estimacion={estimacion}
+          declaredMin={
+            (new Date(declaredFin) - new Date(declaredStart)) / 60000 - (j.declaradas?.esperaMin ?? j.esperaMin ?? 0)
+          }
+          onUpdate={(result) => {
+            setEstimacion(result.estimacionRuta);
+            setAvisos(result.avisos);
+          }}
+          onApplyEnd={() => {
+            setFin(toRomeDateTimeInputValue(estimacion.finEstimadoAt));
+            setNota(
+              `Fin ajustado a la estimacion por ruta (sin GPS): ${formatDuration(estimacion.totalMin)} entre retiro, paradas y retorno a ${estimacion.retorno.nombre}.`
+            );
+            setMode("ajustar");
+          }}
+        />
+      )}
 
       {hasJornada && calculadasAt && (
         <FinGpsBlock
@@ -489,6 +611,7 @@ export const HorasAprobacionPage = () => {
 
   return (
     <div className="flex flex-col gap-5">
+      <GpsEstadoBanner />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-[14px] text-ink-300">
           Horas que enviaron los choferes. Hasta que las apruebes se les paga por kilometros; al aprobarlas

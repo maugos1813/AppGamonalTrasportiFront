@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/Button";
 import { PasswordField } from "../../components/ui/PasswordField";
 import { Spinner } from "../../components/ui/Spinner";
 import { Switch } from "../../components/ui/Switch";
+import { GpsRespaldoBlock } from "../../components/profile/GpsRespaldoBlock";
 import { TextField } from "../../components/ui/TextField";
 import {
   AlertTriangleIcon,
@@ -895,6 +896,12 @@ export const ProfilePage = () => {
                   disabled={savingReperibilidad}
                   onChange={handleToggleReperibilidad}
                 />
+              </div>
+            )}
+
+            {isChofer && (
+              <div className="mt-4 border-t border-line/10 pt-4">
+                <GpsRespaldoBlock />
               </div>
             )}
 

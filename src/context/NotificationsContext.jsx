@@ -27,6 +27,8 @@ import {
   listRecordsRequest,
 } from "../lib/records.api";
 import { listMultaAlertsRequest } from "../lib/multas.api";
+import { getGpsEstadoRequest } from "../lib/gps.api";
+import { gpsEstadoTitle, isGpsFailing } from "../lib/gps";
 import { listPermisosRequest } from "../lib/permisos.api";
 import { listUsersRequest } from "../lib/users.api";
 import {
@@ -179,6 +181,7 @@ const buildOwnerAlerts = async () => {
     speedingEvents,
     multaAlerts,
     permisosPendientes,
+    gpsEstado,
   ] =
     await Promise.all([
       listPendingRecordsRequest(),
@@ -192,6 +195,8 @@ const buildOwnerAlerts = async () => {
       listMultaAlertsRequest().catch(() => null),
       // Solicitudes de permiso de los choferes esperando respuesta.
       listPermisosRequest({ estado: "PENDIENTE" }).catch(() => []),
+      // Estado del GPS de la flota (OneSystec): avisa si esta bloqueado o caido.
+      getGpsEstadoRequest().catch(() => null),
       // Se pide (y se descarta el resultado) solo para que el backend corra la
       // deteccion de Area C/exceso de velocidad como efecto de esta misma consulta
       // (ver checkAreaCEntries/checkSpeedingEvents en vehicle.service.js) - asi corre
@@ -210,6 +215,16 @@ const buildOwnerAlerts = async () => {
     ...computeAreaCAlerts(areaCEntries),
     ...computeSpeedingAlerts(speedingEvents),
     ...computeMultaAlerts(multaAlerts, true),
+    ...(isGpsFailing(gpsEstado)
+      ? [
+          {
+            id: "gps-flota",
+            severity: "urgent",
+            message: `${gpsEstadoTitle(gpsEstado)}. Las paradas se calculan con el celular de los choferes que lo autorizaron.`,
+            link: "/finanzas/paradas",
+          },
+        ]
+      : []),
     ...(permisosPendientes.length
       ? [
           {

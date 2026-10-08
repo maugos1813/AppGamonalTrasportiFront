@@ -7,6 +7,7 @@ import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationsProvider } from "../../context/NotificationsContext";
 import { useTheme } from "../../context/ThemeContext";
+import { useGpsRespaldo } from "../../hooks/useGpsRespaldo";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { Avatar } from "../ui/Avatar";
@@ -300,6 +301,7 @@ export const AppShell = () => {
   };
 
   useLocationSharing();
+  useGpsRespaldo();
   usePushNotifications();
 
   return (

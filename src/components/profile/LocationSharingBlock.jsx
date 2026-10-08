@@ -12,7 +12,7 @@ const BackgroundGeolocation = registerPlugin("BackgroundGeolocation");
 // flujo nativo (y si solo se otorgo "mientras se usa la app", manda a Configuracion
 // para elegir "Permitir todo el tiempo"). En el navegador solo existe el permiso
 // estandar del sitio, no hay un equivalente a "siempre".
-const requestLocationPermission = () =>
+export const requestLocationPermission = () =>
   new Promise((resolve) => {
     if (Capacitor.isNativePlatform()) {
       let watcherId;

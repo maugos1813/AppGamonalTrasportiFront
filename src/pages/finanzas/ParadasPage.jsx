@@ -9,6 +9,9 @@ import { TextField } from "../../components/ui/TextField";
 import { AlertTriangleIcon, CheckCircleIcon, ClockIcon, RouteIcon } from "../../components/ui/icons";
 import { parseApiError } from "../../lib/api";
 import { formatDate } from "../../lib/format";
+import { GpsEstadoBanner } from "../../components/gps/GpsEstadoBanner";
+import { RetornoCard } from "../../components/gps/RetornoCard";
+import { fuenteLabel } from "../../lib/gps";
 import { PARADA_CLASES, formatDuration, mapsLink, romeDay, romeHHMM } from "../../lib/paradas";
 import { getParadasEstadoRequest, listParadasRequest } from "../../lib/paradas.api";
 
@@ -88,6 +91,8 @@ export const ParadasPage = () => {
 
   return (
     <div className="flex flex-col gap-5">
+      <GpsEstadoBanner showOk />
+      <RetornoCard />
       <div className="flex items-start gap-2.5 rounded-xl bg-accent-500/10 px-4 py-3 text-[13px] text-ink-200">
         <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0 text-accent-400" />
         <span>
@@ -187,6 +192,11 @@ export const ParadasPage = () => {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <ClaseChip clase={p.clase} />
                     {p.motorApagado && <span className="text-[11px] text-ink-400" title="Motor apagado">motor off</span>}
+                    {fuenteLabel(p.fuente) && (
+                      <span className="rounded-full bg-warning-500/15 px-2 py-0.5 text-[10px] font-semibold text-warning-500" title="Calculada con el GPS del celular del chofer: menos precisa que la del vehiculo">
+                        {fuenteLabel(p.fuente)}
+                      </span>
+                    )}
                   </div>
                   <a
                     href={mapsLink(p.lat, p.lng)}

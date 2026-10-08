@@ -23,3 +23,8 @@ export const recalcParadasRequest = (recordId) =>
 // hora: "AAAA-MM-DDTHH:mm" en hora de Roma. Devuelve { traspasoHora, estado }.
 export const setRecepcionRequest = (recordId, hora) =>
   api.post(`${BASE}/${recordId}/recepcion`, { hora }).then((res) => res.data.data);
+
+// Recalcula la estimacion por ruta de un servicio (sin GPS): retiro + paradas + retorno (OWNER/ADMIN).
+// Devuelve { estimacionRuta, avisos }.
+export const recalcEstimacionRequest = (recordId) =>
+  api.post(`${BASE}/${recordId}/estimacion`).then((res) => res.data.data);
