@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
+import { AsistenciaCard } from "../../components/calendario/AsistenciaCard";
 import { Alert } from "../../components/ui/Alert";
 import { Avatar } from "../../components/ui/Avatar";
 import { Button } from "../../components/ui/Button";
@@ -595,6 +596,8 @@ export const DriverDetailPage = () => {
           ))}
         </div>
       </GlassCard>
+
+      {isPrivileged && <AsistenciaCard driverId={driver.id} />}
     </div>
 
     <ConfirmModal

@@ -1,9 +1,9 @@
 import { currentMonth, monthName, shiftMonth } from "../../lib/finanzas";
 import { ChevronLeftIcon, ChevronRightIcon } from "../ui/icons";
 
-// Selector de mes con flechas. No deja ir mas alla del mes en curso.
-export const MonthSelector = ({ month, onChange }) => {
-  const isCurrent = month >= currentMonth();
+// Selector de mes con flechas. No deja ir mas alla del mes en curso, salvo allowFuture.
+export const MonthSelector = ({ month, onChange, allowFuture = false }) => {
+  const isCurrent = !allowFuture && month >= currentMonth();
   const buttonClass =
     "flex h-9 w-9 items-center justify-center rounded-lg text-ink-300 transition-colors hover:bg-line/10 hover:text-ink-50 disabled:pointer-events-none disabled:opacity-30";
   return (

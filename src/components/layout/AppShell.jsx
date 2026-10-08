@@ -10,7 +10,7 @@ import { useTheme } from "../../context/ThemeContext";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { Avatar } from "../ui/Avatar";
-import { ChevronDownIcon, ClockIcon, SearchIcon, WalletIcon } from "../ui/icons";
+import { CalendarIcon, ChevronDownIcon, ClockIcon, SearchIcon, WalletIcon } from "../ui/icons";
 import { MobileNavDrawer } from "./MobileNavDrawer";
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -257,6 +257,7 @@ const BottomNavTab = ({ to, label, icon: Icon }) => (
 // header. En desktop siguen en el sidebar fijo de siempre, sin cambios.
 const DRAWER_NAV_ITEMS = [
   { to: "/finanzas", label: "Finanzas Operativas", icon: WalletIcon },
+  { to: "/permisos", label: "Permisos", icon: CalendarIcon },
   { to: "/mapa", label: "Mapa", icon: MapPinIcon },
   { to: "/control-flota", label: "Control de Flota", icon: ShieldIcon },
   { to: "/mecanica", label: "Mecánica", icon: WrenchIcon },
@@ -367,10 +368,12 @@ export const AppShell = () => {
                 <>
                   <SidebarNavTab to="/" label="Hoy" icon={HomeIcon} />
                   <SidebarNavTab to="/mis-horas" label="Mis horas" icon={ClockIcon} />
+                  <SidebarNavTab to="/calendario" label="Calendario" icon={CalendarIcon} />
                   <SidebarNavTab to="/finanzas" label="Mis cargos" icon={WalletIcon} />
                 </>
               )}
               {isPrivileged && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
+              {isPrivileged && <SidebarNavTab to="/permisos" label="Permisos" icon={CalendarIcon} />}
               {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
               {isPrivileged && <SidebarNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
               {isPrivileged && (
@@ -474,6 +477,7 @@ export const AppShell = () => {
           <>
             <BottomNavTab to="/" label="Hoy" icon={HomeIcon} />
             <BottomNavTab to="/mis-horas" label="Mis horas" icon={ClockIcon} />
+            <BottomNavTab to="/calendario" label="Calendario" icon={CalendarIcon} />
             <BottomNavTab to="/finanzas" label="Mis cargos" icon={WalletIcon} />
             <BottomNavTab to="/profile" label="Perfil" icon={UserIcon} />
           </>

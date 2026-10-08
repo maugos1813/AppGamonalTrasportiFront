@@ -145,6 +145,17 @@ const DriverRow = ({ driver, month, reglas, location }) => {
             {driver.esperaHoras > 0 && ` - ${nf(driver.esperaHoras)} h de espera`}
             {driver.horasPorAprobar > 0 && ` - ${driver.horasPorAprobar} con horas por aprobar`}
           </span>
+          {driver.asistencia && (
+            <span className="block text-[12px] text-ink-400">
+              Asistencia: {driver.asistencia.trabajados} {driver.asistencia.trabajados === 1 ? "dia trabajado" : "dias trabajados"}
+              {driver.asistencia.noTrabajados > 0 && (
+                <span className="text-danger-500"> - {driver.asistencia.noTrabajados} sin justificar</span>
+              )}
+              {driver.asistencia.justificados > 0 && (
+                <span className="text-warning-500"> - {driver.asistencia.justificados} justificados</span>
+              )}
+            </span>
+          )}
         </div>
         {hasDeduction && (
           <span className="text-right text-[12px] text-ink-400">

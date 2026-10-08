@@ -4,6 +4,7 @@ import { AppShell } from "./components/layout/AppShell";
 import { GuestRoute } from "./components/layout/GuestRoute";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { PageLoader } from "./components/ui/PageLoader";
+import { useAuth } from "./context/AuthContext";
 import { DataRefreshProvider } from "./context/DataRefreshContext";
 
 // Paginas cargadas de forma perezosa (React.lazy): antes se importaban todas de
@@ -91,6 +92,15 @@ const HorasAprobacionPage = lazy(() =>
   import("./pages/finanzas/HorasAprobacionPage").then((m) => ({ default: m.HorasAprobacionPage })),
 );
 const ParadasPage = lazy(() => import("./pages/finanzas/ParadasPage").then((m) => ({ default: m.ParadasPage })));
+const MiCalendarioPage = lazy(() =>
+  import("./pages/calendario/MiCalendarioPage").then((m) => ({ default: m.MiCalendarioPage })),
+);
+const PermisosChoferPage = lazy(() =>
+  import("./pages/calendario/PermisosChoferPage").then((m) => ({ default: m.PermisosChoferPage })),
+);
+const PermisosPage = lazy(() =>
+  import("./pages/calendario/PermisosPage").then((m) => ({ default: m.PermisosPage })),
+);
 const MisHorasPage = lazy(() => import("./pages/horas/MisHorasPage").then((m) => ({ default: m.MisHorasPage })));
 const GastosServiciosPage = lazy(() =>
   import("./pages/finanzas/GastosServiciosPage").then((m) => ({ default: m.GastosServiciosPage })),
@@ -112,6 +122,13 @@ const VehiclesPage = lazy(() => import("./pages/vehicles/VehiclesPage").then((m)
 const LegacyRedirect = ({ from, to }) => {
   const location = useLocation();
   return <Navigate to={`${to}${location.pathname.slice(from.length)}${location.search}`} replace />;
+};
+
+// Pantallas de un solo perfil: el calendario es del chofer y los permisos de la oficina.
+const RoleOnly = ({ privileged, children }) => {
+  const { user } = useAuth();
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  return isPrivileged === privileged ? children : <Navigate to="/" replace />;
 };
 
 const OverlayRoutes = () => (
@@ -163,6 +180,30 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/resumen" element={<DailySummaryPage />} />
               <Route path="/mis-horas" element={<MisHorasPage />} />
+              <Route
+                path="/calendario"
+                element={
+                  <RoleOnly privileged={false}>
+                    <MiCalendarioPage />
+                  </RoleOnly>
+                }
+              />
+              <Route
+                path="/permisos"
+                element={
+                  <RoleOnly privileged>
+                    <PermisosPage />
+                  </RoleOnly>
+                }
+              />
+              <Route
+                path="/permisos/:driverId"
+                element={
+                  <RoleOnly privileged>
+                    <PermisosChoferPage />
+                  </RoleOnly>
+                }
+              />
               <Route path="/profile" element={<ProfilePage />} />
               <Route path="/records" element={<RecordsListPage />} />
               <Route path="/records/extras-piazza" element={<RecordsListPage section="extras-piazza" />} />

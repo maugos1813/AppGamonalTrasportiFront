@@ -184,6 +184,26 @@ export const MisHorasPage = () => {
             />
           </div>
 
+          {me?.asistencia && (
+            <p className="text-[13px] text-ink-300">
+              Asistencia del mes: <b className="text-success-500">{me.asistencia.trabajados}</b> dias trabajados
+              {me.asistencia.noTrabajados > 0 && (
+                <>
+                  {" "}&middot; <b className="text-danger-500">{me.asistencia.noTrabajados}</b> sin justificar
+                </>
+              )}
+              {me.asistencia.justificados > 0 && (
+                <>
+                  {" "}&middot; <b className="text-warning-500">{me.asistencia.justificados}</b> justificados
+                </>
+              )}
+              .{" "}
+              <Link to="/calendario" className="text-accent-400 hover:text-accent-300">
+                Ver calendario
+              </Link>
+            </p>
+          )}
+
           {(sinCargar > 0 || devueltas > 0) && (
             <div className="flex items-start gap-2.5 rounded-xl bg-warning-500/10 px-4 py-3 text-[13px] text-warning-500">
               <AlertTriangleIcon className="mt-0.5 h-4 w-4 shrink-0" />

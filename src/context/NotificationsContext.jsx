@@ -27,6 +27,7 @@ import {
   listRecordsRequest,
 } from "../lib/records.api";
 import { listMultaAlertsRequest } from "../lib/multas.api";
+import { listPermisosRequest } from "../lib/permisos.api";
 import { listUsersRequest } from "../lib/users.api";
 import {
   getVehicleRequest,
@@ -168,7 +169,17 @@ const buildChoferAlerts = async () => {
 // tardaran en cargar. computeLocationPermissionAlerts solo necesita saber que chofer
 // esta "en camino" ahora mismo, asi que le alcanza con los pendientes de hoy.
 const buildOwnerAlerts = async () => {
-  const [pendingRecords, users, vehicles, documents, syncFailures, areaCEntries, speedingEvents, multaAlerts] =
+  const [
+    pendingRecords,
+    users,
+    vehicles,
+    documents,
+    syncFailures,
+    areaCEntries,
+    speedingEvents,
+    multaAlerts,
+    permisosPendientes,
+  ] =
     await Promise.all([
       listPendingRecordsRequest(),
       listUsersRequest(),
@@ -179,6 +190,8 @@ const buildOwnerAlerts = async () => {
       listSpeedingEventsRequest(),
       // Multas vencidas / por vencer / descuentos pendientes (una sola consulta liviana).
       listMultaAlertsRequest().catch(() => null),
+      // Solicitudes de permiso de los choferes esperando respuesta.
+      listPermisosRequest({ estado: "PENDIENTE" }).catch(() => []),
       // Se pide (y se descarta el resultado) solo para que el backend corra la
       // deteccion de Area C/exceso de velocidad como efecto de esta misma consulta
       // (ver checkAreaCEntries/checkSpeedingEvents en vehicle.service.js) - asi corre
@@ -197,6 +210,18 @@ const buildOwnerAlerts = async () => {
     ...computeAreaCAlerts(areaCEntries),
     ...computeSpeedingAlerts(speedingEvents),
     ...computeMultaAlerts(multaAlerts, true),
+    ...(permisosPendientes.length
+      ? [
+          {
+            id: "permisos-pendientes",
+            severity: "warning",
+            message: `${permisosPendientes.length} ${
+              permisosPendientes.length === 1 ? "solicitud de permiso espera" : "solicitudes de permiso esperan"
+            } tu respuesta.`,
+            link: "/permisos",
+          },
+        ]
+      : []),
   ]);
 };
 
