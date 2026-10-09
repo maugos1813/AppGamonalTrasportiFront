@@ -36,6 +36,7 @@ import {
 import { formatDate, formatDateTime, formatTimeRemaining } from "../../lib/format";
 import { userAreaKeys } from "../../lib/roles";
 import { AREA_ALL, AREAS_BY_KEY, RECORD_AREAS, classifyRecord } from "../../lib/recordAreas";
+import { FaltantesChips, hasFaltantes } from "../../components/records/FaltantesPanel";
 import {
   listPendingRecordsRequest,
   listRecordsByDayRequest,
@@ -163,7 +164,7 @@ const RecordCard = ({ record }) => {
   const location = useLocation();
   return (
     <Link to={`/records/${record.id}`} state={{ backgroundLocation: location }}>
-      <GlassCard className="transition-colors hover:bg-line/[0.08]">
+      <GlassCard className={`transition-colors hover:bg-line/[0.08] ${hasFaltantes(record) ? "!border-danger-500/50 !bg-danger-500/[0.08]" : ""}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <span className="text-[13px] font-medium text-ink-400">{record.codigo}</span>
@@ -182,6 +183,7 @@ const RecordCard = ({ record }) => {
         </span>
         <span>Cliente: {record.client?.nombre}</span>
       </div>
+      <FaltantesChips faltantes={record.faltantes} className="mt-3" />
       </GlassCard>
     </Link>
   );
@@ -212,7 +214,11 @@ const RecordRow = ({ record }) => {
     <Link
       to={`/records/${record.id}`}
       state={{ backgroundLocation: location }}
-      className={`${ROW_GRID} rounded-xl py-2.5 text-[12px] text-ink-200 transition-colors hover:bg-line/[0.06]`}
+      className={`${ROW_GRID} rounded-xl py-2.5 text-[12px] text-ink-200 transition-colors ${
+        hasFaltantes(record)
+          ? "border-l-4 border-danger-500 bg-danger-500/[0.09] hover:bg-danger-500/[0.15]"
+          : "hover:bg-line/[0.06]"
+      }`}
     >
       <span className="flex min-w-0 items-center gap-2.5">
         <AreaBadge areaKey={area.key} size={32} />
@@ -229,6 +235,7 @@ const RecordRow = ({ record }) => {
           {record.client?.nombre ?? "Sin cliente"}
           {record.kilometros != null ? ` · ${fmtKm(record.kilometros)} km` : ""}
         </span>
+        <FaltantesChips faltantes={record.faltantes} className="mt-1" />
       </span>
       <span className="min-w-0">
         <span className="block truncate text-ink-100">{record.vehicle?.targa ?? "-"}</span>

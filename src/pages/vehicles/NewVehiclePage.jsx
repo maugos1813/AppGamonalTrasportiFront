@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { CATEGORIA_VEHICULO_OPTIONS } from "../../lib/vehiculos";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -18,6 +19,7 @@ const INITIAL_FORM = {
   area: "",
   grupo: "",
   estado: "DISPONIBLE",
+  categoria: "",
   poliza: "",
   rTecnica: "",
   autorizadoAreaC: false,
@@ -141,6 +143,15 @@ export const NewVehiclePage = () => {
               value={form.estado}
               onChange={(v) => setField("estado", v)}
               error={fieldErrors.estado?.[0]}
+            />
+            <SearchableSelect
+              id="categoria"
+              label="Categoria de consumo (para estimar carburante)"
+              placeholder="Elige la categoria del vehiculo"
+              options={CATEGORIA_VEHICULO_OPTIONS}
+              value={form.categoria}
+              onChange={(v) => setField("categoria", v)}
+              error={fieldErrors.categoria?.[0]}
             />
             <TextField
               id="poliza"

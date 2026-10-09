@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { CATEGORIA_VEHICULO_LABELS, CATEGORIA_VEHICULO_OPTIONS } from "../../lib/vehiculos";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
@@ -30,6 +31,7 @@ const toFormState = (vehicle) => ({
   area: vehicle.area ?? "",
   grupo: vehicle.grupo ?? "",
   estado: vehicle.estado ?? "",
+  categoria: vehicle.categoria ?? "",
   poliza: toDateInputValue(vehicle.poliza),
   rTecnica: toDateInputValue(vehicle.rTecnica),
   autorizadoAreaC: vehicle.autorizadoAreaC ?? false,
@@ -338,6 +340,7 @@ export const VehicleDetailPage = () => {
           <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <VehicleStat label="Area" value={areaLabel(vehicle.area)} />
             <VehicleStat label="Grupo" value={vehicle.grupo ? grupoLabel(vehicle.grupo) : null} />
+            <VehicleStat label="Categoria de consumo" value={vehicle.categoria ? CATEGORIA_VEHICULO_LABELS[vehicle.categoria] : null} />
             <VehicleStat
               label="Area C (ZTL Milano)"
               value={vehicle.autorizadoAreaC ? "Autorizado" : "No autorizado"}
@@ -391,6 +394,15 @@ export const VehicleDetailPage = () => {
                 value={form.estado}
                 onChange={(v) => setField("estado", v)}
                 error={fieldErrors.estado?.[0]}
+              />
+              <SearchableSelect
+                id="categoria"
+                label="Categoria de consumo (para estimar carburante)"
+                placeholder="Elige la categoria del vehiculo"
+                options={CATEGORIA_VEHICULO_OPTIONS}
+                value={form.categoria}
+                onChange={(v) => setField("categoria", v)}
+                error={fieldErrors.categoria?.[0]}
               />
             </div>
 

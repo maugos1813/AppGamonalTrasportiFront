@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { FaltantesCard } from "../../components/records/FaltantesPanel";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CerrarServicioModal } from "../../components/horas/CerrarServicioModal";
 import { HorasEstadoChip } from "../../components/horas/HorasEstadoChip";
@@ -795,6 +796,8 @@ const RecordSummaryView = ({
       </div>
 
       <JornadaOfService record={record} isChofer={isChofer} onOpenHours={onOpenHours} />
+
+      <FaltantesCard record={record} onReload={onReload} />
 
       {!isChofer && (
         <div className="mt-6 border-t border-line/10 pt-6">

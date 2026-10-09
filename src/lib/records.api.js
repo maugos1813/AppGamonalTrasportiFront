@@ -68,3 +68,7 @@ export const uploadRecordFileRequest = (id, file, tipoArchivo) => {
     .post(`/records/${id}/files`, formData)
     .then((res) => res.data.data.file);
 };
+
+// Switches de peajes y carburante de un servicio (rapido: no sincroniza con AppSheet).
+export const updateDeclaracionesRequest = (id, data) =>
+  api.patch(`/records/${id}/declaraciones`, data).then((res) => res.data.data.record);

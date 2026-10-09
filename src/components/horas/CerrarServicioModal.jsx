@@ -10,6 +10,8 @@ import { formatRomeDateTime, toRomeDateTimeInputValue } from "../../lib/format";
 import { PAY_RULES_FALLBACK } from "../../lib/finanzas";
 import { formatHours, previewShift } from "../../lib/horas";
 import { submitHorasRequest } from "../../lib/horas.api";
+import { updateDeclaracionesRequest } from "../../lib/records.api";
+import { FaltantesSwitches } from "../records/FaltantesPanel";
 
 const MIN_CHIPS = [0, 15, 30, 45, 60];
 
@@ -67,6 +69,12 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
   const [finFueraDeBase, setFinFueraDeBase] = useState(Boolean(jornada.finFueraDeBase));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  // Lo que el chofer declara sobre peajes y carburante de este servicio.
+  const [declared, setDeclared] = useState(() => ({
+    sinPeajeIda: Boolean(record.faltantes?.declarado?.sinPeajeIda),
+    sinPeajeVuelta: Boolean(record.faltantes?.declarado?.sinPeajeVuelta),
+    sinCombustible: Boolean(record.faltantes?.declarado?.sinCombustible),
+  }));
   const [sent, setSent] = useState(false);
 
   useEffect(() => {
@@ -112,6 +120,11 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
         entregado: true,
         finFueraDeBase,
       });
+      // Declaraciones de peajes y carburante, si el chofer las cambio.
+      const changed = Object.fromEntries(
+        Object.entries(declared).filter(([field, value]) => value !== Boolean(record.faltantes?.declarado?.[field]))
+      );
+      if (Object.keys(changed).length > 0) await updateDeclaracionesRequest(record.id, changed).catch(() => {});
       setSent(true);
       onDone?.();
     } catch (err) {
@@ -281,6 +294,16 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
               ) : (
                 <p className="text-[13px] text-ink-400">Completa inicio y fin para ver tus horas.</p>
               )}
+            </div>
+
+            <div className="rounded-2xl border border-line/10 bg-line/[0.03] p-4">
+              <h3 className="mb-3 text-[14px] font-semibold text-ink-50">Peajes y carburante</h3>
+              <FaltantesSwitches
+                record={{ ...record, faltantes: { ...record.faltantes, litrosEstimados: record.faltantes?.litrosEstimados } }}
+                values={declared}
+                onToggle={(field, value) => setDeclared((prev) => ({ ...prev, [field]: value }))}
+                disabled={saving}
+              />
             </div>
 
             <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
