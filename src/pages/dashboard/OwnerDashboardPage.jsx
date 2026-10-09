@@ -37,7 +37,8 @@ import {
   computePeriodKpis,
   filterToMainAreas,
 } from "../../lib/dashboardStats";
-import { AREAS_BY_KEY, RECORD_AREAS, classifyRecord } from "../../lib/recordAreas";
+import { AREAS_BY_KEY, classifyRecord } from "../../lib/recordAreas";
+import { dashboardAreas } from "../../lib/roles";
 import { formatCurrency, formatCurrencyCompact } from "../../lib/format";
 import { listRecordsRequest } from "../../lib/records.api";
 
@@ -154,11 +155,6 @@ const monthLabel = (year, month) =>
 // Vistas del dashboard: "General" junta las 5 areas (DHL Milano, DHL Roma, Extras Piazza
 // Milano, Extras Piazza Roma y AB Service) y las demas aislan una sola - mismas areas que
 // Registros (ver lib/recordAreas.js). "Otros" (Extras Stefania) no entra, como antes.
-const MAIN_AREAS = RECORD_AREAS.filter((a) => a.key !== "otros");
-const MIS_AREAS_VISTA_OPTIONS = [
-  { value: "TODAS", label: "General" },
-  ...MAIN_AREAS.map((a) => ({ value: a.key, label: a.shortLabel ?? a.label })),
-];
 const vistaLabel = (value) => (value === "TODAS" ? "Vista general" : (AREAS_BY_KEY[value]?.label ?? value));
 
 // Detalle de que compone un anillo de Control economico (facturacion/costos/
@@ -214,6 +210,17 @@ const EconomicBreakdownModal = ({ title, sublabel, rows, total, onClose }) => {
 
 export const OwnerDashboardPage = () => {
   const { user } = useAuth();
+  // Areas de este usuario: el Responsable solo ve las que le asigno el Admin (ver dashboardAreas).
+  const userAreas = useMemo(() => dashboardAreas(user), [user]);
+  const MAIN_AREAS = userAreas;
+  const areaKeys = useMemo(() => userAreas.map((a) => a.key), [userAreas]);
+  const MIS_AREAS_VISTA_OPTIONS = useMemo(
+    () => [
+      { value: "TODAS", label: "General" },
+      ...userAreas.map((a) => ({ value: a.key, label: a.shortLabel ?? a.label })),
+    ],
+    [userAreas]
+  );
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
@@ -258,7 +265,7 @@ export const OwnerDashboardPage = () => {
 
   // Registros de las 5 areas principales (sin "Otros"); sin zona cargada, Extras Piazza y DHL
   // cuentan como Milano (ver classifyRecord).
-  const mainRecords = useMemo(() => (loaded ? filterToMainAreas(records) : null), [loaded, records]);
+  const mainRecords = useMemo(() => (loaded ? filterToMainAreas(records, areaKeys) : null), [loaded, records, areaKeys]);
 
   // Lo que ve el dashboard segun la vista elegida: todas las areas o una sola.
   const scopedRecords = useMemo(() => {
@@ -399,7 +406,12 @@ export const OwnerDashboardPage = () => {
           </span>
         }
       >
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">
+        <div
+          className={clsx(
+            "grid grid-cols-2 gap-3",
+            MAIN_AREAS.length >= 5 ? "md:grid-cols-3 xl:grid-cols-5" : "md:grid-cols-3"
+          )}
+        >
           {MAIN_AREAS.map((a) => {
             const stat = areaBreakdown[a.key];
             const total = MAIN_AREAS.reduce((n, x) => n + areaBreakdown[x.key].count, 0);

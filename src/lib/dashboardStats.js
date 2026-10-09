@@ -920,7 +920,10 @@ export const computeFleetKmTable = (records, period, now = new Date(), selectedM
 // Extras Piazza Milano, Extras Piazza Roma y AB Service. Deja afuera solo "Otros" (Extras
 // Stefania). Reemplaza al criterio anterior (solo Piazza + DHL Roma): ahora DHL Milano y AB
 // Service tambien cuentan.
-export const filterToMainAreas = (records) => records.filter((r) => classifyRecord(r) !== "otros");
+export const filterToMainAreas = (records, areaKeys = null) =>
+  areaKeys
+    ? records.filter((r) => areaKeys.includes(classifyRecord(r)))
+    : records.filter((r) => classifyRecord(r) !== "otros");
 
 // Servicios, km y facturacion del periodo por area (bloque "Servicios por area").
 export const computeAreaBreakdown = (records, period, now = new Date(), selectedMonth = null) => {

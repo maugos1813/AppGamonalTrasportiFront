@@ -25,6 +25,7 @@ import { StatTile } from "../../components/ui/StatTile";
 import { TextField } from "../../components/ui/TextField";
 import { VehicleStatusBadge } from "../../components/ui/VehicleStatusBadge";
 import { useAuth } from "../../context/AuthContext";
+import { userAreaKeys } from "../../lib/roles";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import {
@@ -413,7 +414,9 @@ const VehicleKmModal = ({ entry, onClose }) => {
 // computeFleetKmUsage). Acotado a las 5 areas principales (ver filterToMainAreas),
 // mismo criterio que el resto de la app.
 const FleetRankingPanel = ({ records }) => {
-  const ranking = records ? computeFleetKmUsage(filterToMainAreas(records), "mes").slice(0, 10) : undefined;
+  const { user } = useAuth();
+  const areaKeys = userAreaKeys(user);
+  const ranking = records ? computeFleetKmUsage(filterToMainAreas(records, areaKeys), "mes").slice(0, 10) : undefined;
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   return (

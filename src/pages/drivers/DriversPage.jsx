@@ -41,7 +41,7 @@ import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { currentMonth } from "../../lib/finanzas";
 import { listDriversProgressRequest } from "../../lib/metas.api";
-import { nivelLabel } from "../../lib/roles";
+import { nivelLabel, userAreaKeys } from "../../lib/roles";
 import { listUsersRequest } from "../../lib/users.api";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
@@ -458,7 +458,9 @@ const DriverKmModal = ({ entry, onClose }) => {
 // computeDriverKmRanking). Acotado a las 5 areas principales (ver filterToMainAreas),
 // mismo criterio que el resto de la app.
 const DriverRankingPanel = ({ records }) => {
-  const ranking = records ? computeDriverKmRanking(filterToMainAreas(records), "mes").slice(0, 10) : undefined;
+  const { user } = useAuth();
+  const areaKeys = userAreaKeys(user);
+  const ranking = records ? computeDriverKmRanking(filterToMainAreas(records, areaKeys), "mes").slice(0, 10) : undefined;
   const [selectedEntry, setSelectedEntry] = useState(null);
 
   return (

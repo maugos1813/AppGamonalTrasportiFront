@@ -28,6 +28,13 @@ export const nivelLabel = (value) => NIVELES_CHOFER.find((n) => n.value === valu
 // Areas de servicio que ve el usuario: null = todas (Admin), array = solo esas (Responsable).
 export const userAreaKeys = (user) => (user?.cargo === "ADMIN" ? (user.areasPermitidas ?? []) : null);
 
+// Areas que muestran el dashboard y los rankings: el Admin ve las 5 principales (sin "Otros", como
+// siempre) y el Responsable solo las que tiene marcadas, "Otros" incluido si es suyo.
+export const dashboardAreas = (user) => {
+  const keys = userAreaKeys(user);
+  return keys ? RECORD_AREAS.filter((a) => keys.includes(a.key)) : RECORD_AREAS.filter((a) => a.key !== "otros");
+};
+
 // "Admin", "Responsable · Milano Sud", "Chofer · Master".
 export const roleText = (user) => {
   if (!user) return "";
