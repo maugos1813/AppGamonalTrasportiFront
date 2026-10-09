@@ -2,7 +2,7 @@ import clsx from "clsx";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import logo from "../../assets/logo.png";
-import { CARGO_LABELS } from "../../lib/constants";
+import { roleText } from "../../lib/roles";
 import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { useAuth } from "../../context/AuthContext";
 import { NotificationsProvider } from "../../context/NotificationsContext";
@@ -337,7 +337,7 @@ export const AppShell = () => {
                 <span className="block text-[13px] font-semibold text-ink-50">
                   {user?.nombre} {user?.apellido}
                 </span>
-                <span className="block text-[12px] text-ink-400">{CARGO_LABELS[user?.cargo] ?? ""}</span>
+                <span className="block text-[12px] text-ink-400">{roleText(user)}</span>
               </span>
               <ChevronDownIcon className="hidden h-4 w-4 text-ink-400 lg:block" />
             </Link>

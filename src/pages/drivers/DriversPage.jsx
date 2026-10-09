@@ -22,6 +22,7 @@ import { AttentionGroup, PanelShell } from "../../components/ui/PanelShell";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Select } from "../../components/ui/Select";
 import { Spinner } from "../../components/ui/Spinner";
+import { MetasKmCard } from "../../components/roles/MetasKmCard";
 import { StatTile } from "../../components/ui/StatTile";
 import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
@@ -38,6 +39,9 @@ import { listDocumentsRequest } from "../../lib/documents.api";
 import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
+import { currentMonth } from "../../lib/finanzas";
+import { listDriversProgressRequest } from "../../lib/metas.api";
+import { nivelLabel } from "../../lib/roles";
 import { listUsersRequest } from "../../lib/users.api";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
@@ -144,6 +148,7 @@ const DriverCard = ({ driver }) => {
         <div className="mt-3 flex items-center justify-between gap-2">
           <span className="truncate text-[11px] text-ink-400">
             {driver.cargo !== "CHOFER" ? `${CARGO_LABELS[driver.cargo]} · ` : ""}
+            {nivelLabel(driver.nivelChofer) ? `${nivelLabel(driver.nivelChofer)} · ` : ""}
             {areaLabel(driver.area)}
           </span>
           <DriverStatusBadge driver={driver} className="shrink-0 !px-2 !py-0.5 !text-[11px]" />
@@ -172,7 +177,26 @@ const GroupSection = ({ title, members }) => (
 // Vista de tabla
 // ---------------------------------------------------------------------------
 
-const DriverTable = ({ drivers, kmByDriver, onServiceIds }) => {
+// "1.240 / 2.500 km" con una barra de avance si el nivel del chofer ya tiene meta.
+const KmMeta = ({ km, progress }) => {
+  if (!progress?.meta) return <>{km ? fmtKm(km) : "—"}</>;
+  const pct = Math.min(100, progress.porcentaje ?? 0);
+  return (
+    <div className="ml-auto flex w-36 flex-col items-end gap-1">
+      <span>
+        {fmtKm(progress.km)} <span className="text-ink-400">/ {fmtKm(progress.meta)}</span>
+      </span>
+      <span className="block h-1.5 w-full overflow-hidden rounded-full bg-line/15">
+        <span
+          className={`block h-full rounded-full ${progress.cumplida ? "bg-success-500" : "bg-accent-400"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </span>
+    </div>
+  );
+};
+
+const DriverTable = ({ drivers, kmByDriver, progressByDriver, onServiceIds }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const open = (id) => navigate(`/choferes/${id}`, { state: { backgroundLocation: location } });
@@ -186,7 +210,8 @@ const DriverTable = ({ drivers, kmByDriver, onServiceIds }) => {
             <th className="px-2 py-3.5 font-medium">Centro</th>
             <th className="px-2 py-3.5 font-medium">Vehículo</th>
             <th className="px-2 py-3.5 font-medium">Teléfono</th>
-            <th className="px-2 py-3.5 text-right font-medium">Km mes</th>
+            <th className="px-2 py-3.5 font-medium">Nivel</th>
+            <th className="px-2 py-3.5 text-right font-medium">Km mes / meta</th>
             <th className="py-3.5 pl-2 pr-4 font-medium">Estado</th>
           </tr>
         </thead>
@@ -234,8 +259,11 @@ const DriverTable = ({ drivers, kmByDriver, onServiceIds }) => {
                 <td className="px-2 py-3">
                   <PhoneLink driver={driver} />
                 </td>
+                <td className="whitespace-nowrap px-2 py-3 text-ink-200">
+                  {nivelLabel(driver.nivelChofer) ?? <span className="text-ink-400">—</span>}
+                </td>
                 <td className="whitespace-nowrap px-2 py-3 text-right tabular-nums text-ink-100">
-                  {km ? fmtKm(km) : "—"}
+                  <KmMeta km={km} progress={progressByDriver?.get(driver.id)} />
                 </td>
                 <td className="py-3 pl-2 pr-4">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -481,6 +509,7 @@ export const DriversPage = () => {
   const [drivers, setDrivers] = useState(null);
   const [monthlyRecords, setMonthlyRecords] = useState(null);
   const [documents, setDocuments] = useState(null);
+  const [progress, setProgress] = useState(null);
   const [error, setError] = useState("");
 
   const [view, setView] = useState(initialView);
@@ -524,6 +553,14 @@ export const DriversPage = () => {
       .catch((err) => setError(parseApiError(err).message));
   }, [isPrivileged, recordsVersion]);
 
+  // Km del mes y avance contra la meta de cada nivel (el servidor suma los km completos del chofer).
+  useEffect(() => {
+    if (!isPrivileged) return;
+    listDriversProgressRequest(currentMonth())
+      .then(setProgress)
+      .catch((err) => setError(parseApiError(err).message));
+  }, [isPrivileged, recordsVersion, driversVersion]);
+
   useEffect(() => {
     if (!isPrivileged) return;
     listDocumentsRequest()
@@ -531,16 +568,14 @@ export const DriversPage = () => {
       .catch((err) => setError(parseApiError(err).message));
   }, [isPrivileged]);
 
-  // Km del mes por chofer (real si ya se cargo, si no el planificado; sin anulados).
-  const kmByDriver = useMemo(() => {
-    if (!monthlyRecords) return null;
-    const totals = new Map();
-    monthlyRecords.forEach((r) => {
-      if (r.estado === "ANNULLATO" || !r.driver?.id) return;
-      totals.set(r.driver.id, (totals.get(r.driver.id) ?? 0) + (r.kilometrosReales ?? r.kilometros ?? 0));
-    });
-    return totals;
-  }, [monthlyRecords]);
+  const progressByDriver = useMemo(
+    () => (progress ? new Map(progress.items.map((item) => [item.id, item])) : null),
+    [progress]
+  );
+  const kmByDriver = useMemo(
+    () => (progress ? new Map(progress.items.map((item) => [item.id, item.km])) : null),
+    [progress]
+  );
 
   const filtered = useMemo(() => {
     if (!drivers) return [];
@@ -657,6 +692,16 @@ export const DriversPage = () => {
               />
             </div>
 
+            <MetasKmCard
+              metas={progress?.metas}
+              canEdit={user?.cargo === "OWNER"}
+              onSaved={(metas) => {
+                setProgress((prev) => (prev ? { ...prev, metas } : prev));
+                // Los avances de cada chofer se recalculan con la meta nueva.
+                listDriversProgressRequest(currentMonth()).then(setProgress).catch(() => {});
+              }}
+            />
+
             <div className="glass-surface grid grid-cols-2 gap-3 rounded-2xl p-4 md:grid-cols-4">
               <TextField
                 id="drivers-search"
@@ -712,7 +757,12 @@ export const DriversPage = () => {
                 Ningún chofer coincide con los filtros.
               </GlassCard>
             ) : view === "tabla" ? (
-              <DriverTable drivers={pageItems} kmByDriver={kmByDriver} onServiceIds={onServiceIds} />
+              <DriverTable
+                drivers={pageItems}
+                kmByDriver={kmByDriver}
+                progressByDriver={progressByDriver}
+                onServiceIds={onServiceIds}
+              />
             ) : (
               <div className="flex flex-col gap-7">
                 {groups.map((g) => (

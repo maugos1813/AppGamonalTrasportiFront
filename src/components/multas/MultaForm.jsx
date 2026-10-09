@@ -9,6 +9,8 @@ import { Switch } from "../ui/Switch";
 import { TextField } from "../ui/TextField";
 import { Textarea } from "../ui/Textarea";
 import { CheckCircleIcon, ClockIcon, EuroIcon } from "../ui/icons";
+import { useAuth } from "../../context/AuthContext";
+import { AREA_ACCESS_OPTIONS, userAreaKeys } from "../../lib/roles";
 import { MULTA_ESTADO_BY_VALUE, MULTA_PLAZO_POR_DEFECTO_DIAS, QUIEN_PAGA_OPTIONS } from "../../lib/multas";
 import { suggestMultaDriverRequest } from "../../lib/multas.api";
 import { addDaysToDay, parseCosto, romeToday } from "../../lib/mancato";
@@ -78,6 +80,16 @@ const DriverSuggestion = ({ suggestion, selectedId, autoPicked, onPick }) => {
 // ya paso la fecha de vencimiento, Pendiente el resto.
 export const MultaForm = ({ mode, multa, onSubmit, onCancel, submitting, error, fieldErrors = {} }) => {
   const isEdit = mode === "edit";
+  const { user } = useAuth();
+  // Un Responsable elige entre sus areas (obligatorio); el Admin puede dejarla vacia (solo la ven los Admin).
+  const myAreaKeys = userAreaKeys(user);
+  const areaOptions = [
+    ...(myAreaKeys === null ? [{ value: "", label: "Sin area (solo la ven los Admin)" }] : []),
+    ...AREA_ACCESS_OPTIONS.filter((a) => myAreaKeys === null || myAreaKeys.includes(a.key)).map((a) => ({
+      value: a.key,
+      label: a.label,
+    })),
+  ];
 
   const [vehicles, setVehicles] = useState([]);
   const [drivers, setDrivers] = useState([]);
@@ -87,6 +99,7 @@ export const MultaForm = ({ mode, multa, onSubmit, onCancel, submitting, error, 
     targa: multa?.targa ?? "",
     costo: multa ? String(multa.costo).replace(".", ",") : "",
     quienPaga: multa?.quienPaga ?? "",
+    area: multa?.area ?? (myAreaKeys?.length === 1 ? myAreaKeys[0] : ""),
     fechaInfraccion: multa?.fechaInfraccion ? new Date(multa.fechaInfraccion).toISOString().slice(0, 10) : "",
     fechaRecepcion: multa ? new Date(multa.fechaRecepcion).toISOString().slice(0, 10) : romeToday(),
     fechaVencimiento: multa ? new Date(multa.fechaVencimiento).toISOString().slice(0, 10) : "",
@@ -178,6 +191,7 @@ export const MultaForm = ({ mode, multa, onSubmit, onCancel, submitting, error, 
     if (!normalizeTarga(form.targa)) next.targa = "La targa es obligatoria";
     if (parseCosto(form.costo) == null) next.costo = "Ingresa un importe mayor a 0 (ej. 173,50)";
     if (!form.quienPaga) next.quienPaga = "Indica si pago el chofer o se descuenta";
+    if (myAreaKeys !== null && !form.area) next.area = "Elige el area de la multa";
     if (!form.fechaRecepcion) next.fechaRecepcion = "Indica la fecha de recepcion";
     if (!vencimiento) next.fechaVencimiento = "Indica la fecha de vencimiento";
     else if (form.fechaRecepcion && vencimiento < form.fechaRecepcion) {
@@ -196,6 +210,8 @@ export const MultaForm = ({ mode, multa, onSubmit, onCancel, submitting, error, 
       targa: normalizeTarga(form.targa),
       costo: String(parseCosto(form.costo)),
       quienPaga: form.quienPaga,
+      // En edicion "" quita el area (solo un Admin); al crear, si esta vacia no se manda.
+      area: form.area,
       fechaRecepcion: form.fechaRecepcion,
       fechaVencimiento: vencimiento,
       comentarios: form.comentarios.trim(),
@@ -208,6 +224,7 @@ export const MultaForm = ({ mode, multa, onSubmit, onCancel, submitting, error, 
     } else {
       if (!fields.comentarios) delete fields.comentarios;
       if (!fields.fechaInfraccion) delete fields.fechaInfraccion;
+      if (!fields.area) delete fields.area;
     }
 
     onSubmit(fields, { multa: archivoMulta, comprobante });
@@ -292,6 +309,21 @@ export const MultaForm = ({ mode, multa, onSubmit, onCancel, submitting, error, 
           onChange={(e) => setField("costo", e.target.value.replace(/[^\d.,]/g, ""))}
           error={err("costo")}
         />
+
+        <div className="sm:col-span-2">
+          <SearchableSelect
+            id="area"
+            label="Area de servicio"
+            placeholder="Elige el area a la que se imputa"
+            options={areaOptions}
+            value={form.area}
+            onChange={(v) => setField("area", v)}
+            error={err("area")}
+          />
+          <span className="mt-1.5 block text-[12px] text-ink-400">
+            Define quien la ve: los Responsables solo ven las multas de sus areas.
+          </span>
+        </div>
 
         <div className="sm:col-span-2">
           <span className="mb-1.5 block text-[13px] font-medium text-ink-300">¿Chofer pago?</span>

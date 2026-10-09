@@ -36,11 +36,11 @@ import {
 } from "../../components/ui/icons";
 import { useAuth } from "../../context/AuthContext";
 import { parseApiError } from "../../lib/api";
-import { AREA_OPTIONS, CARGO_LABELS, GRUPO_LABELS, TIPO_DOCUMENTO_LABELS } from "../../lib/constants";
+import { AREA_OPTIONS, GRUPO_LABELS, TIPO_DOCUMENTO_LABELS } from "../../lib/constants";
 import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { listDocumentsRequest } from "../../lib/documents.api";
 import { formatDate, formatDateOnly, formatKm } from "../../lib/format";
-import { scopedRecordsSections } from "../../lib/permissions";
+import { AREA_LABEL_BY_KEY, roleText, userAreaKeys } from "../../lib/roles";
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import {
   listUsersRequest,
@@ -608,7 +608,7 @@ export const ProfilePage = () => {
 
   const age = ageFromBirthdate(user?.fechaNacimiento);
   const hasEmergency = Boolean(user?.contactoEmergenciaNombre || user?.contactoEmergenciaTelefono);
-  const scopedSections = scopedRecordsSections(user);
+  const areaKeys = userAreaKeys(user);
   const vehicle = user?.vehiculoAsignado;
   const hasNextService = Boolean(user?.proximoServicioFecha || user?.proximoServicioNota);
 
@@ -656,7 +656,7 @@ export const ProfilePage = () => {
                 </Badge>
               </div>
               <p className="mt-1 text-[16px] font-medium text-brand-bright">
-                {CARGO_LABELS[user?.cargo] ?? user?.cargo}
+                {roleText(user)}
               </p>
               <p className="text-[14px] text-white/75">Gamonal Driver</p>
               {avatarError && <p className="mt-2 text-[13px] text-danger-500">{avatarError}</p>}
@@ -664,7 +664,7 @@ export const ProfilePage = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-x-8 gap-y-5 border-t border-white/10 pt-5 lg:w-[420px] lg:border-l lg:border-t-0 lg:pl-8 lg:pt-0">
-            <HeaderFact icon={BriefcaseIcon} label="Rol" value={CARGO_LABELS[user?.cargo] ?? user?.cargo} />
+            <HeaderFact icon={BriefcaseIcon} label="Rol" value={roleText(user)} />
             <HeaderFact icon={ShieldIcon} label="Area" value={areaLabel(user?.area)} />
             <HeaderFact icon={CalendarIcon} label="Miembro desde" value={formatDate(user?.createdAt)} />
             <HeaderFact
@@ -771,8 +771,10 @@ export const ProfilePage = () => {
                         "Dashboard con facturacion y costos",
                       ]
                     : [
-                        scopedSections
-                          ? `Registros de ${areaLabel(user?.area)}`
+                        areaKeys
+                          ? areaKeys.length > 0
+                            ? `Servicios de: ${areaKeys.map((k) => AREA_LABEL_BY_KEY[k] ?? k).join(", ")}`
+                            : "Todavia no tienes areas asignadas (pidelas a un Admin)"
                           : "Registros de todas las areas",
                         "Choferes, vehiculos y documentos",
                         "Mapa, Area C y Control de Flota",

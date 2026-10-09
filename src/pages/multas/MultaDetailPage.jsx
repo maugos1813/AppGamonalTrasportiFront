@@ -23,6 +23,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { formatCurrency, formatDateOnly } from "../../lib/format";
+import { AREA_LABEL_BY_KEY } from "../../lib/roles";
 import { MULTA_ESTADO_BY_VALUE, quienPagaLabel } from "../../lib/multas";
 import { deleteMultaRequest, getMultaRequest, updateMultaRequest } from "../../lib/multas.api";
 
@@ -254,6 +255,7 @@ const MultaOficinaDetail = () => {
                 <Fact label="Vence">{formatDateOnly(multa.fechaVencimiento)}</Fact>
                 <Fact label="Costo">{formatCurrency(multa.costo)}</Fact>
                 <Fact label="Targa">{multa.targa}</Fact>
+                <Fact label="Area">{AREA_LABEL_BY_KEY[multa.area] ?? "Sin area (solo Admin)"}</Fact>
                 <Fact label="Chofer responsable">
                   {multa.driver ? `${multa.driver.nombre} ${multa.driver.apellido}` : "-"}
                 </Fact>

@@ -34,8 +34,8 @@ import {
   TERMINADOS_STATUSES,
 } from "../../lib/constants";
 import { formatDate, formatDateTime, formatTimeRemaining } from "../../lib/format";
-import { scopedRecordsSections } from "../../lib/permissions";
-import { AREA_ALL, AREAS_BY_KEY, RECORD_AREAS, allowedAreaKeys, classifyRecord } from "../../lib/recordAreas";
+import { userAreaKeys } from "../../lib/roles";
+import { AREA_ALL, AREAS_BY_KEY, RECORD_AREAS, classifyRecord } from "../../lib/recordAreas";
 import {
   listPendingRecordsRequest,
   listRecordsByDayRequest,
@@ -417,10 +417,9 @@ export const RecordsListPage = ({ section: sectionHint }) => {
   const { version, refresh: refreshRecords } = useDataRefresh("records");
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  // ADMIN "de area" (ver lib/permissions.js): solo ve las areas de su(s) seccion(es), las
-  // demas ni siquiera se le ofrecen (el backend tampoco le manda esos registros).
-  const scopedSections = scopedRecordsSections(user);
-  const allowedKeys = allowedAreaKeys(scopedSections);
+  // Un Responsable solo ve las areas que el Admin le marco; las demas ni siquiera se le ofrecen (el
+  // servidor tampoco le manda esos registros). null = todas.
+  const allowedKeys = userAreaKeys(user);
   const availableAreas = RECORD_AREAS.filter((a) => !allowedKeys || allowedKeys.includes(a.key));
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -733,7 +732,7 @@ export const RecordsListPage = ({ section: sectionHint }) => {
           <h1 className="text-[28px] font-semibold tracking-tight text-ink-50">Registros de Servicios</h1>
           <p className="mt-1 max-w-2xl text-[14px] text-ink-300">
             {isPrivileged
-              ? "Gestiona y consulta los servicios de todas las areas. Cada dia se carga solo al desplegarlo."
+              ? `Gestiona y consulta los servicios de ${allowedKeys ? "tus areas" : "todas las areas"}. Cada dia se carga solo al desplegarlo.`
               : "Viajes asignados, ordenados por fecha."}
           </p>
         </div>

@@ -75,15 +75,3 @@ export const classifyRecord = (record) => {
   if (record.spedizzione === "EXTRAS_STEFANIA") return "otros";
   return zonaOf(record) === "ROMA" ? "piazza-roma" : "piazza-milano";
 };
-
-// Un ADMIN "de area" (ver lib/permissions.js) solo ve las secciones de su area; cada seccion
-// de esa lista corresponde a estas areas nuevas.
-const SECTION_TO_AREAS = {
-  "extras-piazza": ["piazza-milano", "piazza-roma"],
-  "dhl-ab-service": ["dhl-milano", "dhl-roma", "ab-service"],
-  "extras-stefania": ["otros"],
-};
-
-// null = sin restriccion (todas las areas).
-export const allowedAreaKeys = (scopedSections) =>
-  scopedSections ? scopedSections.flatMap((section) => SECTION_TO_AREAS[section] ?? []) : null;

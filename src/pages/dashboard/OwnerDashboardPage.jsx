@@ -239,7 +239,8 @@ export const OwnerDashboardPage = () => {
     const since = new Date(sinceYear - 1, 11, 1);
     const days = Math.ceil((Date.now() - since.getTime()) / (24 * 60 * 60 * 1000)) + 1;
 
-    listRecordsRequest({ days })
+    // vista "resumen": solo los campos que usa este dashboard (mucho menos para leer y bajar).
+    listRecordsRequest({ days, vista: "resumen" })
       .then((recordsData) => {
         if (cancelled) return;
         setRecords(recordsData);

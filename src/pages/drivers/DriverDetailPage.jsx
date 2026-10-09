@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/Button";
 import { ConfirmModal } from "../../components/ui/ConfirmModal";
 import { GlassCard } from "../../components/ui/GlassCard";
 import { PageLoader } from "../../components/ui/PageLoader";
+import { AreaCheckboxes } from "../../components/roles/AreaCheckboxes";
 import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
 import { Spinner } from "../../components/ui/Spinner";
@@ -35,6 +36,14 @@ import {
   updateUserRequest,
   uploadUserAvatarRequest,
 } from "../../lib/users.api";
+import {
+  AREA_LABEL_BY_KEY,
+  NIVELES_CHOFER,
+  RESPONSABLE_PRESETS,
+  RESPONSABLE_TIPOS,
+  nivelLabel,
+  responsableTipoLabel,
+} from "../../lib/roles";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
 
 const TrashIcon = (props) => (
@@ -70,6 +79,9 @@ const toFormState = (driver) => ({
   area: driver.area ?? "",
   grupo: driver.grupo ?? "",
   cargo: driver.cargo ?? "CHOFER",
+  responsableTipo: driver.responsableTipo ?? "",
+  areasPermitidas: driver.areasPermitidas ?? [],
+  nivelChofer: driver.nivelChofer ?? "",
   estado: driver.estado ?? "",
   fechaNacimiento: toDateInputValue(driver.fechaNacimiento),
   vehiculoAsignadoId: driver.vehiculoAsignadoId ?? "",
@@ -243,9 +255,21 @@ export const DriverDetailPage = () => {
     setFieldErrors({});
     setSaveSuccess(false);
 
+    const ROLE_FIELDS = ["responsableTipo", "areasPermitidas", "nivelChofer"];
     const payload = Object.fromEntries(
-      Object.entries(form).filter(([, value]) => value !== "")
+      Object.entries(form).filter(([key, value]) => value !== "" && !ROLE_FIELDS.includes(key))
     );
+    // El nivel se puede quitar (null). Sub-rol y areas del Responsable solo las define un Admin.
+    payload.nivelChofer = form.nivelChofer || null;
+    if (user.cargo === "OWNER" && form.cargo === "ADMIN") {
+      if (!form.responsableTipo && driver.cargo !== "ADMIN") {
+        setSaving(false);
+        setSaveError("Elige el sub-rol del Responsable (Milano Sud o Milano Nord).");
+        return;
+      }
+      if (form.responsableTipo) payload.responsableTipo = form.responsableTipo;
+      payload.areasPermitidas = form.areasPermitidas;
+    }
 
     try {
       const updated = await updateUserRequest(id, payload);
@@ -426,6 +450,10 @@ export const DriverDetailPage = () => {
         {!editing ? (
           <div className="mt-8 grid grid-cols-1 gap-3 sm:grid-cols-2">
             <DriverStat label="Cargo" value={CARGO_LABELS[driver.cargo] ?? driver.cargo} />
+            {driver.cargo === "ADMIN" && (
+              <DriverStat label="Sub-rol" value={responsableTipoLabel(driver.responsableTipo)} />
+            )}
+            <DriverStat label="Nivel de chofer" value={nivelLabel(driver.nivelChofer)} />
             <DriverStat label="Grupo" value={driver.grupo ? GRUPO_LABELS[driver.grupo] : null} />
             <DriverStat label="Area" value={areaLabel(driver.area)} />
             <DriverStat
@@ -440,6 +468,14 @@ export const DriverDetailPage = () => {
               label="Vehiculo asignado"
               value={driver.vehiculoAsignado ? vehicleLabel(driver.vehiculoAsignado) : null}
             />
+            {driver.cargo === "ADMIN" && (
+              <div className="sm:col-span-2">
+                <DriverStat
+                  label="Areas a las que accede"
+                  value={(driver.areasPermitidas ?? []).map((k) => AREA_LABEL_BY_KEY[k] ?? k).join(" · ") || null}
+                />
+              </div>
+            )}
           </div>
         ) : (
           <form className="mt-8 flex flex-col gap-5" onSubmit={handleSave}>
@@ -517,6 +553,15 @@ export const DriverDetailPage = () => {
                 required
               />
               <SearchableSelect
+                id="nivelChofer"
+                label="Nivel de chofer (meta de km)"
+                placeholder="Sin nivel"
+                options={[{ value: "", label: "Sin nivel" }, ...NIVELES_CHOFER]}
+                value={form.nivelChofer}
+                onChange={(v) => setField("nivelChofer", v)}
+                error={fieldErrors.nivelChofer?.[0]}
+              />
+              <SearchableSelect
                 id="vehiculoAsignadoId"
                 label="Vehiculo asignado"
                 placeholder="Escribe para buscar un vehiculo"
@@ -527,7 +572,7 @@ export const DriverDetailPage = () => {
               />
             </div>
 
-            {driver.id !== user.id && (
+            {driver.id !== user.id && user.cargo === "OWNER" && (
               <div className="border-t border-line/10 pt-5">
                 <h3 className="mb-4 text-[13px] font-medium uppercase tracking-wide text-ink-400">
                   Permisos
@@ -536,20 +581,57 @@ export const DriverDetailPage = () => {
                   <Switch
                     id="cargo-admin"
                     label="Responsable"
-                    description="Puede gestionar choferes, vehiculos y registros de toda la empresa."
+                    description="Gestiona choferes y servicios, pero solo de las areas que le marques abajo."
                     checked={form.cargo === "ADMIN" || form.cargo === "OWNER"}
                     onChange={(checked) =>
                       setField("cargo", checked ? (form.cargo === "OWNER" ? "OWNER" : "ADMIN") : "CHOFER")
                     }
                   />
-                  {user.cargo === "OWNER" && (
-                    <Switch
-                      id="cargo-owner"
-                      label="Admin"
-                      description="Acceso total, incluida la asignacion de otros administradores."
-                      checked={form.cargo === "OWNER"}
-                      onChange={(checked) => setField("cargo", checked ? "OWNER" : "ADMIN")}
-                    />
+                  <Switch
+                    id="cargo-owner"
+                    label="Admin"
+                    description="Acceso total a todo el sistema, incluida la asignacion de Responsables."
+                    checked={form.cargo === "OWNER"}
+                    onChange={(checked) => setField("cargo", checked ? "OWNER" : "ADMIN")}
+                  />
+
+                  {form.cargo === "ADMIN" && (
+                    <div className="flex flex-col gap-4 rounded-2xl glass-surface-sm p-4">
+                      <SearchableSelect
+                        id="responsableTipo"
+                        label="Sub-rol del Responsable"
+                        placeholder="Elige Milano Sud o Milano Nord"
+                        options={RESPONSABLE_TIPOS}
+                        value={form.responsableTipo}
+                        onChange={(v) => {
+                          const previousPreset = RESPONSABLE_PRESETS[form.responsableTipo] ?? [];
+                          const untouched =
+                            form.areasPermitidas.length === 0 ||
+                            (form.areasPermitidas.length === previousPreset.length &&
+                              previousPreset.every((k) => form.areasPermitidas.includes(k)));
+                          setForm((prev) => ({
+                            ...prev,
+                            responsableTipo: v,
+                            // Si todavia no toco las areas, se marcan las tipicas del sub-rol.
+                            areasPermitidas: untouched ? [...(RESPONSABLE_PRESETS[v] ?? [])] : prev.areasPermitidas,
+                          }));
+                        }}
+                        error={fieldErrors.responsableTipo?.[0]}
+                      />
+                      <div>
+                        <span className="mb-2 block text-[13px] font-medium text-ink-200">
+                          Areas a las que accede
+                        </span>
+                        <AreaCheckboxes
+                          value={form.areasPermitidas}
+                          onChange={(areas) => setField("areasPermitidas", areas)}
+                        />
+                        <p className="mt-2 text-[12px] text-ink-400">
+                          Solo vera los servicios, pagos, costos, combustible, mancatos y multas de las areas
+                          marcadas. Sin ninguna marcada, no vera servicios.
+                        </p>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>

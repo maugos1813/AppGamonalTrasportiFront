@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
+import { MetaKmCard } from "../../components/chofer/MetaKmCard";
 import { MancatoBanner } from "../../components/chofer/MancatoBanner";
 import { ResumenServiciosCard } from "../../components/chofer/ResumenServiciosCard";
 import { ServiciosActualesCard } from "../../components/chofer/ServiciosActualesCard";
@@ -17,6 +18,7 @@ import { computeCurrentServices, computeMyServiceCounts } from "../../lib/dashbo
 import { formatDateTime } from "../../lib/format";
 import { needsHours } from "../../lib/horas";
 import { getRecordRequest, listRecordsRequest, uploadRecordFileRequest } from "../../lib/records.api";
+import { getMyProgressRequest } from "../../lib/metas.api";
 import { updateMyReperibilidadRequest } from "../../lib/users.api";
 
 const PENDING_HOURS_DAYS = 14;
@@ -37,6 +39,7 @@ export const ChoferDashboardPage = () => {
   const { user, setUser } = useAuth();
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
+  const [progress, setProgress] = useState(null);
 
   // Servicio al que se le estan cargando las horas (modal "Terminar servicio").
   const [closing, setClosing] = useState(null);
@@ -66,6 +69,10 @@ export const ChoferDashboardPage = () => {
     listRecordsRequest()
       .then(setRecords)
       .catch((err) => setError(parseApiError(err).message));
+    // La meta es un extra: si falla, el resto del dashboard se ve igual.
+    getMyProgressRequest()
+      .then(setProgress)
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -150,6 +157,8 @@ export const ChoferDashboardPage = () => {
         onClose={openClose}
         onUpload={handleUpload}
       />
+
+      <MetaKmCard progress={progress} />
 
       <ResumenServiciosCard counts={myServiceCounts} />
 
