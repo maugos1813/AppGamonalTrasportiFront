@@ -1,5 +1,5 @@
 import clsx from "clsx";
-import { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
 import { Alert } from "../../components/ui/Alert";
@@ -259,7 +259,38 @@ export const OwnerDashboardPage = () => {
     };
   }, []);
 
+  // La carga anual (la pesada) solo hace falta para las tendencias, que estan mas abajo: se pide
+  // cuando esa zona esta por entrar en pantalla, o enseguida si se mira otro mes (que necesita
+  // mas historia). Pedirla junto con la reciente hacia que compitieran por la red y el CPU.
+  const trendsSentinelRef = useRef(null);
+  const [trendsNear, setTrendsNear] = useState(false);
   useEffect(() => {
+    const node = trendsSentinelRef.current;
+    if (!node || trendsNear) return undefined;
+    if (typeof IntersectionObserver === "undefined") {
+      setTrendsNear(true);
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          setTrendsNear(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px 0px" }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [trendsNear, recentRecords]);
+
+  const viewingOtherMonth = !(
+    selectedMonth.year === new Date().getFullYear() && selectedMonth.month === new Date().getMonth() + 1
+  );
+  const wantYear = trendsNear || viewingOtherMonth;
+
+  useEffect(() => {
+    if (!wantYear) return undefined;
     let cancelled = false;
 
     const since = new Date(sinceYear - 1, 11, 1);
@@ -278,7 +309,7 @@ export const OwnerDashboardPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [sinceYear]);
+  }, [sinceYear, wantYear]);
 
   // Mientras no llega la carga anual se usa la reciente, pero solo si se mira el mes en curso
   // (otro mes necesita mas historia para comparar). Las tendencias del año esperan a la anual.
@@ -554,6 +585,8 @@ export const OwnerDashboardPage = () => {
           onClose={() => setOpenBreakdown(null)}
         />
       )}
+
+      <div ref={trendsSentinelRef} aria-hidden="true" className="-mt-6 h-0" />
 
       {/* Tendencia del anio en curso (siempre anual, no depende de Hoy/Semana/Mes):
           kilometros y facturacion mes a mes. */}
