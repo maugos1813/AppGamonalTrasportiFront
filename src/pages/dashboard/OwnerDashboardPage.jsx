@@ -19,7 +19,6 @@ import {
   ArrowDownIcon,
   ArrowUpIcon,
 } from "../../components/ui/icons";
-import { PageLoader } from "../../components/ui/PageLoader";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { SegmentedControl } from "../../components/ui/SegmentedControl";
 import { Spinner } from "../../components/ui/Spinner";
@@ -375,16 +374,8 @@ export const OwnerDashboardPage = () => {
   const periodLabel =
     period === "mes" ? monthLabel(selectedMonth.year, selectedMonth.month) : PERIOD_OPTIONS.find((o) => o.value === period)?.label;
 
-  if (error) return <Alert>{error}</Alert>;
-
-  if (!loaded) return <PageLoader />;
-
-  const year = new Date().getFullYear();
-  const deltaLabel = PERIOD_DELTA_LABEL[period];
-  const totalServiciosAnio = trendsReady ? servicesTrend.reduce((sum, m) => sum + m.servicios, 0) : null;
-
-  return (
-    <div className="flex flex-col gap-6">
+  const headerBlock = (
+    <>
       {/* Encabezado: saludo a la izquierda, mes + periodo a la derecha. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
@@ -396,6 +387,35 @@ export const OwnerDashboardPage = () => {
           <SegmentedControl options={PERIOD_OPTIONS} value={period} onChange={setPeriod} />
         </div>
       </div>
+    </>
+  );
+
+  if (error) return <Alert>{error}</Alert>;
+
+  // Mientras llegan los datos se dibuja la estructura de la pantalla (mismo encabezado y mismos
+  // huecos) en vez de un indicador de carga: se ve algo util al instante y no hay saltos al llegar.
+  if (!loaded) {
+    return (
+      <div className="flex flex-col gap-6" aria-busy="true">
+        {headerBlock}
+        <div className="glass-surface h-[44px] w-3/4 max-w-md animate-pulse rounded-full" />
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="glass-surface h-[132px] animate-pulse rounded-2xl sm:h-[148px]" />
+          ))}
+        </div>
+        <div className="glass-surface h-[300px] animate-pulse rounded-3xl" />
+      </div>
+    );
+  }
+
+  const year = new Date().getFullYear();
+  const deltaLabel = PERIOD_DELTA_LABEL[period];
+  const totalServiciosAnio = trendsReady ? servicesTrend.reduce((sum, m) => sum + m.servicios, 0) : null;
+
+  return (
+    <div className="flex flex-col gap-6">
+      {headerBlock}
 
       {/* General o una sola area - ver MIS_AREAS_VISTA_OPTIONS. */}
       <div className="flex flex-wrap items-center gap-3">
