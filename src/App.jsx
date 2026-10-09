@@ -139,10 +139,10 @@ const OverlayRoutes = () => (
         <Route path="/records/dhl-ab-service/new" element={<NewDhlAbServiceRecordPage />} />
         <Route path="/records/extras-stefania/new" element={<NewExtrasStefaniaRecordPage />} />
         <Route path="/records/:id" element={<RecordDetailPage />} />
-        <Route path="/choferes/new" element={<NewDriverPage />} />
-        <Route path="/choferes/:id" element={<DriverDetailPage />} />
-        <Route path="/vehiculos/new" element={<NewVehiclePage />} />
-        <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
+        <Route path="/choferes/new" element={<RoleOnly privileged><NewDriverPage /></RoleOnly>} />
+        <Route path="/choferes/:id" element={<RoleOnly privileged><DriverDetailPage /></RoleOnly>} />
+        <Route path="/vehiculos/new" element={<RoleOnly privileged><NewVehiclePage /></RoleOnly>} />
+        <Route path="/vehiculos/:id" element={<RoleOnly privileged><VehicleDetailPage /></RoleOnly>} />
         <Route path="/finanzas/mancato/new" element={<NewMancatoPage />} />
         <Route path="/finanzas/mancato/:id" element={<MancatoDetailPage />} />
         <Route path="/finanzas/multas/new" element={<NewMultaPage />} />
@@ -178,7 +178,7 @@ function App() {
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<DashboardPage />} />
-              <Route path="/resumen" element={<DailySummaryPage />} />
+              <Route path="/resumen" element={<RoleOnly privileged><DailySummaryPage /></RoleOnly>} />
               <Route path="/mis-horas" element={<MisHorasPage />} />
               <Route
                 path="/calendario"
@@ -213,18 +213,18 @@ function App() {
               <Route path="/records/extras-stefania" element={<RecordsListPage section="extras-stefania" />} />
               <Route path="/records/extras-stefania/new" element={<NewExtrasStefaniaRecordPage />} />
               <Route path="/records/:id" element={<RecordDetailPage />} />
-              <Route path="/choferes" element={<DriversPage />} />
-              <Route path="/choferes/new" element={<NewDriverPage />} />
-              <Route path="/choferes/:id" element={<DriverDetailPage />} />
-              <Route path="/vehiculos" element={<VehiclesPage />} />
-              <Route path="/vehiculos/new" element={<NewVehiclePage />} />
-              <Route path="/vehiculos/:id" element={<VehicleDetailPage />} />
+              <Route path="/choferes" element={<RoleOnly privileged><DriversPage /></RoleOnly>} />
+              <Route path="/choferes/new" element={<RoleOnly privileged><NewDriverPage /></RoleOnly>} />
+              <Route path="/choferes/:id" element={<RoleOnly privileged><DriverDetailPage /></RoleOnly>} />
+              <Route path="/vehiculos" element={<RoleOnly privileged><VehiclesPage /></RoleOnly>} />
+              <Route path="/vehiculos/new" element={<RoleOnly privileged><NewVehiclePage /></RoleOnly>} />
+              <Route path="/vehiculos/:id" element={<RoleOnly privileged><VehicleDetailPage /></RoleOnly>} />
               <Route path="/finanzas" element={<FinanzasLayout />}>
                 <Route index element={<FinanzasResumenPage />} />
-                <Route path="pagos" element={<PagosChoferesPage />} />
-                <Route path="horas" element={<HorasAprobacionPage />} />
-                <Route path="paradas" element={<ParadasPage />} />
-                <Route path="gastos" element={<GastosServiciosPage />} />
+                <Route path="pagos" element={<RoleOnly privileged><PagosChoferesPage /></RoleOnly>} />
+                <Route path="horas" element={<RoleOnly privileged><HorasAprobacionPage /></RoleOnly>} />
+                <Route path="paradas" element={<RoleOnly privileged><ParadasPage /></RoleOnly>} />
+                <Route path="gastos" element={<RoleOnly privileged><GastosServiciosPage /></RoleOnly>} />
                 <Route path="mancato" element={<MancatoPagamentoPage />} />
                 <Route path="mancato/new" element={<NewMancatoPage />} />
                 <Route path="mancato/:id" element={<MancatoDetailPage />} />
@@ -239,10 +239,10 @@ function App() {
               <Route path="/mancato-pagamento/*" element={<LegacyRedirect from="/mancato-pagamento" to="/finanzas/mancato" />} />
               <Route path="/multas/*" element={<LegacyRedirect from="/multas" to="/finanzas/multas" />} />
               <Route path="/combustible/*" element={<LegacyRedirect from="/combustible" to="/finanzas/combustible" />} />
-              <Route path="/mapa" element={<MapPage />} />
-              <Route path="/mapa/area-c" element={<AreaCPage />} />
-              <Route path="/control-flota" element={<ControlFlotaPage />} />
-              <Route path="/mecanica" element={<MecanicaPage />} />
+              <Route path="/mapa" element={<RoleOnly privileged><MapPage /></RoleOnly>} />
+              <Route path="/mapa/area-c" element={<RoleOnly privileged><AreaCPage /></RoleOnly>} />
+              <Route path="/control-flota" element={<RoleOnly privileged><ControlFlotaPage /></RoleOnly>} />
+              <Route path="/mecanica" element={<RoleOnly privileged><MecanicaPage /></RoleOnly>} />
             </Route>
           </Route>
 

@@ -16,7 +16,7 @@ export const NIVELES_CHOFER = [
 // Areas que trae marcadas cada sub-rol al ascender a alguien a Responsable (mismo valor que el servidor).
 export const RESPONSABLE_PRESETS = {
   MILANO_SUD: ["dhl-milano", "ab-service", "otros"],
-  MILANO_NORD: [],
+  MILANO_NORD: ["dhl-roma", "piazza-milano", "piazza-roma"],
 };
 
 export const AREA_ACCESS_OPTIONS = RECORD_AREAS.map((area) => ({ key: area.key, label: area.label }));
