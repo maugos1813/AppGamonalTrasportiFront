@@ -606,6 +606,13 @@ export const DriverDetailPage = () => {
                     checked={form.cargo === "OWNER"}
                     onChange={(checked) => setField("cargo", checked ? "OWNER" : "ADMIN")}
                   />
+                  <Switch
+                    id="cargo-rrhh"
+                    label="Recursos Humanos"
+                    description="Solo gestiona choferes y vehiculos y carga las busta paga. No ve servicios ni finanzas."
+                    checked={form.cargo === "RRHH"}
+                    onChange={(checked) => setField("cargo", checked ? "RRHH" : "CHOFER")}
+                  />
 
                   {form.cargo === "ADMIN" && (
                     <div className="flex flex-col gap-4 rounded-2xl glass-surface-sm p-4">
