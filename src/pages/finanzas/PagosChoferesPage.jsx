@@ -15,6 +15,7 @@ import {
   UsersIcon,
 } from "../../components/ui/icons";
 import { useAuth } from "../../context/AuthContext";
+import { PayRulesCard } from "../../components/horas/PayRulesCard";
 import { parseApiError } from "../../lib/api";
 import { COSTO_COLORS, currentMonth, kmSourceLabel, payCalcText } from "../../lib/finanzas";
 import { getPagosChoferesRequest } from "../../lib/finanzas.api";
@@ -35,22 +36,7 @@ const initials = (name) =>
 
 const nf = (value) => Number(value).toLocaleString("es-AR", { maximumFractionDigits: 1 });
 
-// Reglas vigentes, siempre a la vista para que nadie tenga que adivinar como se calcula.
-const RulesCard = ({ reglas }) => (
-  <div className="glass-surface-sm flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl px-5 py-3 text-[13px] text-ink-300">
-    <span className="font-semibold text-ink-50">Como se calcula</span>
-    <span>
-      Horas aprobadas: dia <b className="text-ink-50">{formatCurrency(reglas.horaDiaEur)}</b>/h (07:00-18:59), noche{" "}
-      <b className="text-ink-50">{formatCurrency(reglas.horaNocheEur)}</b>/h (19:00-06:59)
-    </span>
-    <span>
-      Sin horas aprobadas: <b className="text-ink-50">{formatCurrency(reglas.cada100KmEur)}</b> cada 100 km
-    </span>
-    <span>
-      Espera: <b className="text-ink-50">{formatCurrency(reglas.esperaHoraEur)}</b> por hora, se suma
-    </span>
-  </div>
-);
+const RulesCard = ({ reglas }) => <PayRulesCard reglas={reglas} />;
 
 // Tabla de servicios de un chofer en el mes, con el calculo de cada pago.
 const ServiceList = ({ servicios, reglas, location }) =>
@@ -143,6 +129,8 @@ const DriverRow = ({ driver, month, reglas, location }) => {
             {driver.km > 0 && ` - ${formatKm(driver.km)}`}
             {driver.horas > 0 && ` - ${nf(driver.horas)} h`}
             {driver.esperaHoras > 0 && ` - ${nf(driver.esperaHoras)} h de espera`}
+            {driver.salidasReperibilidad > 0 &&
+              ` - ${driver.salidasReperibilidad} ${driver.salidasReperibilidad === 1 ? "salida" : "salidas"} de reperibilidad (+${formatCurrency(driver.pagoReperibilidad)})`}
             {driver.horasPorAprobar > 0 && ` - ${driver.horasPorAprobar} con horas por aprobar`}
           </span>
           {driver.asistencia && (

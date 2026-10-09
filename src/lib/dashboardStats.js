@@ -370,8 +370,6 @@ export const computeMonthlyKmTrend = (records, now = new Date()) => {
   return buckets;
 };
 
-const OTROS_LABEL = "Otros";
-const MAX_CLIENT_SLICES = 4;
 
 export const computeCurrentService = (records, now = new Date()) => {
   const enCurso = records.find((r) => r.estado === "IN_CONSEGNA");

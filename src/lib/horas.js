@@ -1,8 +1,7 @@
-// Bandas horarias de pago (hora de Roma): dia 07:00-18:59, noche 19:00-06:59.
-// Espejo de DAY_BAND / PAY_RATES en el backend (config/payRates.js); el pago real lo calcula el
-// servidor, esto solo alimenta la vista previa mientras el chofer completa el formulario.
-export const DAY_START_MIN = 7 * 60;
-export const NIGHT_START_MIN = 19 * 60;
+// Las bandas, tarifas y reglas de reperibilidad vienen del servidor (config/payRates.js, el unico
+// archivo de tarifas) dentro de "reglas"; el pago real lo calcula el servidor, esto solo alimenta la
+// vista previa mientras el chofer completa el formulario.
+const toMin = (hhmm) => Number(hhmm.slice(0, 2)) * 60 + Number(hhmm.slice(3, 5));
 
 export const HORAS_ESTADOS = {
   PENDIENTE: { label: "En revision", pill: "bg-warning-500/20 text-warning-500" },
@@ -35,19 +34,35 @@ export const previewShift = ({ inicio, fin, esperaMin = 0, pausaMin = 0 }, rates
   const pausa = Math.max(0, Number(pausaMin) || 0);
   if (espera + pausa > total) return { error: "La espera y la pausa no pueden superar la jornada" };
 
+  const dayStart = toMin(rates?.banda?.diaInicio ?? "06:30");
+  const nightStart = toMin(rates?.banda?.nocheInicio ?? "22:00");
   let diaMin = 0;
   for (let t = start; t < end; t += 1) {
     const minuteOfDay = ((t % 1440) + 1440) % 1440;
-    if (minuteOfDay >= DAY_START_MIN && minuteOfDay < NIGHT_START_MIN) diaMin += 1;
+    if (minuteOfDay >= dayStart && minuteOfDay < nightStart) diaMin += 1;
   }
   const nocheMin = total - diaMin;
   const factor = (total - espera - pausa) / total;
-  const horasDia = (diaMin * factor) / 60;
-  const horasNoche = (nocheMin * factor) / 60;
+  const step = rates?.redondeoHoras ?? 0;
+  const round = (value) => (step > 0 ? Math.round(value / step) * step : value);
+  const horasDia = round((diaMin * factor) / 60);
+  const horasNoche = round((nocheMin * factor) / 60);
+  const esperaHoras = round(espera / 60);
+
+  // Reperibilidad: el servicio sale en fin de semana o festivo (fecha de la hora de inicio).
+  let reperibilidad = null;
+  if (rates?.reperibilidad) {
+    const day = inicio.slice(0, 10);
+    const [y, m, d] = day.split("-").map(Number);
+    const weekday = ((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7) + 1; // 1 = lunes ... 7 = domingo
+    if (rates.reperibilidad.festivosCuentan && (rates.festivos ?? []).includes(day)) reperibilidad = "FESTIVO";
+    else if (!rates.reperibilidad.diasLaborales.includes(weekday)) reperibilidad = "FIN_DE_SEMANA";
+  }
+  const extra = reperibilidad ? rates.reperibilidad.extraEur : 0;
   const pago = rates
-    ? horasDia * rates.horaDiaEur + horasNoche * rates.horaNocheEur + (espera / 60) * rates.esperaHoraEur
+    ? horasDia * rates.horaDiaEur + horasNoche * rates.horaNocheEur + esperaHoras * rates.esperaHoraEur + extra
     : null;
-  return { error: "", totalMin: total, horasDia, horasNoche, esperaHoras: espera / 60, pago };
+  return { error: "", totalMin: total, horasDia, horasNoche, esperaHoras, reperibilidad, pago };
 };
 
 // Horas con un decimal y coma: 1,5 h.

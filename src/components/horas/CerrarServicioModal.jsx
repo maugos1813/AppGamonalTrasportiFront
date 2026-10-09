@@ -268,6 +268,12 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
                       </span>
                     )}
                   </div>
+                  {preview.reperibilidad && (
+                    <p className="mt-1 text-[12px] text-accent-300">
+                      Incluye +{(reglas ?? PAY_RULES_FALLBACK).reperibilidad.extraEur} EUR de reperibilidad (
+                      {preview.reperibilidad === "FESTIVO" ? "festivo" : "fin de semana"}).
+                    </p>
+                  )}
                   <p className="mt-1 text-[11px] text-ink-400">
                     Estimado: el pago final lo confirma el responsable al aprobar tus horas.
                   </p>

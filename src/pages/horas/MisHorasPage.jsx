@@ -8,6 +8,7 @@ import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { PageLoader } from "../../components/ui/PageLoader";
 import { AlertTriangleIcon, ClockIcon, EuroIcon, RouteIcon } from "../../components/ui/icons";
+import { PayRulesCard } from "../../components/horas/PayRulesCard";
 import { parseApiError } from "../../lib/api";
 import { COSTO_COLORS, currentMonth, kmSourceLabel, payCalcText } from "../../lib/finanzas";
 import { getPagosChoferesRequest } from "../../lib/finanzas.api";
@@ -15,23 +16,7 @@ import { formatCurrency, formatDate, formatRomeDateTime } from "../../lib/format
 import { formatHours } from "../../lib/horas";
 import { getRecordRequest } from "../../lib/records.api";
 
-const RulesCard = ({ reglas }) => (
-  <div className="glass-surface-sm flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl px-5 py-3 text-[13px] text-ink-300">
-    <span className="font-semibold text-ink-50">Como se paga</span>
-    <span>
-      Dia (07:00-18:59): <b className="text-ink-50">{formatCurrency(reglas.horaDiaEur)}</b>/h
-    </span>
-    <span>
-      Noche (19:00-06:59): <b className="text-ink-50">{formatCurrency(reglas.horaNocheEur)}</b>/h
-    </span>
-    <span>
-      Espera: <b className="text-ink-50">{formatCurrency(reglas.esperaHoraEur)}</b>/h
-    </span>
-    <span>
-      Sin horas aprobadas: <b className="text-ink-50">{formatCurrency(reglas.cada100KmEur)}</b> cada 100 km
-    </span>
-  </div>
-);
+const RulesCard = ({ reglas }) => <PayRulesCard reglas={reglas} title="Como se paga" />;
 
 const ServiceCard = ({ service, reglas, onLoadHours, loading }) => {
   const needsLoad = !service.horasEstado || service.horasEstado === "DEVUELTAS";
