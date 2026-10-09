@@ -11,7 +11,7 @@ import { useGpsRespaldo } from "../../hooks/useGpsRespaldo";
 import { useLocationSharing } from "../../hooks/useLocationSharing";
 import { usePushNotifications } from "../../hooks/usePushNotifications";
 import { Avatar } from "../ui/Avatar";
-import { CalendarIcon, ChevronDownIcon, ClockIcon, SearchIcon, WalletIcon } from "../ui/icons";
+import { CalendarIcon, ChevronDownIcon, ClockIcon, FileTextIcon, SearchIcon, WalletIcon } from "../ui/icons";
 import { MobileNavDrawer } from "./MobileNavDrawer";
 import { NotificationsBell } from "./NotificationsBell";
 
@@ -274,6 +274,8 @@ export const AppShell = () => {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  // Recursos Humanos: solo Choferes, Vehiculos y Busta paga.
+  const isRrhh = user?.cargo === "RRHH";
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [searchText, setSearchText] = useState("");
   const navigate = useNavigate();
@@ -366,6 +368,8 @@ export const AppShell = () => {
                   <SidebarNavTab to="/records" label="Registros" icon={ListIcon} />
                   <SidebarNavTab to="/finanzas" label="Finanzas" icon={WalletIcon} />
                 </>
+              ) : isRrhh ? (
+                <SidebarNavTab to="/busta-paga" label="Busta paga" icon={FileTextIcon} />
               ) : (
                 <>
                   <SidebarNavTab to="/" label="Hoy" icon={HomeIcon} />
@@ -374,9 +378,9 @@ export const AppShell = () => {
                   <SidebarNavTab to="/finanzas" label="Mis cargos" icon={WalletIcon} />
                 </>
               )}
-              {isPrivileged && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
+              {(isPrivileged || isRrhh) && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
               {isPrivileged && <SidebarNavTab to="/permisos" label="Permisos" icon={CalendarIcon} />}
-              {isPrivileged && <SidebarNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
+              {(isPrivileged || isRrhh) && <SidebarNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
               {isPrivileged && <SidebarNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}
               {isPrivileged && (
                 <SidebarNavTab to="/control-flota" label="Control de Flota" icon={ShieldIcon} />
@@ -484,6 +488,11 @@ export const AppShell = () => {
             <BottomNavTab to="/resumen" label="Resumen" icon={ChecklistIcon} />
             <BottomNavTab to="/records" label="Registros" icon={ListIcon} />
           </>
+        ) : isRrhh ? (
+          <>
+            <BottomNavTab to="/busta-paga" label="Busta paga" icon={FileTextIcon} />
+            <BottomNavTab to="/profile" label="Perfil" icon={UserIcon} />
+          </>
         ) : (
           <>
             <BottomNavTab to="/" label="Hoy" icon={HomeIcon} />
@@ -493,8 +502,8 @@ export const AppShell = () => {
             <BottomNavTab to="/profile" label="Perfil" icon={UserIcon} />
           </>
         )}
-        {isPrivileged && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
-        {isPrivileged && <BottomNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
+        {(isPrivileged || isRrhh) && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
+        {(isPrivileged || isRrhh) && <BottomNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
       </nav>
 
       <MobileNavDrawer

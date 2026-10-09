@@ -27,7 +27,7 @@ const INITIAL_FORM = {
 export const NewDriverPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN" || user?.cargo === "RRHH";
   const { refresh: refreshDrivers } = useDataRefresh("drivers");
 
   const [form, setForm] = useState(INITIAL_FORM);

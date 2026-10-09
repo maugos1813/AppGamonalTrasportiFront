@@ -1,5 +1,5 @@
 import { lazy, Suspense } from "react";
-import { Navigate, Route, Routes, useLocation } from "react-router-dom";
+import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { GuestRoute } from "./components/layout/GuestRoute";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
@@ -14,6 +14,9 @@ import { DataRefreshProvider } from "./context/DataRefreshContext";
 // usuario navega a esa ruta.
 const ForgotPasswordPage = lazy(() =>
   import("./pages/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })),
+);
+const BustaPagaRrhhPage = lazy(() =>
+  import("./pages/bustapaga/BustaPagaRrhhPage").then((m) => ({ default: m.BustaPagaRrhhPage }))
 );
 const LoginPage = lazy(() => import("./pages/auth/LoginPage").then((m) => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import("./pages/auth/RegisterPage").then((m) => ({ default: m.RegisterPage })));
@@ -125,10 +128,25 @@ const LegacyRedirect = ({ from, to }) => {
 };
 
 // Pantallas de un solo perfil: el calendario es del chofer y los permisos de la oficina.
-const RoleOnly = ({ privileged, children }) => {
+// allowRrhh: Recursos Humanos tambien entra (Choferes y Vehiculos).
+const RoleOnly = ({ privileged, allowRrhh = false, children }) => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const isRrhh = user?.cargo === "RRHH";
+  if (isRrhh) return allowRrhh ? children : <Navigate to="/busta-paga" replace />;
   return isPrivileged === privileged ? children : <Navigate to="/" replace />;
+};
+
+// Recursos Humanos solo usa Choferes, Vehiculos, Busta paga y su perfil; cualquier otra direccion lo lleva a
+// Busta paga (el servidor ademas le niega todo lo demas).
+const RRHH_PATHS = ["/busta-paga", "/choferes", "/vehiculos", "/profile"];
+const RrhhGuard = () => {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  if (user?.cargo === "RRHH" && !RRHH_PATHS.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return <Navigate to="/busta-paga" replace />;
+  }
+  return <Outlet />;
 };
 
 const OverlayRoutes = () => (
@@ -139,10 +157,10 @@ const OverlayRoutes = () => (
         <Route path="/records/dhl-ab-service/new" element={<NewDhlAbServiceRecordPage />} />
         <Route path="/records/extras-stefania/new" element={<NewExtrasStefaniaRecordPage />} />
         <Route path="/records/:id" element={<RecordDetailPage />} />
-        <Route path="/choferes/new" element={<RoleOnly privileged><NewDriverPage /></RoleOnly>} />
-        <Route path="/choferes/:id" element={<RoleOnly privileged><DriverDetailPage /></RoleOnly>} />
-        <Route path="/vehiculos/new" element={<RoleOnly privileged><NewVehiclePage /></RoleOnly>} />
-        <Route path="/vehiculos/:id" element={<RoleOnly privileged><VehicleDetailPage /></RoleOnly>} />
+        <Route path="/choferes/new" element={<RoleOnly privileged allowRrhh><NewDriverPage /></RoleOnly>} />
+        <Route path="/choferes/:id" element={<RoleOnly privileged allowRrhh><DriverDetailPage /></RoleOnly>} />
+        <Route path="/vehiculos/new" element={<RoleOnly privileged allowRrhh><NewVehiclePage /></RoleOnly>} />
+        <Route path="/vehiculos/:id" element={<RoleOnly privileged allowRrhh><VehicleDetailPage /></RoleOnly>} />
         <Route path="/finanzas/mancato/new" element={<NewMancatoPage />} />
         <Route path="/finanzas/mancato/:id" element={<MancatoDetailPage />} />
         <Route path="/finanzas/multas/new" element={<NewMultaPage />} />
@@ -176,6 +194,7 @@ function App() {
           </Route>
 
           <Route element={<ProtectedRoute />}>
+            <Route element={<RrhhGuard />}>
             <Route element={<AppShell />}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/resumen" element={<RoleOnly privileged><DailySummaryPage /></RoleOnly>} />
@@ -213,12 +232,12 @@ function App() {
               <Route path="/records/extras-stefania" element={<RecordsListPage section="extras-stefania" />} />
               <Route path="/records/extras-stefania/new" element={<NewExtrasStefaniaRecordPage />} />
               <Route path="/records/:id" element={<RecordDetailPage />} />
-              <Route path="/choferes" element={<RoleOnly privileged><DriversPage /></RoleOnly>} />
-              <Route path="/choferes/new" element={<RoleOnly privileged><NewDriverPage /></RoleOnly>} />
-              <Route path="/choferes/:id" element={<RoleOnly privileged><DriverDetailPage /></RoleOnly>} />
-              <Route path="/vehiculos" element={<RoleOnly privileged><VehiclesPage /></RoleOnly>} />
-              <Route path="/vehiculos/new" element={<RoleOnly privileged><NewVehiclePage /></RoleOnly>} />
-              <Route path="/vehiculos/:id" element={<RoleOnly privileged><VehicleDetailPage /></RoleOnly>} />
+              <Route path="/choferes" element={<RoleOnly privileged allowRrhh><DriversPage /></RoleOnly>} />
+              <Route path="/choferes/new" element={<RoleOnly privileged allowRrhh><NewDriverPage /></RoleOnly>} />
+              <Route path="/choferes/:id" element={<RoleOnly privileged allowRrhh><DriverDetailPage /></RoleOnly>} />
+              <Route path="/vehiculos" element={<RoleOnly privileged allowRrhh><VehiclesPage /></RoleOnly>} />
+              <Route path="/vehiculos/new" element={<RoleOnly privileged allowRrhh><NewVehiclePage /></RoleOnly>} />
+              <Route path="/vehiculos/:id" element={<RoleOnly privileged allowRrhh><VehicleDetailPage /></RoleOnly>} />
               <Route path="/finanzas" element={<FinanzasLayout />}>
                 <Route index element={<FinanzasResumenPage />} />
                 <Route path="pagos" element={<RoleOnly privileged><PagosChoferesPage /></RoleOnly>} />
@@ -243,6 +262,8 @@ function App() {
               <Route path="/mapa/area-c" element={<RoleOnly privileged><AreaCPage /></RoleOnly>} />
               <Route path="/control-flota" element={<RoleOnly privileged><ControlFlotaPage /></RoleOnly>} />
               <Route path="/mecanica" element={<RoleOnly privileged><MecanicaPage /></RoleOnly>} />
+              <Route path="/busta-paga" element={<BustaPagaRrhhPage />} />
+            </Route>
             </Route>
           </Route>
 

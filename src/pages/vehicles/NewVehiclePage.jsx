@@ -32,7 +32,7 @@ const FILE_FIELDS = [
 export const NewVehiclePage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN" || user?.cargo === "RRHH";
   const { refresh: refreshVehicles } = useDataRefresh("vehicles");
 
   const [form, setForm] = useState(INITIAL_FORM);

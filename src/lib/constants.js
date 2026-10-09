@@ -43,6 +43,7 @@ export const CARGO_LABELS = {
   OWNER: "Admin",
   ADMIN: "Responsable",
   CHOFER: "Chofer",
+  RRHH: "Recursos Humanos",
 };
 
 // Grupo operativo/organizacional del usuario (sucursal o socios), independiente del

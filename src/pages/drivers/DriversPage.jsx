@@ -505,6 +505,9 @@ export const DriversPage = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  // Recursos Humanos ve y gestiona choferes, pero no la operacion (servicios, metas de km, rankings).
+  const isRrhh = user?.cargo === "RRHH";
+  const canAccess = isPrivileged || isRrhh;
   const { version: driversVersion } = useDataRefresh("drivers");
   const { version: recordsVersion } = useDataRefresh("records");
 
@@ -538,11 +541,11 @@ export const DriversPage = () => {
   };
 
   useEffect(() => {
-    if (!isPrivileged) return;
+    if (!canAccess) return;
     listUsersRequest()
       .then(setDrivers)
       .catch((err) => setError(parseApiError(err).message));
-  }, [isPrivileged, driversVersion]);
+  }, [canAccess, driversVersion]);
 
   // Depende tambien de recordsVersion: el ranking y los km por chofer salen de los
   // registros del mes, no de los choferes - si se edita un km desde el detalle de un
@@ -564,11 +567,11 @@ export const DriversPage = () => {
   }, [isPrivileged, recordsVersion, driversVersion]);
 
   useEffect(() => {
-    if (!isPrivileged) return;
+    if (!canAccess) return;
     listDocumentsRequest()
       .then(setDocuments)
       .catch((err) => setError(parseApiError(err).message));
-  }, [isPrivileged]);
+  }, [canAccess]);
 
   const progressByDriver = useMemo(
     () => (progress ? new Map(progress.items.map((item) => [item.id, item])) : null),
@@ -624,7 +627,7 @@ export const DriversPage = () => {
     setPage(1);
   }, [query, centro, area, estado, sort, view]);
 
-  if (!isPrivileged) return <Navigate to="/" replace />;
+  if (!canAccess) return <Navigate to="/" replace />;
 
   const hasFilters = Boolean(query.trim() || centro || area || estado);
   const total = drivers?.length ?? 0;
@@ -675,6 +678,7 @@ export const DriversPage = () => {
             <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
               <StatTile icon={UsersIcon} value={total} label="Total del equipo" />
               <StatTile icon={CheckCircleIcon} tone="success" value={activos} label="Activos" detail={pct(activos)} />
+              {!isRrhh && (
               <StatTile
                 icon={UserCheckIcon}
                 value={disponibles ?? "…"}
@@ -685,6 +689,7 @@ export const DriversPage = () => {
                     : `${enServicio} en servicio · ${noDisponibles} no disponible${noDisponibles === 1 ? "" : "s"}`
                 }
               />
+              )}
               <StatTile
                 icon={AlertTriangleIcon}
                 tone={docAlerts > 0 ? "warning" : "neutral"}
@@ -694,15 +699,17 @@ export const DriversPage = () => {
               />
             </div>
 
-            <MetasKmCard
-              metas={progress?.metas}
-              canEdit={user?.cargo === "OWNER"}
-              onSaved={(metas) => {
-                setProgress((prev) => (prev ? { ...prev, metas } : prev));
-                // Los avances de cada chofer se recalculan con la meta nueva.
-                listDriversProgressRequest(currentMonth()).then(setProgress).catch(() => {});
-              }}
-            />
+            {!isRrhh && (
+              <MetasKmCard
+                metas={progress?.metas}
+                canEdit={user?.cargo === "OWNER"}
+                onSaved={(metas) => {
+                  setProgress((prev) => (prev ? { ...prev, metas } : prev));
+                  // Los avances de cada chofer se recalculan con la meta nueva.
+                  listDriversProgressRequest(currentMonth()).then(setProgress).catch(() => {});
+                }}
+              />
+            )}
 
             <div className="glass-surface grid grid-cols-2 gap-3 rounded-2xl p-4 md:grid-cols-4">
               <TextField
@@ -802,7 +809,7 @@ export const DriversPage = () => {
           <aside className="flex flex-col gap-5 xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto xl:pr-1">
             <AttentionPanel drivers={drivers} documents={documents} />
             <CenterSummaryPanel drivers={drivers} />
-            <DriverRankingPanel records={monthlyRecords} />
+            {!isRrhh && <DriverRankingPanel records={monthlyRecords} />}
           </aside>
         </div>
       )}

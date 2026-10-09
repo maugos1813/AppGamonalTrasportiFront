@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { MisBustaPagaCard } from "../../components/bustapaga/MisBustaPagaCard";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import heroImage from "../../assets/login-hero.webp";
@@ -490,6 +491,7 @@ export const ProfilePage = () => {
   const { user, setUser } = useAuth();
   const isChofer = user?.cargo === "CHOFER";
   const isOwner = user?.cargo === "OWNER";
+  const isRrhh = user?.cargo === "RRHH";
 
   const [avatarUploading, setAvatarUploading] = useState(false);
   const [avatarError, setAvatarError] = useState("");
@@ -758,7 +760,20 @@ export const ProfilePage = () => {
               <Section icon={ClipboardListIcon} title="Mi mes">
                 <MyMonth />
               </Section>
+
+              <MisBustaPagaCard />
             </>
+          ) : isRrhh ? (
+            <Section icon={ShieldIcon} title="Acceso y permisos" action={<Badge tone="success">Recursos Humanos</Badge>}>
+              <ul className="flex flex-col gap-2.5 text-[14px] text-ink-50">
+                {["Choferes: datos, documentos y estado", "Vehiculos", "Carga de busta paga de cada chofer"].map((item) => (
+                  <li key={item} className="flex items-center gap-2.5">
+                    <CheckCircleIcon className="h-4.5 w-4.5 shrink-0 text-success-500" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+            </Section>
           ) : (
             <>
               <Section icon={ShieldIcon} title="Acceso y permisos" action={<Badge tone="success">{isOwner ? "Total" : "Por area"}</Badge>}>

@@ -464,6 +464,9 @@ export const VehiclesPage = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  // Recursos Humanos gestiona los vehiculos pero no ve la operacion (km del mes, rankings).
+  const isRrhh = user?.cargo === "RRHH";
+  const canAccess = isPrivileged || isRrhh;
   const { version: vehiclesVersion, refresh: refreshVehicles } = useDataRefresh("vehicles");
   const { version: recordsVersion } = useDataRefresh("records");
 
@@ -497,11 +500,11 @@ export const VehiclesPage = () => {
   };
 
   useEffect(() => {
-    if (!isPrivileged) return;
+    if (!canAccess) return;
     listVehiclesRequest()
       .then(setVehicles)
       .catch((err) => setError(parseApiError(err).message));
-  }, [isPrivileged, vehiclesVersion]);
+  }, [canAccess, vehiclesVersion]);
 
   // Depende tambien de recordsVersion: el uso de flota/ranking sale de los registros
   // del mes, no de los vehiculos - si se edita un km desde el detalle de un registro,
@@ -547,7 +550,7 @@ export const VehiclesPage = () => {
     setPage(1);
   }, [query, centro, area, estado, sort, view]);
 
-  if (!isPrivileged) return <Navigate to="/" replace />;
+  if (!canAccess) return <Navigate to="/" replace />;
 
   const hasFilters = Boolean(query.trim() || centro || area || estado);
   const total = vehicles?.length ?? 0;
@@ -734,8 +737,8 @@ export const VehiclesPage = () => {
           <aside className="flex flex-col gap-5 xl:sticky xl:top-24 xl:max-h-[calc(100dvh-7rem)] xl:overflow-y-auto xl:pr-1">
             <AttentionPanel vehicles={vehicles} />
             <CenterSummaryPanel vehicles={vehicles} />
-            <KmMonthPanel records={monthlyRecords} />
-            <FleetRankingPanel records={monthlyRecords} />
+            {!isRrhh && <KmMonthPanel records={monthlyRecords} />}
+            {!isRrhh && <FleetRankingPanel records={monthlyRecords} />}
           </aside>
         </div>
       )}

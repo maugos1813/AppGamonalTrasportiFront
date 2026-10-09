@@ -144,7 +144,7 @@ export const VehicleDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN" || user?.cargo === "RRHH";
   const { refresh: refreshVehicles } = useDataRefresh("vehicles");
 
   const [vehicle, setVehicle] = useState(null);
@@ -272,18 +272,20 @@ export const VehicleDetailPage = () => {
         </Link>
         {!editing && (
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              aria-label="Eliminar vehiculo"
-              title="Eliminar vehiculo"
-              onClick={() => {
-                setDeleteError("");
-                setShowDeleteConfirm(true);
-              }}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-danger-500/15 hover:text-danger-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-danger-500/20"
-            >
-              <TrashIcon className="h-[17px] w-[17px]" />
-            </button>
+            {user?.cargo !== "RRHH" && (
+              <button
+                type="button"
+                aria-label="Eliminar vehiculo"
+                title="Eliminar vehiculo"
+                onClick={() => {
+                  setDeleteError("");
+                  setShowDeleteConfirm(true);
+                }}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-danger-500/15 hover:text-danger-500 focus:outline-none focus-visible:ring-4 focus-visible:ring-danger-500/20"
+              >
+                <TrashIcon className="h-[17px] w-[17px]" />
+              </button>
+            )}
             <Button variant="ghost" className="sm:w-auto sm:px-8" onClick={startEditing}>
               Editar vehiculo
             </Button>

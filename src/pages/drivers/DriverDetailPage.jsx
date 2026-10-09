@@ -185,6 +185,9 @@ export const DriverDetailPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
+  // Recursos Humanos edita la ficha del chofer (datos, estado, vehiculo) pero no su cargo, nivel ni areas.
+  const isRrhh = user?.cargo === "RRHH";
+  const canView = isPrivileged || isRrhh;
   const { refresh: refreshDrivers } = useDataRefresh("drivers");
 
   const [driver, setDriver] = useState(null);
@@ -211,7 +214,7 @@ export const DriverDetailPage = () => {
   const [documentDateSaving, setDocumentDateSaving] = useState({});
 
   const load = useCallback(() => {
-    if (!isPrivileged) return;
+    if (!canView) return;
     setLoadError("");
     Promise.all([getUserRequest(id), listDocumentsRequest(id), listVehiclesRequest()])
       .then(([driverData, docs, vehiclesData]) => {
@@ -221,13 +224,13 @@ export const DriverDetailPage = () => {
         setVehicles(vehiclesData);
       })
       .catch((err) => setLoadError(parseApiError(err).message));
-  }, [id, isPrivileged]);
+  }, [id, canView]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  if (!isPrivileged) return <Navigate to="/" replace />;
+  if (!canView) return <Navigate to="/" replace />;
 
   const handleChange = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
@@ -256,11 +259,14 @@ export const DriverDetailPage = () => {
     setSaveSuccess(false);
 
     const ROLE_FIELDS = ["responsableTipo", "areasPermitidas", "nivelChofer"];
+    const RRHH_FIELDS = ["nombre", "apellido", "correoElectronico", "numeroCelular", "fechaNacimiento", "estado", "vehiculoAsignadoId"];
     const payload = Object.fromEntries(
-      Object.entries(form).filter(([key, value]) => value !== "" && !ROLE_FIELDS.includes(key))
+      Object.entries(form).filter(
+        ([key, value]) => value !== "" && !ROLE_FIELDS.includes(key) && (!isRrhh || RRHH_FIELDS.includes(key))
+      )
     );
     // El nivel se puede quitar (null). Sub-rol y areas del Responsable solo las define un Admin.
-    payload.nivelChofer = form.nivelChofer || null;
+    if (!isRrhh) payload.nivelChofer = form.nivelChofer || null;
     if (user.cargo === "OWNER" && form.cargo === "ADMIN") {
       if (!form.responsableTipo && driver.cargo !== "ADMIN") {
         setSaving(false);
@@ -389,7 +395,7 @@ export const DriverDetailPage = () => {
         </Link>
         {!editing && (
           <div className="flex items-center gap-2">
-            {driver.id !== user.id && (
+            {driver.id !== user.id && !isRrhh && (
               <button
                 type="button"
                 aria-label="Eliminar chofer"
@@ -516,24 +522,28 @@ export const DriverDetailPage = () => {
                 error={fieldErrors.numeroCelular?.[0]}
                 required
               />
-              <SearchableSelect
-                id="area"
-                label="Area"
-                placeholder="Escribe para buscar un area"
-                options={AREA_OPTIONS}
-                value={form.area}
-                onChange={(v) => setField("area", v)}
-                error={fieldErrors.area?.[0]}
-              />
-              <SearchableSelect
-                id="grupo"
-                label="Grupo"
-                placeholder="Escribe para buscar un grupo"
-                options={GRUPO_OPTIONS}
-                value={form.grupo}
-                onChange={(v) => setField("grupo", v)}
-                error={fieldErrors.grupo?.[0]}
-              />
+              {!isRrhh && (
+                <SearchableSelect
+                  id="area"
+                  label="Area"
+                  placeholder="Escribe para buscar un area"
+                  options={AREA_OPTIONS}
+                  value={form.area}
+                  onChange={(v) => setField("area", v)}
+                  error={fieldErrors.area?.[0]}
+                />
+              )}
+              {!isRrhh && (
+                <SearchableSelect
+                  id="grupo"
+                  label="Grupo"
+                  placeholder="Escribe para buscar un grupo"
+                  options={GRUPO_OPTIONS}
+                  value={form.grupo}
+                  onChange={(v) => setField("grupo", v)}
+                  error={fieldErrors.grupo?.[0]}
+                />
+              )}
               <SearchableSelect
                 id="estado"
                 label="Estado de la cuenta"
@@ -552,15 +562,17 @@ export const DriverDetailPage = () => {
                 error={fieldErrors.fechaNacimiento?.[0]}
                 required
               />
-              <SearchableSelect
-                id="nivelChofer"
-                label="Nivel de chofer (meta de km)"
-                placeholder="Sin nivel"
-                options={[{ value: "", label: "Sin nivel" }, ...NIVELES_CHOFER]}
-                value={form.nivelChofer}
-                onChange={(v) => setField("nivelChofer", v)}
-                error={fieldErrors.nivelChofer?.[0]}
-              />
+              {!isRrhh && (
+                <SearchableSelect
+                  id="nivelChofer"
+                  label="Nivel de chofer (meta de km)"
+                  placeholder="Sin nivel"
+                  options={[{ value: "", label: "Sin nivel" }, ...NIVELES_CHOFER]}
+                  value={form.nivelChofer}
+                  onChange={(v) => setField("nivelChofer", v)}
+                  error={fieldErrors.nivelChofer?.[0]}
+                />
+              )}
               <SearchableSelect
                 id="vehiculoAsignadoId"
                 label="Vehiculo asignado"
@@ -680,6 +692,19 @@ export const DriverDetailPage = () => {
       </GlassCard>
 
       {isPrivileged && <AsistenciaCard driverId={driver.id} />}
+      {(isRrhh || user.cargo === "OWNER") && driver.cargo === "CHOFER" && (
+        <GlassCard>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-[17px] font-medium text-ink-50">Busta paga</h2>
+              <p className="mt-1 text-[13px] text-ink-400">Sube y consulta las busta paga de este chofer.</p>
+            </div>
+            <Link to={`/busta-paga?chofer=${driver.id}`} className="text-[14px] font-medium text-accent-400 hover:text-accent-300">
+              Ver busta paga &rarr;
+            </Link>
+          </div>
+        </GlassCard>
+      )}
     </div>
 
     <ConfirmModal
