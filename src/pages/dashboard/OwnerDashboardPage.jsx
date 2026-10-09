@@ -28,7 +28,6 @@ import { parseApiError } from "../../lib/api";
 import { CHART_COLORS } from "../../lib/constants";
 import {
   computeAreaBreakdown,
-  computeClientDistribution,
   computeEconomicStats,
   computeFleetKmTable,
   computeMonthlyKmTrend,
@@ -46,8 +45,6 @@ import { listRecordsRequest } from "../../lib/records.api";
 // paralelo en vez de bloquear el primer pintado de la pagina (titulo + anillos de
 // Control economico, arriba de todo esto en el JSX) - sin esto el navegador tenia que
 // terminar de parsear recharts antes de mostrar cualquier cosa.
-const ClientDistributionChart = lazy(() => import("../../components/charts/ClientDistributionChart"));
-const EconomicsChart = lazy(() => import("../../components/charts/EconomicsChart"));
 const PerformanceTrendChart = lazy(() => import("../../components/charts/PerformanceTrendChart"));
 const ServicesMonthBarChart = lazy(() => import("../../components/charts/ServicesMonthBarChart"));
 
@@ -276,10 +273,6 @@ export const OwnerDashboardPage = () => {
 
   const economicStats = useMemo(
     () => (loaded ? computeEconomicStats(scopedRecords, period, new Date(), selectedMonth) : null),
-    [loaded, scopedRecords, period, selectedMonth]
-  );
-  const clientDistribution = useMemo(
-    () => (loaded ? computeClientDistribution(scopedRecords, period, new Date(), selectedMonth) : null),
     [loaded, scopedRecords, period, selectedMonth]
   );
   const monthlyTrend = useMemo(
@@ -632,35 +625,6 @@ export const OwnerDashboardPage = () => {
           </div>
         </Panel>
       </div>
-
-      <Panel>
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div>
-            <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-              Facturación vs costos
-            </h3>
-            <div className="h-[220px]">
-              <Suspense fallback={<ChartFallback />}>
-                <EconomicsChart
-                  facturacion={economicStats.facturacion}
-                  costos={economicStats.costos}
-                  ganancia={economicStats.ganancia}
-                />
-              </Suspense>
-            </div>
-          </div>
-          <div>
-            <h3 className="mb-3 text-[13px] font-medium uppercase tracking-wide text-ink-400">
-              Distribución por cliente
-            </h3>
-            <div className="h-[220px]">
-              <Suspense fallback={<ChartFallback />}>
-                <ClientDistributionChart data={clientDistribution} />
-              </Suspense>
-            </div>
-          </div>
-        </div>
-      </Panel>
 
       <Panel>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">

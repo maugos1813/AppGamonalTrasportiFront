@@ -373,36 +373,6 @@ export const computeMonthlyKmTrend = (records, now = new Date()) => {
 const OTROS_LABEL = "Otros";
 const MAX_CLIENT_SLICES = 4;
 
-// Distribucion de facturacion por cliente en el periodo, para el grafico de
-// torta del dashboard OWNER. Agrupa todo lo que no entra en el top N como "Otros".
-export const computeClientDistribution = (records, period, now = new Date(), selectedMonth = null) => {
-  const scoped = records.filter((r) => isWithinPeriod(r.fechaServicio, period, now, selectedMonth));
-
-  const totalsByClient = new Map();
-  scoped.forEach((r) => {
-    const name = r.client?.nombre ?? "Sin cliente";
-    const amount = recordRevenue(r);
-    totalsByClient.set(name, (totalsByClient.get(name) ?? 0) + amount);
-  });
-
-  const sorted = Array.from(totalsByClient.entries())
-    .filter(([, value]) => value > 0)
-    .sort((a, b) => b[1] - a[1]);
-
-  const top = sorted.slice(0, MAX_CLIENT_SLICES);
-  const rest = sorted.slice(MAX_CLIENT_SLICES);
-  const otrosTotal = rest.reduce((sum, [, value]) => sum + value, 0);
-
-  const entries = otrosTotal > 0 ? [...top, [OTROS_LABEL, otrosTotal]] : top;
-  const total = entries.reduce((sum, [, value]) => sum + value, 0);
-
-  return entries.map(([name, value]) => ({
-    name,
-    value,
-    percent: total > 0 ? (value / total) * 100 : 0,
-  }));
-};
-
 export const computeCurrentService = (records, now = new Date()) => {
   const enCurso = records.find((r) => r.estado === "IN_CONSEGNA");
   if (enCurso) return enCurso;
