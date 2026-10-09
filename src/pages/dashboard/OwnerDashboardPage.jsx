@@ -146,6 +146,9 @@ const Delta = ({ pct }) =>
     </span>
   );
 
+// Dias de historia de la primera carga del dashboard (cubre el mes en curso y el anterior completos).
+const RECENT_DAYS = 75;
+
 const monthLabel = (year, month) =>
   new Date(year, month - 1, 1).toLocaleDateString("es-AR", { month: "long", year: "numeric" }).toUpperCase();
 
@@ -218,7 +221,10 @@ export const OwnerDashboardPage = () => {
     ],
     [userAreas]
   );
-  const [records, setRecords] = useState(null);
+  // Dos cargas: "reciente" (los ultimos ~75 dias, chica y rapida) pinta el dashboard enseguida; "anual"
+  // llega despues y completa las tendencias del año.
+  const [recentRecords, setRecentRecords] = useState(null);
+  const [yearRecords, setYearRecords] = useState(null);
   const [error, setError] = useState("");
   const [period, setPeriod] = useState("mes");
   const [misAreasVista, setMisAreasVista] = useState("TODAS");
@@ -237,6 +243,22 @@ export const OwnerDashboardPage = () => {
   // vaciar la pantalla mientras llega.
   const sinceYear = Math.min(new Date().getFullYear(), selectedMonth.year);
 
+  // Primera carga: solo lo reciente (mes en curso + el anterior para las variaciones). Pesa una
+  // fraccion de la carga anual, asi las tarjetas y los totales aparecen mucho antes.
+  useEffect(() => {
+    let cancelled = false;
+    listRecordsRequest({ days: RECENT_DAYS, vista: "resumen" })
+      .then((recordsData) => {
+        if (!cancelled) setRecentRecords(recordsData);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(parseApiError(err).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -247,7 +269,7 @@ export const OwnerDashboardPage = () => {
     listRecordsRequest({ days, vista: "resumen" })
       .then((recordsData) => {
         if (cancelled) return;
-        setRecords(recordsData);
+        setYearRecords(recordsData);
       })
       .catch((err) => {
         if (!cancelled) setError(parseApiError(err).message);
@@ -257,6 +279,13 @@ export const OwnerDashboardPage = () => {
       cancelled = true;
     };
   }, [sinceYear]);
+
+  // Mientras no llega la carga anual se usa la reciente, pero solo si se mira el mes en curso
+  // (otro mes necesita mas historia para comparar). Las tendencias del año esperan a la anual.
+  const trendsReady = Boolean(yearRecords);
+  const isCurrentMonth =
+    selectedMonth.year === new Date().getFullYear() && selectedMonth.month === new Date().getMonth() + 1;
+  const records = yearRecords ?? (isCurrentMonth ? recentRecords : null);
 
   const loaded = Boolean(records);
 
@@ -321,7 +350,7 @@ export const OwnerDashboardPage = () => {
 
   const year = new Date().getFullYear();
   const deltaLabel = PERIOD_DELTA_LABEL[period];
-  const totalServiciosAnio = servicesTrend.reduce((sum, m) => sum + m.servicios, 0);
+  const totalServiciosAnio = trendsReady ? servicesTrend.reduce((sum, m) => sum + m.servicios, 0) : null;
 
   return (
     <div className="flex flex-col gap-6">
@@ -352,7 +381,7 @@ export const OwnerDashboardPage = () => {
           value={kpis.servicios.value.toLocaleString("es-AR")}
           deltaPct={kpis.servicios.deltaPct}
           deltaLabel={deltaLabel}
-          series={kpis.servicios.series}
+          series={trendsReady ? kpis.servicios.series : undefined}
         />
         <KpiCard
           icon={RouteIcon}
@@ -361,7 +390,7 @@ export const OwnerDashboardPage = () => {
           value={`${Math.round(kpis.km.value).toLocaleString("es-AR")} km`}
           deltaPct={kpis.km.deltaPct}
           deltaLabel={deltaLabel}
-          series={kpis.km.series}
+          series={trendsReady ? kpis.km.series : undefined}
         />
         <KpiCard
           icon={UsersIcon}
@@ -370,7 +399,7 @@ export const OwnerDashboardPage = () => {
           value={kpis.clientes.value.toLocaleString("es-AR")}
           deltaPct={kpis.clientes.deltaPct}
           deltaLabel={deltaLabel}
-          series={kpis.clientes.series}
+          series={trendsReady ? kpis.clientes.series : undefined}
         />
         <KpiCard
           icon={TruckIcon}
@@ -379,7 +408,7 @@ export const OwnerDashboardPage = () => {
           value={kpis.vehiculos.value.toLocaleString("es-AR")}
           deltaPct={kpis.vehiculos.deltaPct}
           deltaLabel={deltaLabel}
-          series={kpis.vehiculos.series}
+          series={trendsReady ? kpis.vehiculos.series : undefined}
         />
       </div>
 
@@ -548,7 +577,7 @@ export const OwnerDashboardPage = () => {
       >
         <div className="h-[300px]">
           <Suspense fallback={<ChartFallback />}>
-            <PerformanceTrendChart data={performanceData} />
+            {trendsReady ? <PerformanceTrendChart data={performanceData} /> : <ChartFallback />}
           </Suspense>
         </div>
       </Panel>
@@ -609,7 +638,7 @@ export const OwnerDashboardPage = () => {
           aside={
             <div className="text-right">
               <div className="text-[20px] font-semibold leading-none text-ink-50">
-                {totalServiciosAnio.toLocaleString("es-AR")}
+                {totalServiciosAnio == null ? "—" : totalServiciosAnio.toLocaleString("es-AR")}
               </div>
               <div className="mt-1 text-[12px] text-ink-400">en el año</div>
             </div>
@@ -617,10 +646,14 @@ export const OwnerDashboardPage = () => {
         >
           <div className="h-[240px]">
             <Suspense fallback={<ChartFallback />}>
-              <ServicesMonthBarChart
-                data={servicesTrend}
-                areaKeys={misAreasVista === "TODAS" ? MAIN_AREAS.map((a) => a.key) : [misAreasVista]}
-              />
+              {trendsReady ? (
+                <ServicesMonthBarChart
+                  data={servicesTrend}
+                  areaKeys={misAreasVista === "TODAS" ? MAIN_AREAS.map((a) => a.key) : [misAreasVista]}
+                />
+              ) : (
+                <ChartFallback />
+              )}
             </Suspense>
           </div>
         </Panel>

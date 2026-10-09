@@ -1,7 +1,7 @@
 import clsx from "clsx";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
-import logo from "../../assets/logo.png";
+import logo from "../../assets/logo.webp";
 import { roleText } from "../../lib/roles";
 import { setListSearch, useListSearch } from "../../lib/listSearchStore";
 import { useAuth } from "../../context/AuthContext";

@@ -1,4 +1,4 @@
-import logo from "../../assets/logo.png";
+import logo from "../../assets/logo.webp";
 import heroImage from "../../assets/login-hero.webp";
 import { GlassCard } from "../ui/GlassCard";
 
