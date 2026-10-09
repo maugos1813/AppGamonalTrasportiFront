@@ -66,7 +66,7 @@ export const PAY_RULES_FALLBACK = {
   kmBloqueNocheEur: 12,
   esperaHoraEur: 7,
   banda: { diaInicio: "06:30", nocheInicio: "22:00" },
-  redondeoHoras: 0.25,
+  redondeoHoras: 0,
   reperibilidad: { extraEur: 10, diasLaborales: [1, 2, 3, 4, 5], festivosCuentan: true },
   festivos: [],
 };
