@@ -17,6 +17,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
+import { CircuitoDetalle } from "../../components/records/CircuitoDetalle";
 import { RetiroPaqueteField } from "../../components/records/RetiroPaqueteField";
 import { FechasAviso } from "../../components/records/FechasAviso";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
@@ -32,6 +33,7 @@ import {
   ZONA_LABELS,
   ZONA_OPTIONS,
   destinoSugerencias,
+  salidaPorDefectoLabel,
 } from "../../lib/constants";
 import {
   formatCurrency,
@@ -881,6 +883,8 @@ const RecordSummaryView = ({
         </div>
       </div>
 
+      <CircuitoDetalle circuito={record.circuito} recordId={record.id} className="mt-4 rounded-xl bg-line/[0.05] px-4 py-3" />
+
       <ViajeCompactoCard record={record} isChofer={isChofer} onChanged={onReload} />
 
       <JornadaOfService record={record} isChofer={isChofer} onOpenHours={onOpenHours} />
@@ -1180,6 +1184,7 @@ const RecordEditForm = ({
               salida={form.salida}
               onSalidaChange={(salida) => setField("salida", salida)}
               sugerencias={destinoSugerencias(record.spedizzione, record.extrasPiazzaZona)}
+              salidaPorDefecto={salidaPorDefectoLabel(record.spedizzione, record.extrasPiazzaZona)}
               disabled={saving}
             />
 

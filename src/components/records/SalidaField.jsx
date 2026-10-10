@@ -16,7 +16,7 @@ export const buildSalidaPayload = (salida) => {
 // "Salida" del servicio: campo de texto libre, en blanco al crear, con atajos de sugerencia. Elegir una
 // sugerencia rellena el texto (y guarda sus coordenadas exactas); si despues se edita el texto, las
 // coordenadas se descartan y la direccion se geocodifica al guardar.
-export const SalidaField = ({ value, onChange, disabled, error, id = "salida" }) => {
+export const SalidaField = ({ value, onChange, disabled, error, id = "salida", porDefecto = "Via Walter Tobagi, 8 (DHL Milano)" }) => {
   const selected = SALIDA_SUGERENCIAS.find((s) => value.lat === s.lat && value.lng === s.lng);
 
   return (
@@ -54,7 +54,7 @@ export const SalidaField = ({ value, onChange, disabled, error, id = "salida" })
           ? "Ubicacion exacta guardada."
           : value.direccion.trim()
             ? "Se ubica en el mapa al guardar."
-            : "Si lo dejas vacio se usa Via Walter Tobagi, 8 (DHL Milano)."}
+            : `Si lo dejas vacio se usa ${porDefecto}.`}
       </p>
     </div>
   );

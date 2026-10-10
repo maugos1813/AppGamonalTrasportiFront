@@ -10,6 +10,7 @@ import { AlertTriangleIcon, CheckCircleIcon } from "../../components/ui/icons";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { parseApiError } from "../../lib/api";
+import { CircuitoDetalle } from "../../components/records/CircuitoDetalle";
 import { KmViajeResumen } from "../../components/records/KmViajeResumen";
 import { formatCurrency, formatDate, formatRomeDateTime, toRomeDateTimeInputValue } from "../../lib/format";
 import { formatHours } from "../../lib/horas";
@@ -428,6 +429,8 @@ const ReviewCard = ({ item, onReviewed }) => {
           </Link>
         </div>
       )}
+
+      <CircuitoDetalle circuito={item.circuito} recordId={item.id} className="mt-3 rounded-lg bg-line/[0.05] px-3 py-2.5" />
 
       {item.comentarios && (
         <p className="mt-3 rounded-lg bg-line/5 px-3 py-2 text-[12px] text-ink-200">

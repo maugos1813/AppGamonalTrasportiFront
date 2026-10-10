@@ -93,3 +93,6 @@ export const ajustarKmViajeRequest = (compactadoId, { reparto, nota }) =>
 // Registros sin sustentar del propio chofer: peajes y carburante de sus servicios hechos que nadie subio ni declaro.
 // { registros, servicios }.
 export const getSinSustentarRequest = () => api.get("/records/sin-sustentar").then((res) => res.data.data);
+
+// Circuito del servicio (o del viaje) para verlo en un mapa: { circuito, puntos: [{ tipo, nombre, lat, lng }], geometria }.
+export const getCircuitoMapaRequest = (id) => api.get(`/records/${id}/circuito`).then((res) => res.data.data);

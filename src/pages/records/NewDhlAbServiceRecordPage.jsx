@@ -13,7 +13,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS, destinoSugerencias } from "../../lib/constants";
+import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS, destinoSugerencias, salidaPorDefectoLabel } from "../../lib/constants";
 import { useTarifasKm } from "../../hooks/useTarifasKm";
 import { formatCurrency } from "../../lib/format";
 import { createRecordRequest } from "../../lib/records.api";
@@ -367,6 +367,7 @@ export const NewDhlAbServiceRecordPage = () => {
               onChange={(salida) => setField("salida", salida)}
               disabled={submitting}
               error={fieldErrors.salida?.[0]}
+              porDefecto={salidaPorDefectoLabel(form.spedizzione, form.extrasPiazzaZona)}
             />
           </div>
         </GlassCard>
