@@ -96,7 +96,8 @@ const ProgressBar = ({ pct, color }) => (
 );
 
 // "Mi rendimiento": avance de la meta de km, km del mes, estilo de manejo (OneSystec, de los ultimos dias) y
-// un consejo. `estilo` = { puntaje 1-100, dias } o null mientras carga o si no hay datos.
+// un consejo. `estilo` = { puntaje 1-100, dias, calculando } o null mientras carga o si no hay datos. Sale solo de
+// las jornadas del propio chofer (no del vehiculo entero, que otros tambien manejan).
 export const RendimientoCard = ({ progress, estilo: estiloData }) => {
   if (!progress) return null;
 
@@ -160,7 +161,11 @@ export const RendimientoCard = ({ progress, estilo: estiloData }) => {
           ) : (
             <>
               <span className="text-[30px] font-semibold leading-none text-ink-400">—</span>
-              <span className="text-[12px] text-ink-300">Aún sin datos de tu manejo</span>
+              <span className="text-[12px] text-ink-300">
+                {estiloData?.calculando
+                  ? "Calculando tu manejo…"
+                  : "Se calcula con las horas de tus servicios"}
+              </span>
             </>
           )}
         </Tile>
