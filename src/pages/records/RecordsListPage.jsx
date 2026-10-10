@@ -14,6 +14,7 @@ import {
   DownloadIcon,
   PlusIcon,
   RefreshIcon,
+  RouteIcon,
   SearchIcon,
 } from "../../components/ui/icons";
 import { MonthPicker } from "../../components/ui/MonthPicker";
@@ -36,7 +37,9 @@ import {
 import { formatDate, formatDateTime, formatTimeRemaining } from "../../lib/format";
 import { userAreaKeys } from "../../lib/roles";
 import { AREA_ALL, AREAS_BY_KEY, RECORD_AREAS, classifyRecord } from "../../lib/recordAreas";
+import { CompactarModal } from "../../components/records/CompactarModal";
 import { FaltantesChips, hasFaltantes } from "../../components/records/FaltantesPanel";
+import { ViajeChip } from "../../components/records/ViajeChip";
 import {
   listPendingRecordsRequest,
   listRecordsByDayRequest,
@@ -185,6 +188,7 @@ const RecordCard = ({ record }) => {
         <span>Cliente: {record.client?.nombre}</span>
       </div>
       <FaltantesChips faltantes={record.faltantes} className="mt-3" />
+      <ViajeChip compactado={record.compactado} className="mt-3" />
       </GlassCard>
     </Link>
   );
@@ -237,6 +241,7 @@ const RecordRow = ({ record }) => {
           {record.kilometros != null ? ` · ${fmtKm(record.kilometros)} km` : ""}
         </span>
         <FaltantesChips faltantes={record.faltantes} className="mt-1" />
+        <ViajeChip compactado={record.compactado} className="mt-1" />
       </span>
       <span className="min-w-0">
         <span className="block truncate text-ink-100">{record.vehicle?.targa ?? "-"}</span>
@@ -451,6 +456,7 @@ export const RecordsListPage = ({ section: sectionHint }) => {
   const [syncResult, setSyncResult] = useState(null);
   const [syncError, setSyncError] = useState("");
   const [showExportModal, setShowExportModal] = useState(false);
+  const [showCompactar, setShowCompactar] = useState(false);
 
   useEffect(() => {
     if (!isPrivileged) return;
@@ -748,6 +754,14 @@ export const RecordsListPage = ({ section: sectionHint }) => {
           {isPrivileged ? (
             <>
               <MonthPicker value={viewDate} onChange={setViewDate} />
+              <button
+                type="button"
+                onClick={() => setShowCompactar(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-line/25 px-5 py-2.5 text-[14px] font-semibold text-ink-50 transition hover:bg-line/10"
+              >
+                <RouteIcon className="h-4 w-4" />
+                Compactar
+              </button>
               <NewServiceMenu areas={availableAreas} activeKey={areaKey} />
             </>
           ) : (
@@ -1081,6 +1095,7 @@ export const RecordsListPage = ({ section: sectionHint }) => {
       )}
 
       {isPrivileged && <ExportRecordsModal open={showExportModal} onClose={() => setShowExportModal(false)} />}
+      {isPrivileged && <CompactarModal open={showCompactar} onClose={() => setShowCompactar(false)} onDone={refreshRecords} />}
     </div>
   );
 };

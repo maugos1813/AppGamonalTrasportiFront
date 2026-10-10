@@ -46,9 +46,14 @@ const ServiceCard = ({ service, reglas, onLoadHours, loading }) => {
       <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0 text-[12px] text-ink-300">
           {payCalcText(service, reglas)}
-          {service.modo === "KM" && service.kmFuente !== "SIN_DATO" && (
+          {service.modo === "KM" && service.kmFuente !== "SIN_DATO" && service.kmFuente !== "TRASPASO_SIN_KM" && (
             <span className="ml-1.5 rounded bg-line/10 px-1.5 py-0.5 text-[10px] text-ink-400">
               {kmSourceLabel(service.kmFuente)}
+            </span>
+          )}
+          {service.kmFuente === "TRASPASO_SIN_KM" && (
+            <span className="mt-0.5 block text-warning-500">
+              Este servicio tuvo traspaso: carga tus horas (o tus km reales) para que se te pague lo que manejaste.
             </span>
           )}
           {service.estimadoSiAprobada != null && (

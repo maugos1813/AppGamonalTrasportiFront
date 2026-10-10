@@ -71,5 +71,7 @@ export const formatHours = (value) =>
 
 // Un servicio entregado/retirado al que el chofer todavia tiene que cargarle horas.
 export const needsHours = (record) =>
+  // En un viaje compacto las horas se cargan una sola vez, en el servicio principal.
+  !(record.compactado && !record.compactado.principal) &&
   ["CONSEGNATO", "RITIRATO"].includes(record.estado) &&
   (!record.jornada?.estado || record.jornada.estado === "DEVUELTAS");

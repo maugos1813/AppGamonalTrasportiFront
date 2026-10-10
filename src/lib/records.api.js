@@ -76,3 +76,16 @@ export const updateDeclaracionesRequest = (id, data) =>
 // Excepcion de la oficina: al servicio no se le exigen peajes ni combustible (con motivo).
 export const setFaltantesExcepcionRequest = (id, { aplicar, nota }) =>
   api.patch(`/records/${id}/excepcion`, { aplicar, nota }).then((res) => res.data.data.record);
+
+// Servicios compactados (varios servicios de un chofer en un solo viaje): solo Admin/Responsable.
+export const listCompactablesRequest = () =>
+  api.get("/records/compactar/sugerencias").then((res) => res.data.data.servicios);
+
+// recordIds en el orden de las paradas: el primero es el servicio principal.
+export const compactarRequest = (recordIds) =>
+  api.post("/records/compactar", { recordIds }).then((res) => res.data.data.viaje);
+
+export const reordenarCompactadoRequest = (compactadoId, recordIds) =>
+  api.patch(`/records/compactar/${compactadoId}`, { recordIds }).then((res) => res.data.data.viaje);
+
+export const descompactarRequest = (compactadoId) => api.delete(`/records/compactar/${compactadoId}`);

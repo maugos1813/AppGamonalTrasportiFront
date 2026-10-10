@@ -38,8 +38,9 @@ export const FaltantesSwitches = ({ record, values, onToggle, onAll, disabled })
   const location = useLocation();
   const mancatos = record.mancatos ?? [];
   const f = record.faltantes ?? {};
-  const hasIda = mancatos.some((m) => m.tramo === "IDA");
-  const hasVuelta = mancatos.some((m) => m.tramo === "VUELTA");
+  // En un viaje compacto los peajes pueden estar asignados a cualquiera de sus servicios: manda lo que calcula el servidor.
+  const hasIda = f.tieneIda ?? mancatos.some((m) => m.tramo === "IDA");
+  const hasVuelta = f.tieneVuelta ?? mancatos.some((m) => m.tramo === "VUELTA");
   const ownFuel = record.combustible?.comprobantes?.count ?? 0;
   const day = f.combustibleDia;
   const fuelDone = ownFuel > 0 || (day?.comprobantes ?? 0) > 0 || Boolean(day?.declarado && !values.sinCombustible);

@@ -10,11 +10,13 @@ import {
   ChevronRightIcon,
   ClockIcon,
   FileTextIcon,
+  RouteIcon,
   TruckIcon,
   UserIcon,
 } from "../ui/icons";
 import { TruckArt } from "./illustrations";
 import { StatusPill } from "./StatusPill";
+import { ViajeStops } from "./ViajeStops";
 import { formatDateTime } from "../../lib/format";
 import { pendingItems, primaryAction } from "../../lib/pendientes";
 
@@ -62,6 +64,7 @@ export const ServicioPendienteRow = ({ service, opening, uploading, error, onClo
   const action = primaryAction(items);
   const waitingReception = Boolean(service.origen) && !service.traspasoHora;
   const enProceso = items.some((i) => i.key === "terminar");
+  const viaje = service.compactado?.principal ? service.compactado : null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -85,6 +88,16 @@ export const ServicioPendienteRow = ({ service, opening, uploading, error, onClo
           <ChevronDownIcon className={clsx("h-4 w-4 text-ink-400 transition-transform", open && "rotate-180")} />
         </span>
       </button>
+
+      {viaje && (
+        <>
+          <span className="inline-flex w-fit items-center gap-1.5 rounded-full bg-accent-500/15 px-2.5 py-0.5 text-[11px] font-semibold text-accent-300">
+            <RouteIcon className="h-3.5 w-3.5" />
+            Viaje compacto · {viaje.total} servicios
+          </span>
+          <ViajeStops compactado={viaje} />
+        </>
+      )}
 
       <PendingChips items={items} />
 
@@ -119,7 +132,7 @@ export const ServicioPendienteRow = ({ service, opening, uploading, error, onClo
           <span className="w-5" />
           <span className="flex items-center gap-2">
             {opening ? <Spinner className="h-4 w-4" /> : enProceso ? <PlayIcon className="h-4 w-4" /> : <ClockIcon className="h-4 w-4" />}
-            {enProceso ? "Terminar servicio" : items.some((i) => i.key === "corregir") ? "Corregir horas" : "Cargar horas"}
+            {enProceso ? (viaje ? "Terminar viaje" : "Terminar servicio") : items.some((i) => i.key === "corregir") ? "Corregir horas" : "Cargar horas"}
           </span>
           <ChevronRightIcon className="h-5 w-5 opacity-70" />
         </button>

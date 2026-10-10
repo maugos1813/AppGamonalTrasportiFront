@@ -20,10 +20,12 @@ const FALTANTE_KEYS = ["ida", "vuelta", "combustible"];
 // [{ key, label }] de lo que falta en un servicio; vacio = al dia.
 export const pendingItems = (record, now = Date.now()) => {
   if (!record || record.estado === "ANNULLATO" || record.estado === "RISCHEDULATO") return [];
+  // Viaje compacto: lo pendiente de todo el viaje lo lleva el servicio principal.
+  if (record.compactado && !record.compactado.principal) return [];
   const items = [];
 
   if (EN_PROCESO_STATUSES.includes(record.estado)) {
-    items.push({ key: "terminar", label: PENDING_LABELS.terminar });
+    items.push({ key: "terminar", label: record.compactado ? "Terminar viaje" : PENDING_LABELS.terminar });
   } else if (needsHours(record) && new Date(record.fechaServicio).getTime() >= now - PENDING_HOURS_DAYS * DAY_MS) {
     const key = record.jornada?.estado === "DEVUELTAS" ? "corregir" : "horas";
     items.push({ key, label: PENDING_LABELS[key] });

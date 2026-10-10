@@ -11,6 +11,7 @@ import { PAY_RULES_FALLBACK } from "../../lib/finanzas";
 import { formatHours, previewShift } from "../../lib/horas";
 import { submitHorasRequest } from "../../lib/horas.api";
 import { updateDeclaracionesRequest } from "../../lib/records.api";
+import { ViajeStops } from "../chofer/ViajeStops";
 import { FaltantesSwitches } from "../records/FaltantesPanel";
 
 const MIN_CHIPS = [0, 15, 30, 45, 60];
@@ -170,11 +171,24 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
         ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-5">
             <div>
-              <h2 className="text-[19px] font-semibold text-ink-50">Terminar servicio</h2>
+              <h2 className="text-[19px] font-semibold text-ink-50">
+                {record.compactado?.principal ? "Terminar viaje" : "Terminar servicio"}
+              </h2>
               <p className="mt-0.5 text-[13px] text-ink-300">
                 {record.codigo} &middot; {record.destinazione}
               </p>
             </div>
+
+            {record.compactado?.principal && (
+              <div className="rounded-xl bg-accent-500/10 px-4 py-3">
+                <p className="mb-2 text-[13px] text-ink-200">
+                  <b className="text-accent-300">Viaje compacto de {record.compactado.total} servicios.</b> Carga una sola
+                  jornada: desde que sales a la primera parada hasta que terminas la última. Al enviar, todos los
+                  servicios del viaje quedan entregados.
+                </p>
+                <ViajeStops compactado={record.compactado} />
+              </div>
+            )}
 
             {jornada.estado === "DEVUELTAS" && jornada.nota && (
               <div className="rounded-xl bg-danger-500/10 px-4 py-3 text-[13px] text-ink-100">

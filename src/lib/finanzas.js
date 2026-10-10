@@ -31,20 +31,24 @@ export const COSTO_COLORS = {
   combustible: "#22e093",
 };
 
-const KM_SOURCE_LABELS = { REAL: "km reales", SERVICIO: "km del servicio", RUTA: "km de la ruta", SIN_DATO: "sin km" };
+const KM_SOURCE_LABELS = { REAL: "km reales", SERVICIO: "km del servicio", RUTA: "km de la ruta", SIN_DATO: "sin km", VIAJE: "km del viaje", TRASPASO_SIN_KM: "sin km" };
 export const kmSourceLabel = (source) => KM_SOURCE_LABELS[source] ?? "";
 
 const nf = (value) => Number(value).toLocaleString("es-AR", { maximumFractionDigits: 2 });
 
 // Texto de como se calculo el pago de un servicio: "170 km x 10 EUR cada 85 km", "3,5 h x 10 EUR"...
 export const payCalcText = (item, reglas) => {
+  // Servicio compactado en un viaje: se paga una sola vez, en el servicio principal.
+  if (item.incluidoEnViaje) return `Incluido en el viaje de ${item.viajeCodigo}`;
   const parts = [];
+  if (item.viajeServicios > 1) parts.push(`Viaje de ${item.viajeServicios} servicios:`);
   if (item.modo === "HORAS") {
     const horas = [];
     if (item.horasDia > 0) horas.push(`${nf(item.horasDia)} h dia x ${nf(reglas.horaDiaEur)} EUR`);
     if (item.horasNoche > 0) horas.push(`${nf(item.horasNoche)} h noche x ${nf(reglas.horaNocheEur)} EUR`);
     parts.push(horas.join(" + "));
   } else if (item.kmFuente === "SIN_DATO") parts.push("sin kilometros cargados");
+  else if (item.kmFuente === "TRASPASO_SIN_KM") parts.push("servicio con traspaso: sin horas ni km reales no se paga por los km del servicio");
   else {
     const eur = item.franja === "NOCHE" ? reglas.kmBloqueNocheEur : reglas.kmBloqueDiaEur;
     parts.push(`${nf(item.km)} km x ${nf(eur)} EUR cada ${nf(reglas.kmBloque)} km${item.franja === "NOCHE" ? " (noche)" : ""}`);

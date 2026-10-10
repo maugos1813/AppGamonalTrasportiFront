@@ -6,7 +6,7 @@ import { StatusPill } from "../../components/chofer/StatusPill";
 import { HorasEstadoChip } from "../../components/horas/HorasEstadoChip";
 import { Alert } from "../../components/ui/Alert";
 import { PageLoader } from "../../components/ui/PageLoader";
-import { CheckCircleIcon, ChevronDownIcon, ChevronRightIcon } from "../../components/ui/icons";
+import { CheckCircleIcon, ChevronDownIcon, ChevronRightIcon, RouteIcon } from "../../components/ui/icons";
 import { useCerrarServicio } from "../../hooks/useCerrarServicio";
 import { parseApiError } from "../../lib/api";
 import { formatDateTime } from "../../lib/format";
@@ -81,6 +81,42 @@ const ServicioRow = ({ service }) => {
   );
 };
 
+// Servicios compactados en un solo viaje: una tarjeta con sus paradas en orden.
+const ViajeGroup = ({ services }) => (
+  <div className="bg-accent-500/[0.04]">
+    <p className="flex items-center gap-2 px-4 pt-3 text-[12px] font-semibold text-accent-300">
+      <RouteIcon className="h-3.5 w-3.5" />
+      Viaje compacto · {services.length} servicios
+    </p>
+    <div className="flex flex-col divide-y divide-line/10">
+      {services.map((service) => (
+        <ServicioRow key={service.id} service={service} />
+      ))}
+    </div>
+  </div>
+);
+
+// Agrupa los servicios de un mismo viaje (en el orden de sus paradas) y deja el resto sueltos.
+const groupTrips = (items) => {
+  const out = [];
+  const seen = new Map();
+  for (const r of items) {
+    if (!r.compactado) {
+      out.push({ key: r.id, services: [r] });
+      continue;
+    }
+    let group = seen.get(r.compactado.id);
+    if (!group) {
+      group = { key: r.compactado.id, trip: true, services: [] };
+      seen.set(r.compactado.id, group);
+      out.push(group);
+    }
+    group.services.push(r);
+  }
+  for (const g of out) g.services.sort((a, b) => (a.compactado?.orden ?? 0) - (b.compactado?.orden ?? 0));
+  return out;
+};
+
 const Stat = ({ label, value, tone }) => (
   <div className="glass-surface-sm rounded-2xl px-3 py-3 text-center">
     <span
@@ -118,9 +154,12 @@ export const MisServiciosPage = () => {
     const list = records ?? [];
     const pend = list.filter(isPending).sort(sortPending);
     const pendingIds = new Set(pend.map((r) => r.id));
+    // Las paradas de un viaje pendiente se ven dentro de su servicio principal, no por separado.
+    const pendingTrips = new Set(pend.filter((r) => r.compactado?.principal).map((r) => r.compactado.id));
     const byMonth = new Map();
     for (const r of list) {
       if (pendingIds.has(r.id)) continue;
+      if (r.compactado && pendingTrips.has(r.compactado.id)) continue;
       const key = monthKey(r.fechaServicio);
       if (!byMonth.has(key)) byMonth.set(key, []);
       byMonth.get(key).push(r);
@@ -196,9 +235,13 @@ export const MisServiciosPage = () => {
       {months.map(([key, items]) => (
         <Acordeon key={key} title={monthLabel(key)} count={items.length} defaultOpen={key === currentMonth}>
           <div className="flex flex-col divide-y divide-line/10">
-            {items.map((service) => (
-              <ServicioRow key={service.id} service={service} />
-            ))}
+            {groupTrips(items).map((group) =>
+              group.trip && group.services.length > 1 ? (
+                <ViajeGroup key={group.key} services={group.services} />
+              ) : (
+                <ServicioRow key={group.key} service={group.services[0]} />
+              )
+            )}
           </div>
         </Acordeon>
       ))}

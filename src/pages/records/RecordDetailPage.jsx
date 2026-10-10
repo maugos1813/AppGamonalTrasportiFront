@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { FaltantesCard } from "../../components/records/FaltantesPanel";
+import { ViajeCompactoCard } from "../../components/records/ViajeCompactoCard";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { CerrarServicioModal } from "../../components/horas/CerrarServicioModal";
 import { HorasEstadoChip } from "../../components/horas/HorasEstadoChip";
@@ -794,6 +795,8 @@ const RecordSummaryView = ({
           )}
         </div>
       </div>
+
+      <ViajeCompactoCard record={record} isChofer={isChofer} onChanged={onReload} />
 
       <JornadaOfService record={record} isChofer={isChofer} onOpenHours={onOpenHours} />
 

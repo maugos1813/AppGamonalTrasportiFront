@@ -67,10 +67,13 @@ const ServiceList = ({ servicios, reglas, location }) =>
           <div className="min-w-0 text-[12px] text-ink-300">
             <HorasEstadoChip estado={s.horasEstado} className="mr-1.5" />
             {payCalcText(s, reglas)}
-            {s.modo === "KM" && s.kmFuente !== "SIN_DATO" && (
+            {s.modo === "KM" && s.kmFuente !== "SIN_DATO" && s.kmFuente !== "TRASPASO_SIN_KM" && (
               <span className="ml-1.5 rounded bg-line/10 px-1.5 py-0.5 text-[10px] text-ink-400">
                 {kmSourceLabel(s.kmFuente)}
               </span>
+            )}
+            {s.kmFuente === "TRASPASO_SIN_KM" && (
+              <span className="ml-1.5 text-warning-500">revisar: traspaso sin horas ni km reales del chofer</span>
             )}
             {s.kmFuente === "SIN_DATO" && (
               <span className="ml-1.5 text-warning-500">revisar: el servicio no tiene km ni horas</span>
