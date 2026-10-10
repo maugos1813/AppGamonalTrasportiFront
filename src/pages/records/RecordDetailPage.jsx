@@ -1301,7 +1301,7 @@ const RecordEditForm = ({
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
               <TextField
                 id="kilometros"
-                label={isDhlAb(record) ? "Km del cliente (solo ida, se cuentan x2)" : "Kilometros planificados"}
+                label={isDhlAb ? "Km del cliente (solo ida, se cuentan x2)" : "Kilometros planificados"}
                 type="number"
                 step="0.1"
                 min="0"
