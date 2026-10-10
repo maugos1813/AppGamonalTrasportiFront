@@ -72,3 +72,7 @@ export const uploadRecordFileRequest = (id, file, tipoArchivo) => {
 // Switches de peajes y carburante de un servicio (rapido: no sincroniza con AppSheet).
 export const updateDeclaracionesRequest = (id, data) =>
   api.patch(`/records/${id}/declaraciones`, data).then((res) => res.data.data.record);
+
+// Excepcion de la oficina: al servicio no se le exigen peajes ni combustible (con motivo).
+export const setFaltantesExcepcionRequest = (id, { aplicar, nota }) =>
+  api.patch(`/records/${id}/excepcion`, { aplicar, nota }).then((res) => res.data.data.record);

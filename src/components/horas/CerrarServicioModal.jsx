@@ -302,6 +302,7 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
                 record={{ ...record, faltantes: { ...record.faltantes, litrosEstimados: record.faltantes?.litrosEstimados } }}
                 values={declared}
                 onToggle={(field, value) => setDeclared((prev) => ({ ...prev, [field]: value }))}
+                onAll={(fields) => setDeclared((prev) => ({ ...prev, ...Object.fromEntries(fields.map((f) => [f, true])) }))}
                 disabled={saving}
               />
             </div>

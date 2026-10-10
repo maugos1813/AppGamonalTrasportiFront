@@ -123,8 +123,9 @@ const groupSummaryByDay = (list) => {
   const days = new Map();
   for (const item of list) {
     const dKey = dayKey(item.fechaServicio);
-    if (!days.has(dKey)) days.set(dKey, { key: dKey, date: item.fechaServicio, count: 0 });
+    if (!days.has(dKey)) days.set(dKey, { key: dKey, date: item.fechaServicio, count: 0, faltantes: 0 });
     days.get(dKey).count += 1;
+    if (item.faltante) days.get(dKey).faltantes += 1;
   }
   return Array.from(days.values()).sort((a, b) => (a.key < b.key ? 1 : -1));
 };
@@ -960,6 +961,11 @@ export const RecordsListPage = ({ section: sectionHint }) => {
                           <span className="rounded-full bg-accent-500/15 px-2.5 py-0.5 text-[11px] font-medium text-accent-400">
                             {day.count} servicio{day.count === 1 ? "" : "s"}
                           </span>
+                          {day.faltantes > 0 && (
+                            <span className="rounded-full bg-danger-500/15 px-2.5 py-0.5 text-[11px] font-medium text-danger-500">
+                              {day.faltantes} con faltantes
+                            </span>
+                          )}
                         </span>
                       </DisclosureHeader>
 

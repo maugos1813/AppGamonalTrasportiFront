@@ -5,6 +5,7 @@ import { MancatoBanner } from "../../components/chofer/MancatoBanner";
 import { ResumenServiciosCard } from "../../components/chofer/ResumenServiciosCard";
 import { ServiciosActualesCard } from "../../components/chofer/ServiciosActualesCard";
 import { CerrarServicioModal } from "../../components/horas/CerrarServicioModal";
+import { FaltantesBanner } from "../../components/records/FaltantesPanel";
 import { HorasEstadoChip } from "../../components/horas/HorasEstadoChip";
 import { RecepcionPaqueteCard } from "../../components/horas/RecepcionPaqueteCard";
 import { Alert } from "../../components/ui/Alert";
@@ -148,6 +149,8 @@ export const ChoferDashboardPage = () => {
           </div>
         </GlassCard>
       )}
+
+      <FaltantesBanner records={records} />
 
       <ServiciosActualesCard
         services={currentServices}
