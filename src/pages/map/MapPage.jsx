@@ -18,14 +18,14 @@ import { TextField } from "../../components/ui/TextField";
 import { useAuth } from "../../context/AuthContext";
 import { useTheme } from "../../context/ThemeContext";
 import { parseApiError } from "../../lib/api";
-import { EN_PROCESO_STATUSES } from "../../lib/constants";
+import { EN_PROCESO_STATUSES, VEHICLE_AREA_OPTIONS } from "../../lib/constants";
 import { computeLocationPermissionAlerts, filterToPiazzaYDhlRoma } from "../../lib/dashboardStats";
 import { PHONE_GPS_ENABLED } from "../../lib/features";
 import { addMinutes } from "../../lib/format";
 import MILANO_ZONES from "../../lib/geo/milanoZones.json";
 import { startVisibleInterval } from "../../lib/polling";
 import { getRecordLiveEtaRequest, listPendingRecordsRequest } from "../../lib/records.api";
-import { getEtaToDestinationRequest, listVehicleLivePositionsRequest } from "../../lib/vehicles.api";
+import { getEtaToDestinationRequest, listVehicleLivePositionsRequest, listVehiclesRequest } from "../../lib/vehicles.api";
 import { getDriverReturnEtaRequest, listDriverLocationsRequest, listUsersRequest } from "../../lib/users.api";
 
 // Modulo estable fuera del componente: si se recrea en cada render, useJsApiLoader
@@ -163,32 +163,59 @@ const STATUS_META = {
   noGps: { label: "Ubicación del celular", chip: "Sin GPS", color: IDLE_DRIVER_COLOR },
 };
 
+// Una posicion mas vieja que esto se toma como GPS sin senal (el dispositivo dejo de reportar).
+const GPS_SIN_SENAL_MIN = 24 * 60;
+const GPS_OFF_COLOR = "#8a94a8";
+
+const haceTexto = (min) => {
+  if (min < 60) return `${min} min`;
+  if (min < 48 * 60) return `${Math.round(min / 60)} h`;
+  return `${Math.round(min / 1440)} d`;
+};
+
 const VehicleListItem = ({ item, active, onSelect }) => {
   const meta = STATUS_META[item.status];
-  const speed = item.loc.vehiculoGps?.speed;
+  const speed = item.loc?.vehiculoGps?.speed;
+  // Sin ubicacion en el mapa: el vehiculo esta en la flota pero su GPS no reporta (apagado o sin instalar).
+  const sinUbicacion = !item.loc;
+  const gpsAviso = sinUbicacion ? "GPS desactivado" : item.sinSenalMin != null ? `Sin señal · hace ${haceTexto(item.sinSenalMin)}` : null;
+  const dotColor = sinUbicacion ? GPS_OFF_COLOR : meta.color;
   return (
     <li>
       <button
         type="button"
+        disabled={sinUbicacion}
         onClick={() => onSelect(item.loc)}
-        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-line/10 ${
+        className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors enabled:hover:bg-line/10 ${
           active ? "bg-line/10 ring-1 ring-accent-500/40" : ""
-        }`}
+        } ${sinUbicacion ? "cursor-default" : ""}`}
       >
         <span
           className="h-2.5 w-2.5 shrink-0 rounded-full ring-2 ring-[var(--glass-surface-bg)]"
-          style={{ backgroundColor: meta.color, boxShadow: `0 0 8px ${meta.color}` }}
+          style={{ backgroundColor: dotColor, boxShadow: sinUbicacion ? "none" : `0 0 8px ${dotColor}` }}
         />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold tracking-wide text-ink-50">
-            {item.targa ?? "Sin vehículo"}
+          <span className="flex items-center justify-between gap-2">
+            <span className={`truncate text-[13px] font-semibold tracking-wide ${sinUbicacion ? "text-ink-200" : "text-ink-50"}`}>
+              {item.targa ?? "Sin vehículo"}
+            </span>
+            {gpsAviso && (
+              <span
+                className="shrink-0 rounded-full border border-line/15 px-2 py-0.5 text-[10.5px] font-medium"
+                style={{ color: GPS_OFF_COLOR }}
+              >
+                {gpsAviso}
+              </span>
+            )}
           </span>
           <span className="block truncate text-[12px] text-ink-300">
-            {item.driver ?? "Sin chofer asignado"}
+            {item.driver ?? (sinUbicacion ? item.modelo ?? "Sin chofer asignado" : "Sin chofer asignado")}
           </span>
-          <span className="block truncate text-[11px] font-medium" style={{ color: meta.color }}>
-            {meta.label}
-          </span>
+          {!sinUbicacion && (
+            <span className="block truncate text-[11px] font-medium" style={{ color: meta.color }}>
+              {meta.label}
+            </span>
+          )}
         </span>
         {item.status === "moving" && speed != null && (
           <span className="shrink-0 text-[12px] font-semibold text-ink-100">
@@ -219,6 +246,9 @@ export const MapPage = () => {
   // targa/chofer, filtro por estado y si esta desplegada (en celular arranca cerrada).
   const [targaQuery, setTargaQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("todos");
+  const [areaFilter, setAreaFilter] = useState("todos");
+  // Flota completa (fichas de Vehiculos): la lista muestra todos los vehiculos, tengan o no GPS activo.
+  const [fleet, setFleet] = useState(null);
   const [listOpen, setListOpen] = useState(
     () => typeof window === "undefined" || window.matchMedia("(min-width: 640px)").matches
   );
@@ -310,6 +340,21 @@ export const MapPage = () => {
       })
       .catch((err) => {
         if (!cancelled) setError(parseApiError(err).message);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isPrivileged]);
+
+  useEffect(() => {
+    if (!isPrivileged) return;
+    let cancelled = false;
+    listVehiclesRequest()
+      .then((data) => {
+        if (!cancelled) setFleet(data);
+      })
+      .catch(() => {
+        if (!cancelled) setFleet([]);
       });
     return () => {
       cancelled = true;
@@ -439,41 +484,91 @@ export const MapPage = () => {
     return merged;
   }, [locations, allDrivers, records, vehiclePositions, driverVehicleTarga, vehiclePositionByTarga]);
 
-  // Una fila por vehiculo en la lista lateral: con GPS, por targa; sin GPS, por chofer
-  // (un mismo chofer puede tener varias entradas si tiene mas de un servicio en camino).
+  // Una fila por vehiculo en la lista lateral: toda la flota (fichas de Vehiculos). Los que tienen GPS salen
+  // con su estado y se pueden ubicar en el mapa; los que no, al final y marcados "GPS desactivado". Sin GPS
+  // ni ficha del celular, no hay pin. Los vehiculos que reportan pero no tienen ficha caen en "Sin asignar".
   const vehicleItems = useMemo(() => {
+    const fleetByTarga = new Map((fleet ?? []).map((v) => [normalizeTarga(v.targa), v]));
     const unique = new Map();
     (enrichedLocations ?? []).forEach((loc) => {
       const key = loc.vehiculoGps?.targa ? normalizeTarga(loc.vehiculoGps.targa) : `driver-${loc.id}`;
       if (!unique.has(key)) unique.set(key, loc);
     });
-    return [...unique.values()]
-      .map((loc) => ({
+
+    const withLocation = [...unique.values()].map((loc) => {
+      const targa = loc.vehiculoGps?.targa ?? driverVehicleTarga.get(loc.id) ?? null;
+      const ficha = targa ? fleetByTarga.get(normalizeTarga(targa)) : undefined;
+      const minutos = loc.vehiculoGps && loc.actualizada ? minutesAgo(loc.actualizada) : null;
+      const sinSenal = minutos != null && minutos >= GPS_SIN_SENAL_MIN;
+      return {
         loc,
         status: locStatus(loc),
-        targa: loc.vehiculoGps?.targa ?? driverVehicleTarga.get(loc.id) ?? null,
-        driver: loc.sinChofer ? null : `${loc.nombre} ${loc.apellido}`.trim(),
-      }))
-      .sort(
-        (a, b) =>
-          STATUS_ORDER[a.status] - STATUS_ORDER[b.status] || (a.targa ?? "~").localeCompare(b.targa ?? "~", "es")
-      );
-  }, [enrichedLocations, driverVehicleTarga]);
+        targa,
+        driver: loc.sinChofer
+          ? ficha?.conductores?.length
+            ? ficha.conductores.map((c) => c.nombre).join(", ")
+            : null
+          : `${loc.nombre} ${loc.apellido}`.trim(),
+        area: ficha?.area ?? "SIN_ASIGNAR",
+        modelo: ficha?.modelo ?? null,
+        sinSenalMin: sinSenal ? minutos : null,
+      };
+    });
+
+    const represented = new Set(withLocation.filter((i) => i.targa).map((i) => normalizeTarga(i.targa)));
+    const withoutGps = (fleet ?? [])
+      .filter((v) => !represented.has(normalizeTarga(v.targa)))
+      .map((v) => ({
+        loc: null,
+        status: "noGps",
+        targa: v.targa,
+        driver: v.conductores?.length ? v.conductores.map((c) => c.nombre).join(", ") : null,
+        area: v.area,
+        modelo: v.modelo,
+        sinSenalMin: null,
+      }));
+
+    return [...withLocation, ...withoutGps].sort(
+      (a, b) =>
+        (a.loc ? 0 : 1) - (b.loc ? 0 : 1) ||
+        STATUS_ORDER[a.status] - STATUS_ORDER[b.status] ||
+        (a.targa ?? "~").localeCompare(b.targa ?? "~", "es")
+    );
+  }, [enrichedLocations, driverVehicleTarga, fleet]);
+
+  // Pestanias por area: "General" (todos) + cada area con vehiculos ("Sin asignar" solo si hay).
+  const areaTabs = useMemo(() => {
+    const counts = new Map();
+    vehicleItems.forEach((i) => counts.set(i.area, (counts.get(i.area) ?? 0) + 1));
+    return [
+      { key: "todos", label: "General", count: vehicleItems.length },
+      ...VEHICLE_AREA_OPTIONS.filter((o) => o.value !== "SIN_ASIGNAR" || counts.has("SIN_ASIGNAR")).map((o) => ({
+        key: o.value,
+        label: o.label,
+        count: counts.get(o.value) ?? 0,
+      })),
+    ];
+  }, [vehicleItems]);
+
+  const itemsInArea = useMemo(
+    () => (areaFilter === "todos" ? vehicleItems : vehicleItems.filter((i) => i.area === areaFilter)),
+    [vehicleItems, areaFilter]
+  );
 
   const statusCounts = useMemo(() => {
-    const counts = { todos: vehicleItems.length, moving: 0, idlingOn: 0, idlingOff: 0, noGps: 0 };
-    vehicleItems.forEach((item) => {
+    const counts = { todos: itemsInArea.length, moving: 0, idlingOn: 0, idlingOff: 0, noGps: 0 };
+    itemsInArea.forEach((item) => {
       counts[item.status] += 1;
     });
     return counts;
-  }, [vehicleItems]);
+  }, [itemsInArea]);
 
   // Filtra por estado y por texto (targa sin espacios o nombre del chofer).
   const visibleItems = useMemo(() => {
     const query = targaQuery.trim();
     const normQuery = normalizeTarga(query);
     const lowerQuery = query.toLowerCase();
-    return vehicleItems.filter((item) => {
+    return itemsInArea.filter((item) => {
       if (statusFilter !== "todos" && item.status !== statusFilter) return false;
       if (!query) return true;
       return (
@@ -481,7 +576,7 @@ export const MapPage = () => {
         (item.driver && item.driver.toLowerCase().includes(lowerQuery))
       );
     });
-  }, [vehicleItems, statusFilter, targaQuery]);
+  }, [itemsInArea, statusFilter, targaQuery]);
 
   // Centra/hace zoom sobre el vehiculo elegido en la lista y abre su InfoWindow - mismo
   // id que usan los Marker mas abajo (loc.servicio?.id ?? `idle-${loc.id}`). En celular
@@ -654,7 +749,7 @@ export const MapPage = () => {
               <header className="flex items-center justify-between gap-2 border-b border-line/10 px-4 py-3">
                 <h2 className="flex items-center gap-2 text-[14px] font-semibold text-ink-50">
                   <TruckIcon className="h-4 w-4 text-ink-300" />
-                  Vehículos <span className="font-normal text-ink-400">({vehicleItems.length})</span>
+                  Vehículos <span className="font-normal text-ink-400">({itemsInArea.length})</span>
                 </h2>
                 <button
                   type="button"
@@ -666,6 +761,24 @@ export const MapPage = () => {
                   <ChevronLeftIcon className="h-4 w-4" />
                 </button>
               </header>
+
+              <div className="flex flex-wrap gap-1.5 border-b border-line/10 px-3 py-2.5">
+                {areaTabs.map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setAreaFilter(tab.key)}
+                    aria-pressed={areaFilter === tab.key}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                      areaFilter === tab.key
+                        ? "border-accent-500/60 bg-accent-500/20 text-ink-50"
+                        : "border-line/10 text-ink-300 hover:bg-line/10"
+                    }`}
+                  >
+                    {tab.label} {tab.count}
+                  </button>
+                ))}
+              </div>
 
               <div className="flex flex-col gap-2.5 border-b border-line/10 p-3">
                 <div className="relative">
@@ -682,7 +795,7 @@ export const MapPage = () => {
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     { key: "todos", label: "Todos", color: null },
-                    ...["moving", "idlingOn", "idlingOff", ...(PHONE_GPS_ENABLED ? ["noGps"] : [])].map((key) => ({
+                    ...["moving", "idlingOn", "idlingOff", "noGps"].map((key) => ({
                       key,
                       label: STATUS_META[key].chip,
                       color: STATUS_META[key].color,
@@ -709,20 +822,20 @@ export const MapPage = () => {
               </div>
 
               <ul className="flex-1 overflow-y-auto p-1.5">
-                {enrichedLocations === null ? (
+                {enrichedLocations === null || fleet === null ? (
                   <li className="flex justify-center py-6">
                     <Spinner className="h-5 w-5 border-line/20 border-t-line" />
                   </li>
                 ) : visibleItems.length === 0 ? (
                   <li className="px-3 py-6 text-center text-[13px] text-ink-400">
-                    {vehicleItems.length === 0 ? "Ningún vehículo con ubicación ahora." : "Sin resultados."}
+                    {itemsInArea.length === 0 ? "Ningún vehículo en esta área." : "Sin resultados."}
                   </li>
                 ) : (
                   visibleItems.map((item) => (
                     <VehicleListItem
-                      key={item.targa ?? item.loc.id}
+                      key={item.targa ?? item.loc?.id}
                       item={item}
-                      active={openInfoId === (item.loc.servicio?.id ?? `idle-${item.loc.id}`)}
+                      active={!!item.loc && openInfoId === (item.loc.servicio?.id ?? `idle-${item.loc.id}`)}
                       onSelect={selectVehicle}
                     />
                   ))

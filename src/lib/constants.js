@@ -28,6 +28,9 @@ export const DESTINO_SUGERENCIAS = {
     { id: "segrate-wedo", label: "Segrate Wedo", lat: 45.4957098962224, lng: 9.306901004445473 },
     { id: "gallarate-trust", label: "Gallarate Trust", lat: 45.661734360997734, lng: 8.78631566371155 },
     { id: "lainate-world-courier", label: "Lainate World Courier/Cencora", lat: 45.56605997279036, lng: 9.009437343673945 },
+    { id: "via-mecenate-gucci", label: "Via Mecenate - Gucci", lat: 45.452556354603246, lng: 9.249917692461695 },
+    { id: "via-turati", label: "Via Turati", lat: 45.474463134360384, lng: 9.195140569497456 },
+    { id: "linate-dogana", label: "Linate Aeroporto Dogana", lat: 45.45645476935813, lng: 9.283428018585507 },
   ],
 };
 
