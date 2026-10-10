@@ -7,7 +7,7 @@ export const PALETTES = [
   {
     id: "clasico",
     label: "Clásico",
-    description: "Azul marino con el verde de Gamonal Driver.",
+    description: "Azul marino con el verde de Gamonal Driver 2.0.",
     swatches: ["#0a1628", "#12305f", "#2f8dff", "#22e093", "#6ff2b8"],
   },
   {

@@ -1,6 +1,6 @@
 {
   "appId": "com.gamonaltrasporti.app",
-  "appName": "Gamonal Driver",
+  "appName": "Gamonal Driver 2.0",
   "webDir": "dist",
   "android": {
     "useLegacyBridge": true

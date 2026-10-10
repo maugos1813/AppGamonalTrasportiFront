@@ -354,9 +354,9 @@ export const AppShell = () => {
         <aside className="hidden sm:sticky sm:top-0 sm:flex sm:h-dvh sm:w-60 sm:shrink-0 sm:flex-col sm:justify-between sm:border-r sm:border-sidebar-border sm:bg-sidebar sm:px-4 sm:py-6">
           <div>
             <Link to="/" className="flex items-center gap-3 px-2">
-              <img src={logo} alt="Gamonal Driver" className="h-10 w-10 shrink-0 rounded-full" />
+              <img src={logo} alt="Gamonal Driver 2.0" className="h-10 w-10 shrink-0 rounded-full" />
               <span className="text-[16px] font-semibold text-sidebar-foreground">
-                Gamonal <span className="text-sidebar-active">Driver</span>
+                Gamonal <span className="text-sidebar-active">Driver 2.0</span>
               </span>
             </Link>
 
@@ -440,12 +440,12 @@ export const AppShell = () => {
             >
               <img
                 src={logo}
-                alt="Gamonal Driver"
+                alt="Gamonal Driver 2.0"
                 className={clsx("h-10 w-10 shrink-0", isPrivileged ? "rounded-xl" : "rounded-full")}
               />
               {!isPrivileged && (
                 <span className="text-[20px] font-semibold text-ink-50">
-                  Gamonal <span className="text-brand">Driver</span>
+                  Gamonal <span className="text-brand">Driver 2.0</span>
                 </span>
               )}
             </button>

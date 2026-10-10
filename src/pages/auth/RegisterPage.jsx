@@ -52,7 +52,7 @@ export const RegisterPage = () => {
   return (
     <AuthLayout
       title="Crea tu cuenta"
-      subtitle="Únete al equipo de Gamonal Driver"
+      subtitle="Únete al equipo de Gamonal Driver 2.0"
       footer={
         <>
           Ya tienes cuenta?{" "}
