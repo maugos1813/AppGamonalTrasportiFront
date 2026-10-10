@@ -9,6 +9,7 @@ import { SearchableSelect } from "../../components/ui/SearchableSelect";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
+import { FechasAviso } from "../../components/records/FechasAviso";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
 import { buildSalidaPayload, EMPTY_SALIDA } from "../../components/records/SalidaField";
 import { useAuth } from "../../context/AuthContext";
@@ -217,7 +218,7 @@ export const NewExtrasStefaniaRecordPage = () => {
 
             <TextField
               id="fechaServicio"
-              label="Fecha de servicio"
+              label="Fecha de servicio (hora de Roma)"
               type="datetime-local"
               value={form.fechaServicio}
               onChange={handleChange("fechaServicio")}
@@ -236,13 +237,15 @@ export const NewExtrasStefaniaRecordPage = () => {
 
             <TextField
               id="eta"
-              label="ETA"
+              label="ETA (hora de Roma)"
               type="datetime-local"
               value={form.eta}
               onChange={handleChange("eta")}
               error={fieldErrors.eta?.[0]}
               required
             />
+
+            <FechasAviso fechas={form} />
           </div>
 
           <div className="mt-5">

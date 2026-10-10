@@ -17,6 +17,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
+import { FechasAviso } from "../../components/records/FechasAviso";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
 import { buildSalidaPayload } from "../../components/records/SalidaField";
 import { useAuth } from "../../context/AuthContext";
@@ -35,7 +36,6 @@ import {
   formatCurrency,
   formatDateTime,
   formatRomeDateTime,
-  toDateTimeInputValue,
   toRomeDateTimeInputValue,
 } from "../../lib/format";
 import {
@@ -254,8 +254,6 @@ const OWNER_FIELDS = [
   "stops",
   "descripcion",
   "ciudad",
-  "fechaServicio",
-  "eta",
   "kilometros",
   "precioKm",
   "areaC",
@@ -296,10 +294,11 @@ const toFormState = (record) => ({
     : [{ direccion: "", cap: "", lat: null, lng: null }],
   descripcion: record.descripcion ?? "",
   ciudad: record.ciudad ?? "",
-  fechaServicio: toDateTimeInputValue(record.fechaServicio),
-  eta: toDateTimeInputValue(record.eta),
-  // Hora de pared de Roma (el backend la interpreta asi); no entra en OWNER_FIELDS porque ""
-  // significa "borrar" y se maneja aparte en handleSave.
+  // Las tres fechas van en hora de pared de Roma (el backend las interpreta asi): lo que escribe la
+  // oficina es lo que se guarda. No entran en OWNER_FIELDS: se mandan solo si cambiaron (y "" en
+  // fechaRetiro significa "borrar"), ver handleSave.
+  fechaServicio: toRomeDateTimeInputValue(record.fechaServicio),
+  eta: toRomeDateTimeInputValue(record.eta),
   fechaRetiro: toRomeDateTimeInputValue(record.fechaRetiro),
   kilometros: record.kilometros ?? "",
   precioKm: record.precioKm ?? "",
@@ -518,6 +517,12 @@ export const RecordDetailPage = () => {
     // solo si cambio, para no disparar re-evaluaciones de mancatos de balde).
     if (!isChofer && form.fechaRetiro !== toRomeDateTimeInputValue(record.fechaRetiro)) {
       payload.fechaRetiro = form.fechaRetiro;
+    }
+    // Fecha de servicio y ETA: igual, solo si cambiaron (reenviarlas sin tocar les borraria los segundos).
+    if (!isChofer) {
+      for (const field of ["fechaServicio", "eta"]) {
+        if (form[field] && form[field] !== toRomeDateTimeInputValue(record[field])) payload[field] = form[field];
+      }
     }
 
     try {
@@ -742,12 +747,12 @@ const RecordSummaryView = ({
       <p className="mt-3 text-[15px] text-ink-200">{record.descripcion}</p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <InfoRow label="Fecha de servicio" value={formatDateTime(record.fechaServicio)} />
+        <InfoRow label="Fecha de servicio" value={`${formatRomeDateTime(record.fechaServicio)} (Roma)`} />
         <InfoRow
           label="Fecha retiro"
           value={record.fechaRetiro ? `${formatRomeDateTime(record.fechaRetiro)} (Roma)` : "Sin cargar"}
         />
-        <InfoRow label="ETA" value={formatDateTime(record.eta)} />
+        <InfoRow label="ETA" value={`${formatRomeDateTime(record.eta)} (Roma)`} />
         {record.salida?.direccion && <InfoRow label="Salida" value={record.salida.direccion} />}
         <InfoRow
           label="Vehiculo"
@@ -1045,7 +1050,7 @@ const RecordEditForm = ({
               />
               <TextField
                 id="fechaServicio"
-                label="Fecha de servicio"
+                label="Fecha de servicio (hora de Roma)"
                 type="datetime-local"
                 value={form.fechaServicio}
                 onChange={handleChange("fechaServicio")}
@@ -1059,12 +1064,20 @@ const RecordEditForm = ({
               />
               <TextField
                 id="eta"
-                label="ETA"
+                label="ETA (hora de Roma)"
                 type="datetime-local"
                 value={form.eta}
                 onChange={handleChange("eta")}
               />
             </div>
+
+            <FechasAviso
+              fechas={form}
+              original={{
+                eta: toRomeDateTimeInputValue(record.eta),
+                fechaServicio: toRomeDateTimeInputValue(record.fechaServicio),
+              }}
+            />
 
             <StopListEditor
               stops={form.stops}

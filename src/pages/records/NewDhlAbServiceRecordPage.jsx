@@ -16,6 +16,7 @@ import { listClientsRequest } from "../../lib/clients.api";
 import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS, destinoSugerencias } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { DestinoSugerencias } from "../../components/records/DestinoSugerencias";
+import { FechasAviso } from "../../components/records/FechasAviso";
 import { buildSalidaPayload, EMPTY_SALIDA, SalidaField } from "../../components/records/SalidaField";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -252,7 +253,7 @@ export const NewDhlAbServiceRecordPage = () => {
 
             <TextField
               id="fechaServicio"
-              label="Data"
+              label="Data (hora de Roma)"
               type="datetime-local"
               value={form.fechaServicio}
               onChange={handleChange("fechaServicio")}
@@ -271,13 +272,15 @@ export const NewDhlAbServiceRecordPage = () => {
 
             <TextField
               id="eta"
-              label="ETA"
+              label="ETA (hora de Roma)"
               type="datetime-local"
               value={form.eta}
               onChange={handleChange("eta")}
               error={fieldErrors.eta?.[0]}
               required
             />
+
+            <FechasAviso fechas={form} />
 
             <SearchableSelect
               id="spedizzione"
