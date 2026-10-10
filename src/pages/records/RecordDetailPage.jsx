@@ -52,6 +52,36 @@ import { listVehiclesRequest } from "../../lib/vehicles.api";
 // Jornada declarada por el chofer (inicio/fin, espera, pausa) y su estado de aprobacion. El chofer
 // puede cargarla o corregirla mientras no este aprobada; la oficina las revisa en Finanzas > Horas.
 const JornadaOfService = ({ record, isChofer, onOpenHours }) => {
+  const location = useLocation();
+  const viaje = record.compactado;
+  // Servicio que no es el principal de un viaje compacto: las horas son las del viaje, se cargan en el principal.
+  if (viaje && !viaje.principal) {
+    return (
+      <div className="mt-6 border-t border-line/10 pt-6">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h3 className="text-[13px] font-medium uppercase tracking-wide text-ink-400">Horas trabajadas</h3>
+          <HorasEstadoChip estado={viaje.principalHoras} />
+        </div>
+        <p className="mt-2 text-[13px] text-ink-300">
+          Las horas de este viaje se cargan una sola vez, en{" "}
+          <Link
+            to={`/records/${viaje.principalId}`}
+            state={{ backgroundLocation: location.state?.backgroundLocation ?? location }}
+            replace
+            className="font-semibold text-accent-300 hover:underline"
+          >
+            {viaje.principalCodigo}
+          </Link>
+          .{" "}
+          {viaje.principalHoras
+            ? "Ya están cargadas (estado arriba)."
+            : isChofer
+              ? "Todavía no las cargaste."
+              : "El chofer todavía no las cargó."}
+        </p>
+      </div>
+    );
+  }
   const j = record.jornada ?? {};
   const delivered = ["CONSEGNATO", "RITIRATO", "IN_CONSEGNA"].includes(record.estado);
   const canLoad = isChofer && delivered && j.estado !== "APROBADAS" && j.estado !== "PENDIENTE";
@@ -232,6 +262,10 @@ const FuelOfService = ({ record }) => {
     </div>
   );
 };
+
+// Estados de un servicio todavia abierto: el chofer mueve el viaje compacto entre estos; lo entrega terminando el viaje.
+const OPEN_STATUSES = ["IN_SOSPESO", "IN_CONSEGNA", "RITIRATO"];
+const STATUS_LABEL = Object.fromEntries(RECORD_STATUS_OPTIONS.map((opt) => [opt.value, opt.label]));
 
 const OPERATIONAL_FIELDS = [
   "estado",
@@ -492,6 +526,12 @@ export const RecordDetailPage = () => {
         ])
         .filter(([, value]) => value !== "" && value !== undefined)
     );
+
+    // Servicio de un viaje compacto: los km son los del viaje (no se mandan) y el estado solo si cambio.
+    if (record.compactado) {
+      delete payload.kilometrosReales;
+      if (payload.estado === record.estado) delete payload.estado;
+    }
 
     // Salida: solo si cambio respecto de lo guardado; vacia = vuelve al deposito.
     if (!isChofer) {
@@ -948,7 +988,9 @@ const RecordEditForm = ({
       </h2>
       <p className="mt-1 text-[13px] text-ink-300">
         {isChofer
-          ? "Kilometros reales y comentarios del servicio. Tus horas se cargan con el boton Cargar horas."
+          ? record.compactado
+            ? "Estado y comentarios del servicio. Tus horas y los km del viaje se cargan con el boton Cargar horas."
+            : "Kilometros reales y comentarios del servicio. Tus horas se cargan con el boton Cargar horas."
           : "Modifica cualquier dato del servicio, incluidos los planificados y economicos."}
       </p>
 
@@ -1104,26 +1146,54 @@ const RecordEditForm = ({
           </>
         )}
 
-        <SearchableSelect
-          id="estado"
-          label="Estado"
-          placeholder="Escribe para buscar un estado"
-          options={RECORD_STATUS_OPTIONS}
-          maxSuggestions={RECORD_STATUS_OPTIONS.length}
-          value={form.estado}
-          onChange={(v) => setField("estado", v)}
-        />
+        {isChofer && record.compactado && !OPEN_STATUSES.includes(record.estado) ? (
+          <p className="text-[13px] text-ink-300">
+            Estado: <b className="text-ink-50">{STATUS_LABEL[record.estado] ?? record.estado}</b>. Los servicios de un
+            viaje se entregan todos juntos al terminar el viaje.
+          </p>
+        ) : (
+          <div>
+            <SearchableSelect
+              id="estado"
+              label="Estado"
+              placeholder="Escribe para buscar un estado"
+              options={
+                isChofer && record.compactado
+                  ? RECORD_STATUS_OPTIONS.filter((opt) => OPEN_STATUSES.includes(opt.value))
+                  : RECORD_STATUS_OPTIONS
+              }
+              maxSuggestions={RECORD_STATUS_OPTIONS.length}
+              value={form.estado}
+              onChange={(v) => setField("estado", v)}
+            />
+            {isChofer && record.compactado && (
+              <p className="mt-1.5 text-[12px] text-ink-400">
+                Cambia el estado de todo el viaje. Para entregarlo usa «Terminar viaje».
+              </p>
+            )}
+          </div>
+        )}
 
-        <TextField
-          id="kilometrosReales"
-          label={`Kilometros reales${record.kilometros != null ? ` (planificado: ${record.kilometros} km)` : ""}`}
-          type="number"
-          step="0.1"
-          min="0"
-          placeholder="Kilometros recorridos"
-          value={form.kilometrosReales}
-          onChange={handleChange("kilometrosReales")}
-        />
+        {record.compactado ? (
+          <div className="rounded-xl bg-accent-500/10 px-4 py-3 text-[13px] text-ink-200">
+            <b className="text-accent-300">Km reales del viaje compacto.</b>{" "}
+            {record.kilometrosReales != null ? `Este servicio: ${record.kilometrosReales} km (viaje: ${record.compactado.km?.real ?? "-"} km). ` : ""}
+            {isChofer
+              ? `Los km se cargan para todo el viaje, junto con tus horas (en ${record.compactado.principalCodigo}): el sistema los reparte entre los servicios.`
+              : "Los km se reparten entre los servicios del viaje: usa «Ajustar reparto de km» en la tarjeta del viaje."}
+          </div>
+        ) : (
+          <TextField
+            id="kilometrosReales"
+            label={`Kilometros reales${record.kilometros != null ? ` (planificado: ${record.kilometros} km)` : ""}`}
+            type="number"
+            step="0.1"
+            min="0"
+            placeholder="Kilometros recorridos"
+            value={form.kilometrosReales}
+            onChange={handleChange("kilometrosReales")}
+          />
+        )}
 
         {!isChofer && (
         <div>
