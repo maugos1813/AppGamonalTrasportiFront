@@ -614,13 +614,6 @@ export const RecordDetailPage = () => {
         </Link>
       </div>
 
-      {record.appsheetSyncFallido && (
-        <div className="rounded-xl border border-status-rischedulato/25 bg-status-rischedulato/5 px-4 py-3 text-[13px] text-status-rischedulato">
-          Este servicio se guardo en la app pero no se pudo sincronizar con AppSheet. Se va a
-          reintentar la proxima vez que se edite, o se puede avisar a soporte para forzarlo antes.
-        </div>
-      )}
-
       {isEditing ? (
         <RecordEditForm
           record={record}
@@ -784,8 +777,22 @@ const RecordSummaryView = ({
           Kilometraje
         </h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <InfoRow label="Km planificados" value={record.kilometros ?? "-"} />
-          <InfoRow label="Km reales" value={record.kilometrosReales ?? "-"} />
+          <InfoRow
+            label="Km planificados"
+            value={
+              record.compactado?.km
+                ? `${record.kilometros ?? "-"} (viaje: ${record.compactado.km.planificado})`
+                : (record.kilometros ?? "-")
+            }
+          />
+          <InfoRow
+            label={record.compactado?.km ? "Km reales (de este servicio)" : "Km reales"}
+            value={
+              record.compactado?.km?.real != null
+                ? `${record.kilometrosReales ?? "-"} (viaje: ${record.compactado.km.real})`
+                : (record.kilometrosReales ?? "-")
+            }
+          />
           {!isChofer && (
             <InfoRow
               label="Diferencia"

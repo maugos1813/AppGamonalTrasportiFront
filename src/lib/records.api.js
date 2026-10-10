@@ -21,10 +21,6 @@ export const searchRecordsRequest = (q) =>
 export const exportRecordsRequest = (filters) =>
   api.get("/records/export", { params: filters }).then((res) => res.data.data.records);
 
-// Registros cuyo ultimo intento de sincronizar con AppSheet fallo (campanita OWNER/ADMIN).
-export const listAppsheetSyncFailuresRequest = () =>
-  api.get("/records/sync-fallidos").then((res) => res.data.data.records);
-
 // Resumen liviano (id/fechaServicio/estado) de un mes, para armar el acordeon de
 // dias sin traer stops/ruta/economico de cada registro.
 export const listRecordsSummaryByMonthRequest = (year, month) =>
@@ -89,3 +85,7 @@ export const reordenarCompactadoRequest = (compactadoId, recordIds) =>
   api.patch(`/records/compactar/${compactadoId}`, { recordIds }).then((res) => res.data.data.viaje);
 
 export const descompactarRequest = (compactadoId) => api.delete(`/records/compactar/${compactadoId}`);
+
+// La oficina corrige el reparto de km reales de un viaje: reparto = [{ id, km }] con todos sus servicios.
+export const ajustarKmViajeRequest = (compactadoId, { reparto, nota }) =>
+  api.put(`/records/compactar/${compactadoId}/km`, { reparto, ...(nota ? { nota } : {}) }).then((res) => res.data.data.viaje);

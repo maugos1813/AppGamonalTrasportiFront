@@ -8,6 +8,7 @@ import { Textarea } from "../ui/Textarea";
 import { parseApiError } from "../../lib/api";
 import { formatRomeDateTime, toRomeDateTimeInputValue } from "../../lib/format";
 import { PAY_RULES_FALLBACK } from "../../lib/finanzas";
+import { extraEsGrande, formatKmValue, repartirKm } from "../../lib/compactado";
 import { formatHours, previewShift } from "../../lib/horas";
 import { submitHorasRequest } from "../../lib/horas.api";
 import { updateDeclaracionesRequest } from "../../lib/records.api";
@@ -64,7 +65,12 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
   const [fin, setFin] = useState(toRomeDateTimeInputValue(jornada.fin ?? new Date()));
   const [esperaMin, setEsperaMin] = useState(String(jornada.esperaMin ?? 0));
   const [pausaMin, setPausaMin] = useState(String(jornada.pausaMin ?? 0));
-  const [km, setKm] = useState(record.kilometrosReales ?? "");
+  // Viaje compacto: los km reales son los de TODO el viaje y el sistema los reparte entre sus servicios.
+  const viajeKm = record.compactado?.principal ? record.compactado.km : null;
+  const [km, setKm] = useState(viajeKm ? (viajeKm.real ?? "") : (record.kilometrosReales ?? ""));
+  // Con km de mas, en que servicios fueron (si marca varios se reparten) y por que.
+  const [extraIds, setExtraIds] = useState(viajeKm?.reparto?.origen === "CHOFER" ? (viajeKm.reparto.servicioIds ?? []) : []);
+  const [extraNota, setExtraNota] = useState(viajeKm?.reparto?.origen === "CHOFER" ? (viajeKm.reparto.nota ?? "") : "");
   const [comentarios, setComentarios] = useState(record.comentarios ?? "");
   // Termino sin pasar por el lugar de espera (por ejemplo fue directo a casa): su fin es la hora de llegada.
   const [finFueraDeBase, setFinFueraDeBase] = useState(Boolean(jornada.finFueraDeBase));
@@ -103,6 +109,19 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
       handoverError = "Tu jornada no puede terminar antes de entregar el paquete: termina cuando vuelves al lugar de espera.";
     }
   }
+  // Km de mas del viaje: reales anotados menos planificados de todos sus servicios.
+  const kmNum = km !== "" ? Number(km) : null;
+  const kmExtra = viajeKm && kmNum != null ? Math.round((kmNum - viajeKm.planificado) * 10) / 10 : null;
+  const kmExtraGrande = kmExtra != null && kmExtra > 0 && extraEsGrande(kmExtra, viajeKm.planificado);
+  const kmReparto =
+    viajeKm && kmNum != null
+      ? repartirKm({
+          total: kmNum,
+          servicios: record.compactado.servicios.map((s) => ({ id: s.id, plan: s.kmPlan ?? 0 })),
+          extraIds: kmExtra > 0 ? extraIds : [],
+        })
+      : null;
+  const toggleExtra = (id) => setExtraIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   const canSubmit = preview.totalMin != null && !preview.error && !handoverError;
 
   const handleSubmit = async (e) => {
@@ -117,6 +136,9 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
         esperaMin: Number(esperaMin) || 0,
         pausaMin: Number(pausaMin) || 0,
         ...(km !== "" ? { kilometrosReales: Number(km) } : {}),
+        ...(viajeKm && kmExtra > 0 && (extraIds.length > 0 || extraNota.trim())
+          ? { kmExtra: { servicioIds: extraIds, ...(extraNota.trim() ? { nota: extraNota.trim() } : {}) } }
+          : {}),
         ...(comentarios.trim() ? { comentarios: comentarios.trim() } : {}),
         entregado: true,
         finFueraDeBase,
@@ -260,16 +282,77 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
               />
             </div>
 
-            <TextField
-              id="horas-km"
-              label="Km reales (opcional)"
-              type="number"
-              inputMode="decimal"
-              min="0"
-              step="0.1"
-              value={km}
-              onChange={(e) => setKm(e.target.value)}
-            />
+            <div>
+              <TextField
+                id="horas-km"
+                label={viajeKm ? "Km reales de todo el viaje (opcional)" : "Km reales (opcional)"}
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.1"
+                value={km}
+                onChange={(e) => setKm(e.target.value)}
+              />
+              {viajeKm && (
+                <div className="mt-2 text-[12px] text-ink-300">
+                  Planificado del viaje: <b className="text-ink-100">{formatKmValue(viajeKm.planificado)}</b>
+                  {record.compactado.servicios.length > 1 &&
+                    ` (${record.compactado.servicios.map((s) => formatKmValue(s.kmPlan).replace(" km", "")).join(" + ")})`}
+                  . Anota los km de todo el viaje: el sistema los reparte entre los servicios.
+                </div>
+              )}
+
+              {viajeKm && kmNum != null && kmExtra > 0 && !kmExtraGrande && (
+                <p className="mt-2 text-[12px] text-ink-400">
+                  Hiciste {formatKmValue(kmExtra)} más de lo planificado: se reparten solos entre los servicios.
+                </p>
+              )}
+
+              {viajeKm && kmExtraGrande && (
+                <div className="mt-3 rounded-xl bg-warning-500/10 px-4 py-3">
+                  <p className="text-[13px] font-medium text-ink-50">
+                    Hiciste {formatKmValue(kmExtra)} más de lo planificado. ¿En qué servicio fue?
+                  </p>
+                  <p className="mt-0.5 text-[12px] text-ink-300">
+                    Marca el que tuvo los km de más (si marcas varios, se reparten entre ellos). Si no sabes, déjalo sin
+                    marcar y se reparten proporcional.
+                  </p>
+                  <div className="mt-2 flex flex-col gap-1.5">
+                    {record.compactado.servicios.map((s) => (
+                      <label key={s.id} className="flex items-center gap-2.5 text-[13px] text-ink-100">
+                        <input
+                          type="checkbox"
+                          checked={extraIds.includes(s.id)}
+                          onChange={() => toggleExtra(s.id)}
+                          className="h-4 w-4 shrink-0 rounded border-line/20 bg-transparent accent-accent-500"
+                        />
+                        <span className="min-w-0 truncate">
+                          {s.codigo} · {s.destinazione}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="mt-3">
+                    <Textarea
+                      id="horas-km-extra-nota"
+                      label="¿Por qué? (opcional)"
+                      rows={2}
+                      value={extraNota}
+                      onChange={(e) => setExtraNota(e.target.value)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {kmReparto && record.compactado.servicios.length > 1 && (
+                <p className="mt-2 text-[12px] text-ink-300">
+                  Quedaría:{" "}
+                  {record.compactado.servicios
+                    .map((s) => `${s.codigo.split("-").pop()} ${formatKmValue(kmReparto.km.find((r) => r.id === s.id)?.km)}`)
+                    .join(" · ")}
+                </p>
+              )}
+            </div>
             <Textarea
               id="horas-comentarios"
               label="Comentarios (opcional)"

@@ -3,7 +3,6 @@ import { useLocation } from "react-router-dom";
 import { PHONE_GPS_ENABLED } from "../lib/features";
 import { useAuth } from "./AuthContext";
 import {
-  computeAppsheetSyncAlerts,
   computeAreaCAlerts,
   computeBirthdayAlerts,
   computeCurrentService,
@@ -22,7 +21,6 @@ import { desdeCorte } from "../lib/fechasCorte";
 import { cancelIdle, scheduleIdle } from "../lib/idle";
 import { startVisibleInterval } from "../lib/polling";
 import {
-  listAppsheetSyncFailuresRequest,
   listPendingRecordsRequest,
   listRecordFilesRequest,
   listRecordsRequest,
@@ -178,7 +176,6 @@ const buildOwnerAlerts = async () => {
     users,
     vehicles,
     documents,
-    syncFailures,
     areaCEntries,
     speedingEvents,
     multaAlerts,
@@ -190,7 +187,6 @@ const buildOwnerAlerts = async () => {
       listUsersRequest(),
       listVehiclesRequest(),
       listDocumentsRequest(),
-      listAppsheetSyncFailuresRequest(),
       listUnpaidAreaCEntriesRequest(),
       listSpeedingEventsRequest(),
       // Multas vencidas / por vencer / descuentos pendientes (una sola consulta liviana).
@@ -213,7 +209,6 @@ const buildOwnerAlerts = async () => {
     ...computeVehicleDocumentAlerts(vehicles),
     ...computeVehicleMaintenanceAlerts(vehicles),
     ...computeBirthdayAlerts(users),
-    ...computeAppsheetSyncAlerts(syncFailures),
     ...computeAreaCAlerts(areaCEntries),
     ...computeSpeedingAlerts(speedingEvents),
     ...computeMultaAlerts(multaAlerts, true),

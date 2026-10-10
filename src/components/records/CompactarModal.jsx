@@ -13,7 +13,7 @@ import { compactarRequest, listCompactablesRequest } from "../../lib/records.api
 const chofer = (s) => (s.driver ? `${s.driver.nombre} ${s.driver.apellido}` : "Sin chofer");
 
 // "Compactar": el Admin/Responsable junta 2 o mas servicios de un mismo chofer y vehiculo en un solo viaje.
-// Sugiere los ultimos servicios creados (solo de sus areas); al elegir el primero, solo se pueden sumar los del
+// Sugiere los ultimos servicios creados (solo de sus areas; tambien los de ETA vencida o ya entregados sin horas); al elegir el primero, solo se pueden sumar los del
 // mismo chofer y vehiculo. El orden de las paradas se puede dejar por ETA o ajustar a mano; el primero es el
 // servicio principal (ahi se cargan las horas de todo el viaje).
 export const CompactarModal = ({ open, onClose, onDone }) => {
@@ -102,13 +102,17 @@ export const CompactarModal = ({ open, onClose, onDone }) => {
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-ink-400">
             Últimos servicios creados
           </h3>
+          <p className="mt-1 text-[12px] text-ink-400">
+            Aparecen también los que se cargaron cuando el viaje ya pasó (ETA vencida o ya entregados), mientras no tengan
+            horas cargadas.
+          </p>
           {items === null && !loadError && (
             <p className="mt-3 flex items-center gap-2 text-[13px] text-ink-300">
               <Spinner className="h-4 w-4" /> Cargando…
             </p>
           )}
           {items?.length === 0 && (
-            <p className="mt-3 text-[13px] text-ink-300">No hay servicios abiertos para compactar.</p>
+            <p className="mt-3 text-[13px] text-ink-300">No hay servicios para compactar.</p>
           )}
           <div className="mt-2 flex flex-col gap-1.5">
             {items?.map((s) => {
@@ -138,6 +142,7 @@ export const CompactarModal = ({ open, onClose, onDone }) => {
                     </span>
                     <span className="mt-0.5 block text-[12px] text-ink-400">
                       {chofer(s)} · {s.vehicle?.targa ?? "-"} · ETA {formatDateTime(s.eta)}
+                      {new Date(s.eta) < new Date() ? " (vencida)" : ""}
                       {s.cliente ? ` · ${s.cliente}` : ""}
                     </span>
                     {s.recibidoDe && (

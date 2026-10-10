@@ -7,8 +7,10 @@ import { ChevronDownIcon, RouteIcon } from "../ui/icons";
 import { StatusBadge } from "../ui/StatusBadge";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
-import { moveItem, sortByEta } from "../../lib/compactado";
+import { formatKmValue, moveItem, sortByEta } from "../../lib/compactado";
 import { formatDateTime } from "../../lib/format";
+import { KmRepartoEditor } from "./KmRepartoEditor";
+import { KmViajeResumen } from "./KmViajeResumen";
 import { descompactarRequest, reordenarCompactadoRequest } from "../../lib/records.api";
 
 // Detalle de un servicio que va en un viaje compacto: las paradas en orden, cual es el principal y como se
@@ -20,6 +22,7 @@ export const ViajeCompactoCard = ({ record, isChofer, onChanged }) => {
   const [order, setOrder] = useState(viaje?.servicios ?? []);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [editingKm, setEditingKm] = useState(false);
 
   useEffect(() => {
     setOrder(viaje?.servicios ?? []);
@@ -99,7 +102,8 @@ export const ViajeCompactoCard = ({ record, isChofer, onChanged }) => {
                   {index === 0 && <span className="ml-2 text-[10px] font-semibold uppercase text-success-500">Principal</span>}
                 </span>
                 <span className="block text-[11px] text-ink-400">
-                  ETA {formatDateTime(s.eta)}
+                  ETA {formatDateTime(s.eta)} · Plan {formatKmValue(s.kmPlan)}
+                  {s.kmReal != null && ` · Real ${formatKmValue(s.kmReal)}`}
                   {s.recibidoDe && <span className="text-accent-400"> · recibido de {s.recibidoDe}</span>}
                 </span>
               </span>
@@ -131,6 +135,20 @@ export const ViajeCompactoCard = ({ record, isChofer, onChanged }) => {
         })}
       </ol>
 
+      <KmViajeResumen km={viaje.km} servicios={viaje.servicios} className="mt-3 rounded-xl bg-line/[0.05] px-3 py-2.5" />
+
+      {!isChofer && editingKm && (
+        <KmRepartoEditor
+          viaje={viaje}
+          onClose={() => setEditingKm(false)}
+          onSaved={() => {
+            setEditingKm(false);
+            refresh();
+            onChanged?.();
+          }}
+        />
+      )}
+
       <p className="mt-3 text-[12px] text-ink-300">
         {viaje.principal
           ? "Las horas, los peajes y el carburante de todo el viaje se cargan aquí, una sola vez."
@@ -142,6 +160,16 @@ export const ViajeCompactoCard = ({ record, isChofer, onChanged }) => {
 
       {!isChofer && (
         <div className="mt-3 flex flex-wrap items-center gap-3">
+          {!editingKm && (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setEditingKm(true)}
+              className="text-[12px] font-medium text-accent-400 hover:text-accent-300 disabled:opacity-40"
+            >
+              {viaje.km?.real != null ? "Ajustar reparto de km" : "Cargar km del viaje"}
+            </button>
+          )}
           {!principalHasHours && (
             <>
               <button

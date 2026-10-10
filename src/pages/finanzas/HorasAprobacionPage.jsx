@@ -10,6 +10,7 @@ import { AlertTriangleIcon, CheckCircleIcon } from "../../components/ui/icons";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { parseApiError } from "../../lib/api";
+import { KmViajeResumen } from "../../components/records/KmViajeResumen";
 import { formatCurrency, formatDate, formatRomeDateTime, toRomeDateTimeInputValue } from "../../lib/format";
 import { formatHours } from "../../lib/horas";
 import { listHorasPendientesRequest, recalcParadasRequest, recalcEstimacionRequest, reviewHorasRequest } from "../../lib/horas.api";
@@ -385,14 +386,29 @@ const ReviewCard = ({ item, onReviewed }) => {
         )}
         <Fact label="Espera">{j.esperaMin} min</Fact>
         <Fact label="Pausa no trabajada">{j.pausaMin} min</Fact>
-        <Fact label="Km reales / plan">
-          {item.kilometrosReales ?? "-"} / {item.kilometros ?? item.rutaDistanciaKm ?? "-"}
+        <Fact label={item.viaje?.km ? "Km del viaje real / plan" : "Km reales / plan"}>
+          {item.viaje?.km
+            ? `${item.viaje.km.real ?? "-"} / ${item.viaje.km.planificado}`
+            : `${item.kilometrosReales ?? "-"} / ${item.kilometros ?? item.rutaDistanciaKm ?? "-"}`}
         </Fact>
         <Fact label="Pago">
           <span className="text-ink-300 line-through decoration-ink-500">{formatCurrency(item.pago.actual)}</span>{" "}
           {formatCurrency(item.pago.siAprobada)}
         </Fact>
       </div>
+
+      {item.viaje?.km && item.viaje.km.real != null && (
+        <div className="mt-3 rounded-lg bg-accent-500/10 px-3 py-2">
+          <KmViajeResumen km={item.viaje.km} servicios={item.viaje.servicios} />
+          <Link
+            to={`/records/${item.id}`}
+            state={{ backgroundLocation: location }}
+            className="mt-1 inline-block text-[12px] font-medium text-accent-400 hover:text-accent-300"
+          >
+            Ver o ajustar el reparto de km &rarr;
+          </Link>
+        </div>
+      )}
 
       {item.comentarios && (
         <p className="mt-3 rounded-lg bg-line/5 px-3 py-2 text-[12px] text-ink-200">
