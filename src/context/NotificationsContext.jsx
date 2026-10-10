@@ -18,6 +18,7 @@ import {
 } from "../lib/dashboardStats";
 import { listDocumentsRequest } from "../lib/documents.api";
 import { formatDate } from "../lib/format";
+import { desdeCorte } from "../lib/fechasCorte";
 import { cancelIdle, scheduleIdle } from "../lib/idle";
 import { startVisibleInterval } from "../lib/polling";
 import {
@@ -96,7 +97,7 @@ const buildChoferAlerts = async () => {
 
   // Servicios que otro chofer no pudo terminar y se le asignaron: falta la hora de recepcion.
   records
-    .filter((r) => r.origen && !r.traspasoHora && r.estado !== "ANNULLATO")
+    .filter((r) => r.origen && !r.traspasoHora && r.estado !== "ANNULLATO" && desdeCorte(r.fechaServicio))
     .forEach((record) => {
       const from = record.origen.chofer ? `${record.origen.chofer.nombre} ${record.origen.chofer.apellido}` : "otro chofer";
       list.push({
@@ -109,7 +110,7 @@ const buildChoferAlerts = async () => {
 
   // Horas que el responsable devolvio para corregir.
   records
-    .filter((r) => r.jornada?.estado === "DEVUELTAS")
+    .filter((r) => r.jornada?.estado === "DEVUELTAS" && desdeCorte(r.fechaServicio))
     .forEach((record) => {
       list.push({
         id: `horas-devueltas-${record.id}`,
@@ -140,7 +141,8 @@ const buildChoferAlerts = async () => {
 
   const now = Date.now();
   const recentDelivered = records.filter(
-    (r) => r.estado === "CONSEGNATO" && now - new Date(r.fechaServicio).getTime() <= FOURTEEN_DAYS_MS
+    (r) =>
+      r.estado === "CONSEGNATO" && desdeCorte(r.fechaServicio) && now - new Date(r.fechaServicio).getTime() <= FOURTEEN_DAYS_MS
   );
 
   const filesByRecord = await Promise.all(

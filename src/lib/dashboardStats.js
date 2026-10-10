@@ -1,4 +1,5 @@
 import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS, getTagliandoStatus } from "./constants";
+import { desdeCorte } from "./fechasCorte";
 import { formatCurrency, formatDate, formatDateTime } from "./format";
 import { RECORD_AREAS, classifyRecord } from "./recordAreas";
 
@@ -391,7 +392,8 @@ export const computeCurrentServices = (records) =>
 
 export const computeMyServiceCounts = (records, now = new Date()) => ({
   hoy: records.filter((r) => isSameDay(r.fechaServicio, now)).length,
-  pendientes: records.filter((r) => EN_PROCESO_STATUSES.includes(r.estado)).length,
+  // Solo los servicios desde el corte: los anteriores no cuentan como pendientes.
+  pendientes: records.filter((r) => EN_PROCESO_STATUSES.includes(r.estado) && desdeCorte(r.fechaServicio)).length,
   completados: records.filter((r) => r.estado === "CONSEGNATO").length,
   cancelados: records.filter((r) => r.estado === "ANNULLATO").length,
 });
@@ -607,6 +609,7 @@ export const computeOverdueServices = (records, now = new Date()) =>
   records.filter(
     (r) =>
       (r.estado === "IN_CONSEGNA" || r.estado === "IN_SOSPESO") &&
+      desdeCorte(r.fechaServicio) &&
       new Date(r.fechaServicio) < now
   );
 

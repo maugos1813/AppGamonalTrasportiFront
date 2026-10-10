@@ -1,4 +1,5 @@
 import { EN_PROCESO_STATUSES } from "./constants";
+import { desdeCorte } from "./fechasCorte";
 import { needsHours } from "./horas";
 
 // Servicios del chofer que todavia le piden algo: terminarlos, cargar las horas de manejo, o declarar los peajes
@@ -20,6 +21,8 @@ const FALTANTE_KEYS = ["ida", "vuelta", "combustible"];
 // [{ key, label }] de lo que falta en un servicio; vacio = al dia.
 export const pendingItems = (record, now = Date.now()) => {
   if (!record || record.estado === "ANNULLATO" || record.estado === "RISCHEDULATO") return [];
+  // Los servicios de antes del corte no generan pendientes.
+  if (!desdeCorte(record.fechaServicio)) return [];
   // Viaje compacto: lo pendiente de todo el viaje lo lleva el servicio principal.
   if (record.compactado && !record.compactado.principal) return [];
   const items = [];

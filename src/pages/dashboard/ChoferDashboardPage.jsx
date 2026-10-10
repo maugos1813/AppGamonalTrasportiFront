@@ -12,6 +12,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useCerrarServicio } from "../../hooks/useCerrarServicio";
 import { parseApiError } from "../../lib/api";
 import { computeMyServiceCounts } from "../../lib/dashboardStats";
+import { desdeCorte } from "../../lib/fechasCorte";
 import { isPending, sortPending } from "../../lib/pendientes";
 import { listRecordsRequest } from "../../lib/records.api";
 import { getMyDrivingStyleRequest, getMyProgressRequest } from "../../lib/metas.api";
@@ -81,7 +82,9 @@ export const ChoferDashboardPage = () => {
   // Solo lo que le pide algo: terminar el servicio, cargar horas, declarar peajes o carburante.
   const pendingServices = records.filter(isPending).sort(sortPending);
   // Servicios que otro chofer no pudo terminar y se le asignaron a este: falta la hora de recepcion.
-  const awaitingReception = records.filter((r) => r.origen && !r.traspasoHora && r.estado !== "ANNULLATO");
+  const awaitingReception = records.filter(
+    (r) => r.origen && !r.traspasoHora && r.estado !== "ANNULLATO" && desdeCorte(r.fechaServicio)
+  );
   const myServiceCounts = computeMyServiceCounts(records);
 
   return (
