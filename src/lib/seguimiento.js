@@ -43,3 +43,12 @@ export const computeSeguimientoAlerts = (data) =>
     message: a.message,
     link: `/mapa/seguimiento?servicio=${a.recordId}`,
   }));
+
+// "Llegó a las 10:42 · 3 min antes de la ETA": hora real de llegada del GPS contra la ETA planificada.
+export const llegadaTexto = (llegoAt, puntualidadMin) => {
+  const hora = `Llegó a las ${horaRoma(llegoAt)}`;
+  if (puntualidadMin == null) return hora;
+  if (puntualidadMin > RETRASO_AVISO_MIN) return `${hora} · ${puntualidadMin} min tarde`;
+  if (puntualidadMin < -1) return `${hora} · ${Math.abs(puntualidadMin)} min antes de la ETA`;
+  return `${hora} · a tiempo`;
+};

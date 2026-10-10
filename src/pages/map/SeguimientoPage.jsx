@@ -17,6 +17,7 @@ import {
   SEGUIMIENTO_COLOR_SIN_GPS,
   SEGUIMIENTO_TIPOS,
   horaRoma,
+  llegadaTexto,
   minutosTexto,
   tipoMeta,
 } from "../../lib/seguimiento";
@@ -77,6 +78,12 @@ const ServicioItem = ({ s, active, onSelect }) => {
         </p>
         <p className="truncate text-[12px] text-ink-300">{s.destino}</p>
 
+        {s.llego ? (
+          <p className="mt-1.5 flex items-center gap-1.5 text-[13px] font-semibold text-[#22e093]">
+            <span aria-hidden>✓</span>
+            {llegadaTexto(s.llegoAt, s.puntualidadMin)}
+          </p>
+        ) : (
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="text-[13px] font-semibold text-ink-50">
             {simulado
@@ -90,6 +97,7 @@ const ServicioItem = ({ s, active, onSelect }) => {
             </span>
           )}
         </div>
+        )}
 
         {s.sinGps ? (
           <div className="mt-2 flex items-center justify-between gap-2">
@@ -109,7 +117,7 @@ const ServicioItem = ({ s, active, onSelect }) => {
             )}
           </div>
         ) : (
-          <p className="mt-1 text-[11px] text-ink-400">{FUENTE_GPS_LABEL[s.gps?.fuente]}</p>
+          s.gps && <p className="mt-1 text-[11px] text-ink-400">{FUENTE_GPS_LABEL[s.gps.fuente]}</p>
         )}
       </div>
     </li>
@@ -124,9 +132,10 @@ const LineaDeTiempo = ({ servicio, onSelect }) => (
     </p>
     <ol className="flex gap-0 overflow-x-auto pb-1">
       {servicio.timeline.map((t, index) => {
-        const tarde = !t.entregado && t.retrasoMin > RETRASO_AVISO_MIN;
+        const hecho = t.entregado || t.llego;
+        const tarde = !hecho && t.retrasoMin > RETRASO_AVISO_MIN;
         const actual = t.id === servicio.id;
-        const color = t.entregado ? "#22e093" : tarde ? SEGUIMIENTO_COLOR_RETRASO : "#3987e5";
+        const color = hecho ? "#22e093" : tarde ? SEGUIMIENTO_COLOR_RETRASO : "#3987e5";
         return (
           <li key={t.id} className="flex min-w-[150px] flex-1 flex-col">
             <div className="flex items-center">
@@ -140,7 +149,7 @@ const LineaDeTiempo = ({ servicio, onSelect }) => (
                 style={{ backgroundColor: color }}
                 aria-label={`Servicio ${t.orden}: ${t.codigo}`}
               >
-                {t.entregado ? "✓" : t.orden}
+                {hecho ? "✓" : t.orden}
               </button>
               {index < servicio.timeline.length - 1 && <span className="h-0.5 flex-1" style={{ backgroundColor: `${color}88` }} />}
             </div>
@@ -149,6 +158,8 @@ const LineaDeTiempo = ({ servicio, onSelect }) => (
               <p className="truncate text-[11.5px] text-ink-300">{t.destino}</p>
               {t.entregado ? (
                 <p className="text-[11.5px] font-medium text-[#22e093]">Entregado</p>
+              ) : t.llego ? (
+                <p className="text-[11.5px] font-medium text-[#22e093]">{llegadaTexto(t.llegoAt, t.puntualidadMin)}</p>
               ) : (
                 <p className="text-[11.5px] text-ink-300">
                   ETA {horaRoma(t.etaPlan)} ·{" "}
