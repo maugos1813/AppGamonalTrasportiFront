@@ -15,7 +15,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS } from "../../lib/constants";
+import { EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS, destinoSugerencias } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -29,7 +29,7 @@ const INITIAL_FORM = {
   // se elija Roma a proposito - eso fue justamente lo que dejo el switch Milano/Roma
   // de Registros sin poder confiar en el filtro (ver backfill-zona-milano.js).
   extrasPiazzaZona: "MILANO",
-  stops: [{ direccion: "", cap: "" }],
+  stops: [{ direccion: "", cap: "", lat: null, lng: null }],
   // Punto de salida: en blanco al empezar (si queda vacio se usa el deposito).
   salida: EMPTY_SALIDA,
   descripcion: "",
@@ -271,6 +271,7 @@ export const NewRecordPage = () => {
               salida={form.salida}
               onSalidaChange={(salida) => setField("salida", salida)}
               salidaError={fieldErrors.salida?.[0]}
+              sugerencias={destinoSugerencias("EXTRA_PIAZZA", form.extrasPiazzaZona)}
               error={fieldErrors.stops?.[0]}
               disabled={submitting}
             />

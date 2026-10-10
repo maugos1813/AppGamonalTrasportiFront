@@ -13,8 +13,9 @@ import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
-import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS } from "../../lib/constants";
+import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS, destinoSugerencias } from "../../lib/constants";
 import { createRecordRequest } from "../../lib/records.api";
+import { DestinoSugerencias } from "../../components/records/DestinoSugerencias";
 import { buildSalidaPayload, EMPTY_SALIDA, SalidaField } from "../../components/records/SalidaField";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -92,6 +93,19 @@ export const NewDhlAbServiceRecordPage = () => {
       .catch((err) => setLoadError(parseApiError(err).message));
   }, []);
 
+  // Destino elegido de las sugerencias (ubicacion exacta): { lat, lng }. Escribir la calle a mano lo descarta.
+  const [destinoExacto, setDestinoExacto] = useState(null);
+  const sugerenciasDestino = destinoSugerencias(form.spedizzione, form.extrasPiazzaZona);
+  const exactoVigente =
+    destinoExacto && sugerenciasDestino.some((s) => s.lat === destinoExacto.lat && s.lng === destinoExacto.lng)
+      ? destinoExacto
+      : null;
+
+  const pickDestino = (s) => {
+    setForm((prev) => ({ ...prev, calle: s.label, cap: "" }));
+    setDestinoExacto({ lat: s.lat, lng: s.lng });
+  };
+
   const handleChange = (field) => (e) =>
     setForm((prev) => ({ ...prev, [field]: e.target.value }));
 
@@ -105,7 +119,10 @@ export const NewDhlAbServiceRecordPage = () => {
 
     const { calle, cap, ciudad, salida, ...rest } = form;
     const salidaPayload = buildSalidaPayload(salida);
-    const direccion = buildAddress({ calle, cap, ciudad });
+    // Con una sugerencia (ubicacion exacta) la parada es solo el nombre del destino y sus coordenadas.
+    const direccion = exactoVigente
+      ? { direccion: calle.trim(), lat: exactoVigente.lat, lng: exactoVigente.lng }
+      : buildAddress({ calle, cap, ciudad });
     // DHL/AB Service no maneja codigos propios: se genera uno interno solo para
     // cumplir la columna unica de la base, no se le muestra al usuario.
     const codigo = `${form.spedizzione}-${Date.now()}`;
@@ -349,6 +366,15 @@ export const NewDhlAbServiceRecordPage = () => {
             mapa sea mas precisa.
           </p>
 
+          <DestinoSugerencias
+            className="mt-4"
+            sugerencias={sugerenciasDestino}
+            lat={exactoVigente?.lat}
+            lng={exactoVigente?.lng}
+            disabled={submitting}
+            onPick={pickDestino}
+          />
+
           <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
             <TextField
               id="calle"
@@ -356,7 +382,10 @@ export const NewDhlAbServiceRecordPage = () => {
               placeholder="Ej: Via delle Industrie, 2e"
               className="sm:col-span-2"
               value={form.calle}
-              onChange={handleChange("calle")}
+              onChange={(e) => {
+                setDestinoExacto(null);
+                handleChange("calle")(e);
+              }}
               error={fieldErrors.stops?.[0]}
               required
             />
@@ -365,6 +394,7 @@ export const NewDhlAbServiceRecordPage = () => {
               label="CAP"
               placeholder="Ej: 26014"
               value={form.cap}
+              disabled={Boolean(exactoVigente)}
               onChange={handleChange("cap")}
             />
             <TextField
@@ -375,7 +405,7 @@ export const NewDhlAbServiceRecordPage = () => {
               value={form.ciudad}
               onChange={handleChange("ciudad")}
               error={fieldErrors.ciudad?.[0]}
-              required
+              required={!exactoVigente}
             />
           </div>
         </GlassCard>

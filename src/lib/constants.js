@@ -14,6 +14,25 @@ export const SALIDA_SUGERENCIAS = [
   { id: "dhl-roma", label: "DHL Roma", direccion: "DHL Roma", lat: 41.87714283318788, lng: 12.359177365097292 },
 ];
 
+// Destinos frecuentes por area (solo atajos: la direccion sigue siendo de texto libre). Traen ubicacion exacta, asi no
+// se buscan en el mapa al guardar. Clave: "SPEDIZZIONE|ZONA".
+export const DESTINO_SUGERENCIAS = {
+  "DHL|MILANO": [
+    { id: "navetta-settala", label: "Navetta Settala", lat: 45.42892605725507, lng: 9.392336833887438 },
+    { id: "navetta-segrate", label: "Navetta Segrate", lat: 45.48365938751447, lng: 9.265573114520084 },
+    { id: "navetta-lancetti", label: "Navetta Lancetti", lat: 45.49531725706131, lng: 9.178625050425186 },
+    { id: "navetta-ferrera", label: "Navetta Ferrera", lat: 45.1003545280592, lng: 8.862973738302165 },
+  ],
+  "EXTRA_PIAZZA|MILANO": [
+    { id: "malpensa-cargo-city", label: "Malpensa Cargo City", lat: 45.609681671586074, lng: 8.718266109902153 },
+    { id: "segrate-wedo", label: "Segrate Wedo", lat: 45.4957098962224, lng: 9.306901004445473 },
+    { id: "gallarate-trust", label: "Gallarate Trust", lat: 45.661734360997734, lng: 8.78631566371155 },
+    { id: "lainate-world-courier", label: "Lainate World Courier/Cencora", lat: 45.56605997279036, lng: 9.009437343673945 },
+  ],
+};
+
+export const destinoSugerencias = (spedizzione, zona) => DESTINO_SUGERENCIAS[`${spedizzione}|${zona}`] ?? [];
+
 export const DEPOT_ORIGIN_LABEL = "Via Walter Tobagi, 8, 20068 Bettola-Zeloforamagno MI";
 
 export const AREA_OPTIONS = [

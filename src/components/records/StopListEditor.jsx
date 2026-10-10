@@ -1,14 +1,17 @@
 import { Button } from "../ui/Button";
 import { TextField } from "../ui/TextField";
 import { DEPOT_ORIGIN_LABEL } from "../../lib/constants";
+import { DestinoSugerencias } from "./DestinoSugerencias";
 import { SalidaField } from "./SalidaField";
 
 // Arma la direccion final que recibe el backend a partir de la parada (texto
 // libre, puede incluir el CAP) + el campo CAP aparte (ayuda opcional para que
 // la busqueda en el mapa sea mas precisa). Si el CAP ya esta en el texto no lo
 // duplica.
-export const combineStopAddress = ({ direccion, cap }) => {
+// Una parada elegida de las sugerencias (con lat/lng) sale como { direccion, lat, lng }: no se geocodifica.
+export const combineStopAddress = ({ direccion, cap, lat, lng }) => {
   const trimmedDireccion = direccion.trim();
+  if (trimmedDireccion && lat != null && lng != null) return { direccion: trimmedDireccion, lat, lng };
   const trimmedCap = cap.trim();
   if (!trimmedCap || trimmedDireccion.includes(trimmedCap)) return trimmedDireccion;
   return [trimmedDireccion, trimmedCap].filter(Boolean).join(", ");
@@ -19,14 +22,27 @@ export const combineStopAddress = ({ direccion, cap }) => {
 // referencia). Cada parada tiene una
 // direccion de texto libre y un CAP opcional aparte (ayuda para que el backend
 // geocodifique mejor); se combinan en un solo string antes de enviar al backend.
-export const StopListEditor = ({ stops, onChange, error, disabled, salida, onSalidaChange, salidaError }) => {
+export const StopListEditor = ({ stops, onChange, error, disabled, salida, onSalidaChange, salidaError, sugerencias }) => {
   const updateStop = (index, field, value) => {
     const next = [...stops];
     next[index] = { ...next[index], [field]: value };
     onChange(next);
   };
 
-  const addStop = () => onChange([...stops, { direccion: "", cap: "" }]);
+  // Escribir a mano descarta la ubicacion exacta de una sugerencia: se geocodifica el texto al guardar.
+  const typeAddress = (index, direccion) => {
+    const next = [...stops];
+    next[index] = { ...next[index], direccion, lat: null, lng: null };
+    onChange(next);
+  };
+
+  const pickSuggestion = (index, s) => {
+    const next = [...stops];
+    next[index] = { ...next[index], direccion: s.label, cap: "", lat: s.lat, lng: s.lng };
+    onChange(next);
+  };
+
+  const addStop = () => onChange([...stops, { direccion: "", cap: "", lat: null, lng: null }]);
 
   const removeStop = (index) => {
     if (stops.length === 1) return;
@@ -64,21 +80,31 @@ export const StopListEditor = ({ stops, onChange, error, disabled, salida, onSal
               "Nuevo servicio" y quedaba comprimido a unos pocos px (bug reportado) -
               con flex-wrap en la fila y este piso, los botones pasan a la siguiente
               linea en vez de aplastar el campo. */}
-          <div className="flex min-w-56 flex-1 flex-col gap-2 sm:flex-row">
-            <TextField
-              className="flex-1"
-              placeholder="Ej: Via delle Industrie, 2e, Romanengo CR"
-              value={stop.direccion}
+          <div className="flex min-w-56 flex-1 flex-col gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <TextField
+                className="flex-1"
+                placeholder="Ej: Via delle Industrie, 2e, Romanengo CR"
+                value={stop.direccion}
+                disabled={disabled}
+                onChange={(e) => typeAddress(index, e.target.value)}
+              />
+              <TextField
+                className="sm:w-28"
+                placeholder="CAP"
+                value={stop.cap}
+                disabled={disabled || stop.lat != null}
+                onChange={(e) => updateStop(index, "cap", e.target.value)}
+              />
+            </div>
+            <DestinoSugerencias
+              sugerencias={sugerencias}
+              lat={stop.lat}
+              lng={stop.lng}
               disabled={disabled}
-              onChange={(e) => updateStop(index, "direccion", e.target.value)}
+              onPick={(s) => pickSuggestion(index, s)}
             />
-            <TextField
-              className="sm:w-28"
-              placeholder="CAP"
-              value={stop.cap}
-              disabled={disabled}
-              onChange={(e) => updateStop(index, "cap", e.target.value)}
-            />
+            {stop.lat != null && <span className="text-[12px] text-ink-400">Ubicacion exacta guardada.</span>}
           </div>
           <div className="flex shrink-0 items-center gap-3 pt-3">
             <Button

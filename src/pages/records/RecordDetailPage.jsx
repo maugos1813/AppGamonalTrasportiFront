@@ -29,6 +29,7 @@ import {
   TIPO_ARCHIVO_LABELS,
   ZONA_LABELS,
   ZONA_OPTIONS,
+  destinoSugerencias,
 } from "../../lib/constants";
 import {
   formatCurrency,
@@ -291,8 +292,8 @@ const toFormState = (record) => ({
   aplicativo: record.aplicativo ?? "",
   extrasPiazzaZona: record.extrasPiazzaZona ?? "",
   stops: record.stops?.length
-    ? record.stops.map((s) => ({ direccion: s.direccion, cap: "" }))
-    : [{ direccion: "", cap: "" }],
+    ? record.stops.map((s) => ({ direccion: s.direccion, cap: "", lat: null, lng: null }))
+    : [{ direccion: "", cap: "", lat: null, lng: null }],
   descripcion: record.descripcion ?? "",
   ciudad: record.ciudad ?? "",
   fechaServicio: toDateTimeInputValue(record.fechaServicio),
@@ -1070,6 +1071,7 @@ const RecordEditForm = ({
               onChange={(stops) => setField("stops", stops)}
               salida={form.salida}
               onSalidaChange={(salida) => setField("salida", salida)}
+              sugerencias={destinoSugerencias(record.spedizzione, record.extrasPiazzaZona)}
               disabled={saving}
             />
 

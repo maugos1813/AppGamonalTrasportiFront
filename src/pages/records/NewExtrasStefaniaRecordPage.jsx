@@ -25,7 +25,7 @@ const INITIAL_FORM = {
   clientId: "",
   driverId: "",
   vehicleId: "",
-  stops: [{ direccion: "", cap: "" }],
+  stops: [{ direccion: "", cap: "", lat: null, lng: null }],
   // Punto de salida: en blanco al empezar (si queda vacio se usa el deposito).
   salida: EMPTY_SALIDA,
   descripcion: "",
