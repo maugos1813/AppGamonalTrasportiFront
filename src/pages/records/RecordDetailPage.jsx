@@ -774,15 +774,18 @@ const RecordSummaryView = ({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <StatusBadge status={record.estado} />
-          <button
-            type="button"
-            aria-label="Editar servicio"
-            title="Editar servicio"
-            onClick={onEdit}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/15 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20"
-          >
-            <PencilIcon className="h-[16px] w-[16px]" />
-          </button>
+          {/* El chofer no edita el servicio: sus horas y km se cargan con "Cargar horas" / "Terminar servicio". */}
+          {!isChofer && (
+            <button
+              type="button"
+              aria-label="Editar servicio"
+              title="Editar servicio"
+              onClick={onEdit}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full glass-surface-sm text-ink-300 transition-colors hover:bg-accent-500/15 hover:text-accent-400 focus:outline-none focus-visible:ring-4 focus-visible:ring-accent-500/20"
+            >
+              <PencilIcon className="h-[16px] w-[16px]" />
+            </button>
+          )}
           {isPrivileged && (
             <button
               type="button"
