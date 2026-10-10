@@ -7,7 +7,6 @@ import { TextField } from "../ui/TextField";
 import { Textarea } from "../ui/Textarea";
 import { parseApiError } from "../../lib/api";
 import { formatRomeDateTime, toRomeDateTimeInputValue } from "../../lib/format";
-import { PAY_RULES_FALLBACK } from "../../lib/finanzas";
 import { extraEsGrande, formatKmValue, repartirKm } from "../../lib/compactado";
 import { formatHours, previewShift } from "../../lib/horas";
 import { submitHorasRequest } from "../../lib/horas.api";
@@ -93,7 +92,7 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
   }, [saving, onClose]);
 
   const preview = useMemo(
-    () => previewShift({ inicio, fin, esperaMin, pausaMin }, reglas ?? PAY_RULES_FALLBACK),
+    () => previewShift({ inicio, fin, esperaMin, pausaMin }, reglas ?? { banda: { diaInicio: "06:30", nocheInicio: "22:00" } }),
     [inicio, fin, esperaMin, pausaMin, reglas]
   );
   // Coherencia con el traspaso: quien recibe empieza a mas tardar cuando recibio el paquete; quien lo
@@ -173,7 +172,7 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
             <h2 className="text-[19px] font-semibold text-ink-50">Servicio enviado</h2>
             <p className="text-[14px] text-ink-300">
               Tus horas quedaron en revision. Si todo está dentro de lo planificado (horas y km), se aprueban solas en unos
-              minutos; si no, las revisa el responsable. Cuando se aprueban, cuentan para tu pago.
+              minutos; si no, las revisa el responsable.
             </p>
             <div className="mt-2 w-full rounded-2xl bg-warning-500/10 px-4 py-3 text-left">
               <p className="text-[14px] font-medium text-ink-50">¿Pasaste por algun peaje sin pagar?</p>
@@ -383,21 +382,7 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
                       <b className="text-ink-50">{formatHours(preview.horasNoche)}</b> &middot; Espera{" "}
                       <b className="text-ink-50">{formatHours(preview.esperaHoras)}</b>
                     </span>
-                    {preview.pago != null && (
-                      <span className="text-[15px] font-semibold text-ink-50">
-                        ~ {preview.pago.toLocaleString("es-AR", { style: "currency", currency: "EUR" })}
-                      </span>
-                    )}
                   </div>
-                  {preview.reperibilidad && (
-                    <p className="mt-1 text-[12px] text-accent-300">
-                      Incluye +{(reglas ?? PAY_RULES_FALLBACK).reperibilidad.extraEur} EUR de reperibilidad (
-                      {preview.reperibilidad === "FESTIVO" ? "festivo" : "fin de semana"}).
-                    </p>
-                  )}
-                  <p className="mt-1 text-[11px] text-ink-400">
-                    Estimado: el pago final lo confirma el responsable al aprobar tus horas.
-                  </p>
                 </>
               ) : (
                 <p className="text-[13px] text-ink-400">Completa inicio y fin para ver tus horas.</p>

@@ -14,7 +14,7 @@ import { parseApiError } from "../../lib/api";
 import { computeMyServiceCounts } from "../../lib/dashboardStats";
 import { desdeCorte } from "../../lib/fechasCorte";
 import { isPending, sortPending } from "../../lib/pendientes";
-import { listRecordsRequest } from "../../lib/records.api";
+import { getSinSustentarRequest, listRecordsRequest } from "../../lib/records.api";
 import { getMyDrivingStyleRequest, getMyProgressRequest } from "../../lib/metas.api";
 import { updateMyReperibilidadRequest } from "../../lib/users.api";
 
@@ -36,6 +36,7 @@ export const ChoferDashboardPage = () => {
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(null);
   const [estilo, setEstilo] = useState(null);
+  const [sinSustentar, setSinSustentar] = useState(null);
 
   const [savingReperibilidad, setSavingReperibilidad] = useState(false);
   const [reperibilidadError, setReperibilidadError] = useState("");
@@ -62,6 +63,10 @@ export const ChoferDashboardPage = () => {
     // La meta es un extra: si falla, el resto del dashboard se ve igual.
     getMyProgressRequest()
       .then(setProgress)
+      .catch(() => {});
+    // Registros sin sustentar (peajes y carburante): tambien un extra, no frena el resto.
+    getSinSustentarRequest()
+      .then(setSinSustentar)
       .catch(() => {});
     // El estilo de manejo viene del GPS y puede tardar: va aparte para no demorar el resto de la tarjeta.
     getMyDrivingStyleRequest()
@@ -122,7 +127,7 @@ export const ChoferDashboardPage = () => {
         onUpload={actions.onUpload}
       />
 
-      <RendimientoCard progress={progress} estilo={estilo} />
+      <RendimientoCard progress={progress} estilo={estilo} sinSustentar={sinSustentar} />
 
       <ResumenServiciosCard counts={myServiceCounts} />
 

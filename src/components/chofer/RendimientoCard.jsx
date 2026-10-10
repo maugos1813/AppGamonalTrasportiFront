@@ -1,16 +1,9 @@
 import clsx from "clsx";
+import { Link } from "react-router-dom";
 import { nivelLabel } from "../../lib/roles";
-import { BulbIcon, RouteIcon, ShieldIcon, TrendIcon, TruckIcon } from "../ui/icons";
+import { AlertTriangleIcon, CheckCircleIcon, RouteIcon, ShieldIcon, TrendIcon, TruckIcon } from "../ui/icons";
 
 const km = (value) => `${Math.round(value).toLocaleString("es-AR")} km`;
-
-// Dias que quedan del mes (contando hoy), en hora de Roma.
-const daysLeftInMonth = (month) => {
-  const today = new Date().toLocaleDateString("en-CA", { timeZone: "Europe/Rome" });
-  if (!month || !today.startsWith(month)) return 0;
-  const [y, m, d] = today.split("-").map(Number);
-  return new Date(Date.UTC(y, m, 0)).getUTCDate() - d + 1;
-};
 
 // Color del estilo de manejo: baja del verde al rojo pasando por amarillo y naranja sin saltos. Puntos
 // (porcentaje, tono HSL) entre los que se interpola; hasta 40 es rojo, 60 naranja y desde 80 verde.
@@ -45,32 +38,6 @@ const styleVerdict = (value) => {
   return "A mejorar";
 };
 
-// Consejos de uso general: cuando no hay nada mas especifico que decirle, uno distinto cada dia.
-const GENERAL_TIPS = [
-  "Al terminar cada servicio, declara tus peajes y el carburante: no te quedan avisos en rojo.",
-  "Mira el trafico antes de salir: salir 10 minutos antes evita el apuro y las frenadas fuertes.",
-  "Mantén la distancia con el de adelante: frenar suave cuida el vehículo y tu estilo de manejo.",
-  "Carga las horas apenas termines el servicio: se aprueban y se pagan antes.",
-  "Revisa presion de neumaticos y luces al empezar el dia: un minuto que evita problemas en ruta.",
-];
-
-const dayOfYear = () => {
-  const now = new Date();
-  return Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
-};
-
-// Lo mas util para este chofer hoy, segun sus datos: primero el manejo, luego el ritmo de su meta.
-const buildTip = ({ estilo, meta, cumplida, faltan, left }) => {
-  if (estilo != null && estilo < 70) {
-    return "Anticipa los frenos y acelera de a poco: es lo que mas sube tu porcentaje de manejo.";
-  }
-  if (meta && !cumplida && left > 0 && faltan > 0) {
-    return `Para llegar a tu meta necesitas unos ${km(faltan / left)} por dia en los ${left} dias que quedan.`;
-  }
-  if (meta && cumplida) return "¡Meta cumplida! Todo lo que hagas de ahora es extra. Sigue con manejo suave.";
-  return GENERAL_TIPS[dayOfYear() % GENERAL_TIPS.length];
-};
-
 const Tile = ({ label, icon: Icon, accent, children, className }) => (
   <div
     className={clsx("flex min-w-0 flex-col justify-between gap-2 rounded-2xl border bg-line/[0.03] px-3.5 py-3.5", className)}
@@ -89,23 +56,62 @@ const Tile = ({ label, icon: Icon, accent, children, className }) => (
   </div>
 );
 
+// Registros sin sustentar: con 1 o mas, en rojo y con el aviso de que puede haber descuentos en el pago del mes.
+const SinSustentarTile = ({ data }) => {
+  const n = data?.registros ?? 0;
+  const red = "0 80% 58%";
+  const ok = "142 70% 45%";
+  const alerta = n > 0;
+  return (
+    <Tile label="Sin sustentar" icon={alerta ? AlertTriangleIcon : CheckCircleIcon} accent={data ? (alerta ? red : ok) : null}>
+      {data ? (
+        <>
+          <span className="text-[30px] font-semibold leading-none" style={{ color: `hsl(${alerta ? red : ok})` }}>
+            {n}
+          </span>
+          {alerta ? (
+            <>
+              <span className="text-[12px] font-medium leading-snug" style={{ color: `hsl(${red})` }}>
+                {n === 1 ? "registro" : "registros"} de peajes o carburante en {data.servicios}{" "}
+                {data.servicios === 1 ? "servicio" : "servicios"}
+              </span>
+              <span className="text-[11.5px] leading-snug text-ink-300">
+                Si no los sustentas, pueden aparecer descuentos no esperados en tu pago del mes.{" "}
+                <Link to="/mis-servicios" className="font-semibold underline" style={{ color: `hsl(${red})` }}>
+                  Sustentar
+                </Link>
+              </span>
+            </>
+          ) : (
+            <span className="text-[12px] text-ink-300">Todo sustentado, estas al dia</span>
+          )}
+        </>
+      ) : (
+        <>
+          <span className="text-[30px] font-semibold leading-none text-ink-400">—</span>
+          <span className="text-[12px] text-ink-300">Revisando tus servicios…</span>
+        </>
+      )}
+    </Tile>
+  );
+};
+
 const ProgressBar = ({ pct, color }) => (
   <div className="h-2 overflow-hidden rounded-full bg-line/15">
     <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: `hsl(${color})` }} />
   </div>
 );
 
-// "Mi rendimiento": avance de la meta de km, km del mes, estilo de manejo (OneSystec, de los ultimos dias) y
-// un consejo. `estilo` = { puntaje 1-100, dias, calculando } o null mientras carga o si no hay datos. Sale solo de
-// las jornadas del propio chofer (no del vehiculo entero, que otros tambien manejan).
-export const RendimientoCard = ({ progress, estilo: estiloData }) => {
+// "Mi rendimiento": avance de la meta de km, km del mes, estilo de manejo (OneSystec, de los ultimos dias) y los
+// registros sin sustentar. `estilo` = { puntaje 1-100, dias, calculando } o null mientras carga o si no hay datos. Sale
+// solo de las jornadas del propio chofer (no del vehiculo entero, que otros tambien manejan). `sinSustentar` =
+// { registros, servicios } (peajes y carburante de servicios hechos que faltan subir o declarar) o null mientras carga.
+export const RendimientoCard = ({ progress, estilo: estiloData, sinSustentar }) => {
   if (!progress) return null;
 
-  const { meta, km: done, porcentaje, faltan, cumplida, nivel, month } = progress;
+  const { meta, km: done, porcentaje, faltan, cumplida, nivel } = progress;
   const estilo = typeof estiloData?.puntaje === "number" ? Math.round(estiloData.puntaje) : null;
-  const left = daysLeftInMonth(month);
   const goalColor = cumplida ? "142 70% 45%" : "212 90% 60%";
-  const tip = buildTip({ estilo, meta, cumplida, faltan, left });
   const styleHsl = estilo != null ? styleColor(estilo) : null;
 
   return (
@@ -170,9 +176,7 @@ export const RendimientoCard = ({ progress, estilo: estiloData }) => {
           )}
         </Tile>
 
-        <Tile label="Consejo" icon={BulbIcon} accent="45 95% 55%">
-          <p className="text-[13px] leading-snug text-ink-50">{tip}</p>
-        </Tile>
+        <SinSustentarTile data={sinSustentar} />
       </div>
     </section>
   );

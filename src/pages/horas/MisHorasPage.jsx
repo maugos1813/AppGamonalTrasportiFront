@@ -7,19 +7,20 @@ import { MancatoKpi } from "../../components/mancato/MancatoKpi";
 import { Alert } from "../../components/ui/Alert";
 import { Button } from "../../components/ui/Button";
 import { PageLoader } from "../../components/ui/PageLoader";
-import { AlertTriangleIcon, ClockIcon, EuroIcon, RouteIcon } from "../../components/ui/icons";
-import { PayRulesCard } from "../../components/horas/PayRulesCard";
+import { AlertTriangleIcon, ClockIcon, RouteIcon } from "../../components/ui/icons";
 import { parseApiError } from "../../lib/api";
-import { COSTO_COLORS, currentMonth, kmSourceLabel, payCalcText } from "../../lib/finanzas";
+import { currentMonth } from "../../lib/finanzas";
 import { getPagosChoferesRequest } from "../../lib/finanzas.api";
-import { formatCurrency, formatDate, formatRomeDateTime } from "../../lib/format";
+import { formatDate, formatRomeDateTime } from "../../lib/format";
 import { formatHours } from "../../lib/horas";
 import { getRecordRequest } from "../../lib/records.api";
 
-const RulesCard = ({ reglas }) => <PayRulesCard reglas={reglas} title="Como se paga" />;
-
-const ServiceCard = ({ service, reglas, onLoadHours, loading }) => {
-  const needsLoad = !service.horasEstado || service.horasEstado === "DEVUELTAS";
+// Un servicio del mes: su jornada y el estado de sus horas. Sin importes: el chofer no ve dinero en esta pantalla.
+const ServiceCard = ({ service, onLoadHours, loading }) => {
+  // Servicio que va dentro de un viaje compacto: no lleva horas propias, son las del viaje (en el servicio principal).
+  const enViaje = service.incluidoEnViaje;
+  const needsLoad = !enViaje && (!service.horasEstado || service.horasEstado === "DEVUELTAS");
+  const viajeSinHoras = enViaje && !service.viajeHorasEstado;
   return (
     <div className="glass-surface rounded-2xl p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -34,36 +35,36 @@ const ServiceCard = ({ service, reglas, onLoadHours, loading }) => {
             {formatDate(service.fecha)} &middot; {[service.cliente, service.destinazione].filter(Boolean).join(" - ")}
           </span>
         </div>
-        <HorasEstadoChip estado={service.horasEstado} />
+        <HorasEstadoChip estado={enViaje ? service.viajeHorasEstado : service.horasEstado} />
       </div>
 
-      {service.horaInicioReal && service.horaFinReal && (
+      {enViaje && (
         <p className="mt-2 text-[12px] text-ink-300">
-          Jornada: {formatRomeDateTime(service.horaInicioReal)} &rarr; {formatRomeDateTime(service.horaFinReal)}
+          Incluido en el viaje de <b className="text-ink-100">{service.viajeCodigo}</b>: las horas de todo el viaje se cargan
+          una sola vez, ahi.
         </p>
       )}
 
-      <div className="mt-2 flex flex-wrap items-end justify-between gap-2">
-        <div className="min-w-0 text-[12px] text-ink-300">
-          {payCalcText(service, reglas)}
-          {service.modo === "KM" && service.kmFuente !== "SIN_DATO" && service.kmFuente !== "TRASPASO_SIN_KM" && (
-            <span className="ml-1.5 rounded bg-line/10 px-1.5 py-0.5 text-[10px] text-ink-400">
-              {kmSourceLabel(service.kmFuente)}
-            </span>
+      {!enViaje && service.horaInicioReal && service.horaFinReal && (
+        <p className="mt-2 text-[12px] text-ink-300">
+          Jornada: {formatRomeDateTime(service.horaInicioReal)} &rarr; {formatRomeDateTime(service.horaFinReal)}
+          {service.horas > 0 && (
+            <>
+              {" "}&middot; {formatHours(service.horas)} (dia {formatHours(service.horasDia)} - noche {formatHours(service.horasNoche)})
+            </>
           )}
-          {service.kmFuente === "TRASPASO_SIN_KM" && (
-            <span className="mt-0.5 block text-warning-500">
-              Este servicio tuvo traspaso: carga tus horas (o tus km reales) para que se te pague lo que manejaste.
-            </span>
-          )}
-          {service.estimadoSiAprobada != null && (
-            <span className="mt-0.5 block text-ink-400">
-              Si se aprueban tus horas: ~ {formatCurrency(service.estimadoSiAprobada)}
-            </span>
-          )}
-        </div>
-        <span className="text-[16px] font-semibold text-ink-50">{formatCurrency(service.total)}</span>
-      </div>
+        </p>
+      )}
+
+      {!enViaje && service.viajeServicios > 1 && (
+        <p className="mt-1 text-[12px] text-ink-300">Viaje de {service.viajeServicios} servicios: una sola jornada para todos.</p>
+      )}
+
+      {service.kmFuente === "TRASPASO_SIN_KM" && (
+        <p className="mt-1 text-[12px] text-warning-500">
+          Este servicio tuvo traspaso: carga tus horas (o tus km reales) para que se tenga en cuenta lo que manejaste.
+        </p>
+      )}
 
       {service.horasNota && (
         <p className="mt-2 rounded-lg bg-line/5 px-3 py-2 text-[12px] text-ink-200">
@@ -71,21 +72,24 @@ const ServiceCard = ({ service, reglas, onLoadHours, loading }) => {
         </p>
       )}
 
-      {needsLoad && (
+      {(needsLoad || viajeSinHoras) && (
         <Button
           className="mt-3 sm:w-auto sm:px-5 sm:py-2 sm:text-[13px]"
           loading={loading}
-          onClick={() => onLoadHours(service.id)}
+          onClick={() => onLoadHours(enViaje ? service.viajeId : service.id)}
         >
-          {service.horasEstado === "DEVUELTAS" ? "Corregir horas" : "Cargar horas"}
+          {enViaje
+            ? "Cargar horas del viaje"
+            : service.horasEstado === "DEVUELTAS"
+              ? "Corregir horas"
+              : "Cargar horas"}
         </Button>
       )}
     </div>
   );
 };
 
-// "Mis horas" (chofer): lo trabajado en el mes, lo que se paga, lo que falta cargar y el estado
-// de cada servicio.
+// "Mis horas" (chofer): lo trabajado en el mes, lo que falta cargar y el estado de cada servicio. No muestra dinero.
 export const MisHorasPage = () => {
   const [month, setMonth] = useState(currentMonth);
   const [data, setData] = useState(null);
@@ -119,12 +123,10 @@ export const MisHorasPage = () => {
 
   const me = data?.porChofer[0];
   const servicios = data?.servicios ?? [];
-  const sinCargar = servicios.filter((s) => !s.horasEstado).length;
-  const devueltas = servicios.filter((s) => s.horasEstado === "DEVUELTAS").length;
-  const estimadoPendiente = servicios
-    .filter((s) => s.horasEstado === "PENDIENTE")
-    .reduce((sum, s) => sum + (s.estimadoSiAprobada ?? 0) - s.total, 0);
-  const aDescontar = me?.aDescontar.total ?? 0;
+  // Los servicios incluidos en un viaje no cuentan: sus horas son las del viaje (en el servicio principal).
+  const propios = servicios.filter((s) => !s.incluidoEnViaje);
+  const sinCargar = propios.filter((s) => !s.horasEstado).length;
+  const devueltas = propios.filter((s) => s.horasEstado === "DEVUELTAS").length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -132,7 +134,7 @@ export const MisHorasPage = () => {
         <div>
           <h1 className="text-[26px] font-semibold leading-tight text-ink-50">Mis horas</h1>
           <p className="mt-0.5 max-w-xl text-[14px] text-ink-300">
-            Lo que trabajaste, lo que te corresponde cobrar y lo que falta cargar.
+            Lo que trabajaste y lo que falta cargar.
           </p>
         </div>
         <MonthSelector month={month} onChange={setMonth} />
@@ -143,7 +145,7 @@ export const MisHorasPage = () => {
 
       {data && (
         <>
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-3">
             <MancatoKpi
               icon={ClockIcon}
               label="Horas trabajadas"
@@ -157,13 +159,6 @@ export const MisHorasPage = () => {
               value={formatHours(me?.esperaHoras ?? 0)}
               detail="Aprobadas este mes"
               color="#22d3ee"
-            />
-            <MancatoKpi
-              icon={EuroIcon}
-              label="Tu pago del mes"
-              value={formatCurrency(data.total.total)}
-              detail={aDescontar > 0 ? `Neto ${formatCurrency(me?.neto ?? data.total.total)}` : "Base + espera"}
-              color={COSTO_COLORS.pagoChoferes}
             />
             <MancatoKpi
               icon={RouteIcon}
@@ -203,30 +198,10 @@ export const MisHorasPage = () => {
                 {sinCargar > 0 && devueltas > 0 && " y "}
                 {devueltas > 0 &&
                   `${devueltas} ${devueltas === 1 ? "servicio devuelto para corregir" : "servicios devueltos para corregir"}`}
-                . Mientras no tengan horas aprobadas se pagan por kilometros.
+                .
               </span>
             </div>
           )}
-
-          {estimadoPendiente > 0.5 && (
-            <p className="px-1 text-[13px] text-ink-300">
-              Tus horas en revision podrian sumar ~ <b className="text-ink-50">{formatCurrency(estimadoPendiente)}</b>{" "}
-              mas cuando el responsable las apruebe.
-            </p>
-          )}
-
-          {aDescontar > 0 && (
-            <div className="glass-surface-sm flex flex-wrap items-center justify-between gap-2 rounded-2xl px-5 py-3 text-[13px] text-ink-300">
-              <span>
-                Multas a descontar: <b className="text-warning-500">- {formatCurrency(aDescontar)}</b>
-              </span>
-              <Link to="/finanzas/multas" className="font-medium text-accent-400 hover:text-accent-300">
-                Ver detalle &rarr;
-              </Link>
-            </div>
-          )}
-
-          <RulesCard reglas={data.reglas} />
 
           {servicios.length === 0 ? (
             <p className="px-1 py-6 text-[14px] text-ink-400">No hay servicios entregados en este mes.</p>
@@ -236,8 +211,7 @@ export const MisHorasPage = () => {
                 <ServiceCard
                   key={service.id}
                   service={service}
-                  reglas={data.reglas}
-                  loading={loadingId === service.id}
+                  loading={loadingId === service.id || loadingId === service.viajeId}
                   onLoadHours={openLoadHours}
                 />
               ))}

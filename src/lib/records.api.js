@@ -89,3 +89,7 @@ export const descompactarRequest = (compactadoId) => api.delete(`/records/compac
 // La oficina corrige el reparto de km reales de un viaje: reparto = [{ id, km }] con todos sus servicios.
 export const ajustarKmViajeRequest = (compactadoId, { reparto, nota }) =>
   api.put(`/records/compactar/${compactadoId}/km`, { reparto, ...(nota ? { nota } : {}) }).then((res) => res.data.data.viaje);
+
+// Registros sin sustentar del propio chofer: peajes y carburante de sus servicios hechos que nadie subio ni declaro.
+// { registros, servicios }.
+export const getSinSustentarRequest = () => api.get("/records/sin-sustentar").then((res) => res.data.data);

@@ -1,6 +1,6 @@
 import clsx from "clsx";
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { CostosChart } from "../../components/finanzas/CostosChart";
 import { MonthSelector } from "../../components/finanzas/MonthSelector";
 import { MancatoKpi } from "../../components/mancato/MancatoKpi";
@@ -26,7 +26,6 @@ import { parseApiError } from "../../lib/api";
 import { COSTO_COLORS, currentMonth, monthName } from "../../lib/finanzas";
 import { getFinanzasResumenRequest } from "../../lib/finanzas.api";
 import { formatCurrency } from "../../lib/format";
-import { ResumenChoferPage } from "./ResumenChoferPage";
 
 const TONE = {
   danger: { dot: "bg-danger-500 shadow-[0_0_6px_var(--danger-500)]", edge: "border-l-danger-500" },
@@ -262,5 +261,6 @@ const ResumenOficinaPage = () => {
 export const FinanzasResumenPage = () => {
   const { user } = useAuth();
   const isPrivileged = user?.cargo === "OWNER" || user?.cargo === "ADMIN";
-  return isPrivileged ? <ResumenOficinaPage /> : <ResumenChoferPage />;
+  // El chofer no tiene "Resumen" en Mis cargos: entra directo a Combustible (y sin importes de pago).
+  return isPrivileged ? <ResumenOficinaPage /> : <Navigate to="/finanzas/combustible" replace />;
 };

@@ -17,15 +17,6 @@ const tabClass = ({ isActive }) =>
 // Contenedor de "Finanzas Operativas": titulo, pestañas y, debajo, la pestaña activa.
 // Las rutas viven bajo /finanzas (ver App.jsx); los detalles y altas de cada modulo se
 // abren encima de la pestaña como panel lateral.
-const GridIcon = (props) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true" {...props}>
-    <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
-    <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
-    <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
-    <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
-  </svg>
-);
-
 const choferTabClass = ({ isActive }) =>
   clsx(
     "relative flex flex-1 items-center justify-center gap-1 whitespace-nowrap px-1.5 py-3.5 text-[12px] font-medium transition-colors sm:gap-2 sm:px-3.5 sm:text-[13px] min-w-0",
@@ -61,10 +52,6 @@ const ChoferHeader = () => (
       aria-label="Secciones de mis cargos"
       className="glass-surface-sm flex overflow-x-auto rounded-2xl"
     >
-      <NavLink to="/finanzas" end className={choferTabClass}>
-        <GridIcon className="h-[18px] w-[18px]" />
-        Resumen
-      </NavLink>
       <NavLink to="/finanzas/combustible" className={choferTabClass}>
         <FuelIcon className="h-[18px] w-[18px]" />
         Combustible
