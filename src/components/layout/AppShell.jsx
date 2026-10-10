@@ -243,7 +243,7 @@ const BottomNavTab = ({ to, label, icon: Icon }) => (
     end={to === "/"}
     className={({ isActive }) =>
       clsx(
-        "flex flex-1 flex-col items-center justify-center gap-1 py-3.5 text-[11px] font-medium transition-colors",
+        "flex flex-1 flex-col items-center justify-center gap-1 px-0.5 py-3.5 text-center text-[11px] font-medium leading-tight transition-colors",
         isActive ? "text-sidebar-active" : "text-sidebar-foreground/60"
       )
     }
@@ -373,6 +373,7 @@ export const AppShell = () => {
               ) : (
                 <>
                   <SidebarNavTab to="/" label="Hoy" icon={HomeIcon} />
+                  <SidebarNavTab to="/mis-servicios" label="Mis servicios" icon={ListIcon} />
                   <SidebarNavTab to="/mis-horas" label="Mis horas" icon={ClockIcon} />
                   <SidebarNavTab to="/calendario" label="Calendario" icon={CalendarIcon} />
                   <SidebarNavTab to="/finanzas" label="Mis cargos" icon={WalletIcon} />
@@ -500,7 +501,7 @@ export const AppShell = () => {
             <BottomNavTab to="/mis-horas" label="Mis horas" icon={ClockIcon} />
             <BottomNavTab to="/calendario" label="Calendario" icon={CalendarIcon} />
             <BottomNavTab to="/finanzas" label="Mis cargos" icon={WalletIcon} />
-            <BottomNavTab to="/profile" label="Perfil" icon={UserIcon} />
+            <BottomNavTab to="/mis-servicios" label="Mis servicios" icon={ListIcon} />
           </>
         )}
         {(isPrivileged || isRrhh) && <BottomNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}

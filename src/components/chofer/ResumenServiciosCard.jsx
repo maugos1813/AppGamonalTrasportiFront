@@ -56,7 +56,7 @@ export const ResumenServiciosCard = ({ counts }) => (
     </div>
 
     <Link
-      to="/records"
+      to="/mis-servicios"
       className="mt-4 flex items-center justify-between gap-3 text-[14px] font-medium text-accent-400 hover:text-accent-300"
     >
       <span className="flex items-center gap-2.5">

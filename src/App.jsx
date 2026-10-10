@@ -16,6 +16,9 @@ import { DataRefreshProvider } from "./context/DataRefreshContext";
 const ForgotPasswordPage = lazy(() =>
   import("./pages/auth/ForgotPasswordPage").then((m) => ({ default: m.ForgotPasswordPage })),
 );
+const MisServiciosPage = lazy(() =>
+  import("./pages/servicios/MisServiciosPage").then((m) => ({ default: m.MisServiciosPage }))
+);
 const BustaPagaRrhhPage = lazy(() =>
   import("./pages/bustapaga/BustaPagaRrhhPage").then((m) => ({ default: m.BustaPagaRrhhPage }))
 );
@@ -236,6 +239,14 @@ function App() {
               <Route path="/" element={<DashboardPage />} />
               <Route path="/resumen" element={<RoleOnly privileged><DailySummaryPage /></RoleOnly>} />
               <Route path="/mis-horas" element={<MisHorasPage />} />
+              <Route
+                path="/mis-servicios"
+                element={
+                  <RoleOnly privileged={false}>
+                    <MisServiciosPage />
+                  </RoleOnly>
+                }
+              />
               <Route
                 path="/calendario"
                 element={
