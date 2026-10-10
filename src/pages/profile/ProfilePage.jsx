@@ -49,6 +49,7 @@ import {
   updateUserRequest,
   uploadUserAvatarRequest,
 } from "../../lib/users.api";
+import { kmRecorrido } from "../../lib/km";
 
 const areaLabel = (value) => AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 
@@ -469,7 +470,7 @@ const MyMonth = () => {
 
   const valid = records.filter((r) => r.estado !== "ANNULLATO");
   const entregados = valid.filter((r) => r.estado === "CONSEGNATO").length;
-  const km = valid.reduce((total, r) => total + (r.kilometrosReales ?? r.kilometros ?? 0), 0);
+  const km = valid.reduce((total, r) => total + kmRecorrido(r), 0);
 
   return (
     <div className="grid grid-cols-3 gap-2.5">

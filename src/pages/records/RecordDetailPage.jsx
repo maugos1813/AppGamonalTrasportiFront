@@ -103,6 +103,12 @@ const JornadaOfService = ({ record, isChofer, onOpenHours }) => {
       ) : (
         <p className="mt-2 text-[13px] text-ink-400">El chofer todavia no cargo sus horas.</p>
       )}
+      {j.estado === "APROBADAS" && j.auto && (
+        <p className="mt-3 rounded-lg bg-success-500/10 px-3 py-2 text-[12px] text-ink-200">
+          <b className="text-success-500">Aprobadas automáticamente:</b> las horas y los km quedaron dentro de lo planificado
+          (circuito, ruta{record.compactado ? " y viaje" : ""}), así que no pasaron por la cola de aprobación.
+        </p>
+      )}
       {j.nota && (
         <p className="mt-3 rounded-lg bg-line/5 px-3 py-2 text-[12px] text-ink-200">
           <b className="text-ink-50">Nota del responsable:</b> {j.nota}
@@ -389,6 +395,9 @@ const COST_BREAKDOWN_FIELDS = [
   ["costoHotel", "Hotel"],
   ["costoOtros", "Otros"],
 ];
+
+// DHL, DHL Roma y AB Service: los km que manda el cliente son de ida (se cuentan x2 y se pagan a la tarifa de DHL).
+const isDhlAb = (record) => record.spedizzione === "DHL" || record.spedizzione === "AB_SERVICE";
 
 // Peajes del servicio: los mancatos asignados si hay (mandan), si no lo cargado a mano. Nunca la suma de ambos.
 const peajesText = (record) => {
@@ -829,11 +838,14 @@ const RecordSummaryView = ({
         </h3>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <InfoRow
-            label="Km planificados"
+            label={isDhlAb(record) ? "Km del cliente (ida) / facturables" : "Km planificados"}
             value={
-              record.compactado?.km
-                ? `${record.kilometros ?? "-"} (viaje: ${record.compactado.km.planificado})`
-                : (record.kilometros ?? "-")
+              (isDhlAb(record) ? `${record.kilometros ?? "-"} → x2 = ${record.kmFacturables ?? "-"}` : (record.kilometros ?? "-")) +
+              (record.compactado?.km
+                ? ` (viaje: ${record.compactado.km.planificado})`
+                : record.circuito?.km
+                  ? ` (circuito: ${record.circuito.km})`
+                  : "")
             }
           />
           <InfoRow
@@ -902,6 +914,17 @@ const RecordSummaryView = ({
           <div className="mt-4 grid grid-cols-1 gap-4 border-t border-line/10 pt-4 sm:grid-cols-3">
             <FuelOfService record={record} />
             <InfoRow label="Monto recibido" value={record.pagoRecibido ? formatCurrency(record.pagoRecibido) : "-"} />
+            <InfoRow
+              label={`Esperado (${record.kmFacturables ?? 0} km x ${record.precioKm ?? "-"})`}
+              value={record.facturacion?.esperado ? formatCurrency(record.facturacion.esperado) : "-"}
+            />
+            {record.facturacion?.diferencia != null && (
+              <InfoRow
+                label="Recibido menos esperado"
+                value={`${record.facturacion.diferencia > 0 ? "+" : ""}${formatCurrency(record.facturacion.diferencia)}`}
+                tone={Math.abs(record.facturacion.diferencia) < 0.5 ? undefined : record.facturacion.diferencia < 0 ? "amber" : "blue"}
+              />
+            )}
           </div>
         </div>
       )}
@@ -1261,7 +1284,7 @@ const RecordEditForm = ({
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
               <TextField
                 id="kilometros"
-                label="Kilometros planificados"
+                label={isDhlAb(record) ? "Km del cliente (solo ida, se cuentan x2)" : "Kilometros planificados"}
                 type="number"
                 step="0.1"
                 min="0"

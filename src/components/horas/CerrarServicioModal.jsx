@@ -172,7 +172,8 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
             <CheckCircleIcon className="h-12 w-12 text-success-500" />
             <h2 className="text-[19px] font-semibold text-ink-50">Servicio enviado</h2>
             <p className="text-[14px] text-ink-300">
-              Tus horas quedaron en revision. Cuando el responsable las apruebe, cuentan para tu pago.
+              Tus horas quedaron en revision. Si todo está dentro de lo planificado (horas y km), se aprueban solas en unos
+              minutos; si no, las revisa el responsable. Cuando se aprueban, cuentan para tu pago.
             </p>
             <div className="mt-2 w-full rounded-2xl bg-warning-500/10 px-4 py-3 text-left">
               <p className="text-[14px] font-medium text-ink-50">¿Pasaste por algun peaje sin pagar?</p>
@@ -295,10 +296,20 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
               />
               {viajeKm && (
                 <div className="mt-2 text-[12px] text-ink-300">
-                  Planificado del viaje: <b className="text-ink-100">{formatKmValue(viajeKm.planificado)}</b>
-                  {record.compactado.servicios.length > 1 &&
-                    ` (${record.compactado.servicios.map((s) => formatKmValue(s.kmPlan).replace(" km", "")).join(" + ")})`}
+                  {viajeKm.circuito ? "Circuito planificado del viaje" : "Planificado del viaje"}:{" "}
+                  <b className="text-ink-100">{formatKmValue(viajeKm.planificado)}</b>
+                  {viajeKm.circuito
+                    ? " (lugar de espera, retiro, todas las paradas en orden y vuelta al lugar de espera)"
+                    : record.compactado.servicios.length > 1 &&
+                      ` (${record.compactado.servicios.map((s) => formatKmValue(s.kmPlan).replace(" km", "")).join(" + ")})`}
                   . Anota los km de todo el viaje: el sistema los reparte entre los servicios.
+                </div>
+              )}
+
+              {!viajeKm && record.circuito?.km > 0 && (
+                <div className="mt-2 text-[12px] text-ink-300">
+                  Circuito planificado: <b className="text-ink-100">{formatKmValue(record.circuito.km)}</b> (lugar de espera,
+                  retiro, entrega y vuelta al lugar de espera).
                 </div>
               )}
 

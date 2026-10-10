@@ -17,6 +17,9 @@ import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import { EXTRAS_PIAZZA_ZONA_OPTIONS, RECORD_STATUS_OPTIONS, destinoSugerencias } from "../../lib/constants";
+import { useTarifasKm } from "../../hooks/useTarifasKm";
+import { CATEGORIA_VEHICULO_LABELS } from "../../lib/vehiculos";
+import { formatCurrency } from "../../lib/format";
 import { createRecordRequest } from "../../lib/records.api";
 import { listUsersRequest } from "../../lib/users.api";
 import { listVehiclesRequest } from "../../lib/vehicles.api";
@@ -71,6 +74,16 @@ export const NewRecordPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+
+  // Precio por km automatico segun la categoria del vehiculo (se puede cambiar a mano).
+  const tarifas = useTarifasKm();
+  const [precioTocado, setPrecioTocado] = useState(false);
+  const categoria = vehicles?.find((v) => v.id === form.vehicleId)?.categoria ?? null;
+  const precioAuto = categoria && tarifas ? (tarifas[categoria] ?? null) : null;
+  useEffect(() => {
+    if (precioTocado) return;
+    setForm((prev) => ({ ...prev, precioKm: precioAuto != null ? String(precioAuto) : "" }));
+  }, [precioAuto, precioTocado]);
 
   useEffect(() => {
     Promise.all([listUsersRequest(), listVehiclesRequest(), listClientsRequest()])
@@ -299,6 +312,13 @@ export const NewRecordPage = () => {
             Opcional. El chofer despues carga los kilometros reales para comparar.
           </p>
 
+          <p className="mt-3 text-[12px] text-ink-300">
+            {Number(form.kilometros) > 0 && Number(form.precioKm) > 0
+              ? `Costo esperado: ${form.kilometros} km x ${form.precioKm} EUR/km = ${formatCurrency(Number(form.kilometros) * Number(form.precioKm))}. `
+              : ""}
+            El monto recibido lo cargas tu a mano segun los correos de los clientes.
+          </p>
+
           <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
             <TextField
               id="kilometros"
@@ -309,15 +329,25 @@ export const NewRecordPage = () => {
               value={form.kilometros}
               onChange={handleChange("kilometros")}
             />
-            <TextField
-              id="precioKm"
-              label="Precio por km"
-              type="number"
-              step="0.01"
-              min="0"
-              value={form.precioKm}
-              onChange={handleChange("precioKm")}
-            />
+            <div>
+              <TextField
+                id="precioKm"
+                label="Precio por km"
+                type="number"
+                step="0.01"
+                min="0"
+                value={form.precioKm}
+                onChange={(e) => {
+                  setPrecioTocado(true);
+                  handleChange("precioKm")(e);
+                }}
+              />
+              <p className="mt-1.5 text-[12px] text-ink-400">
+                {categoria
+                  ? `Automatico: ${CATEGORIA_VEHICULO_LABELS[categoria]} (${precioAuto != null ? `${precioAuto} EUR/km` : "sin tarifa"}). Puedes cambiarlo.`
+                  : "Elige un vehiculo con categoria para que se complete solo."}
+              </p>
+            </div>
             <TextField
               id="pagoRecibido"
               label="Monto recibido"

@@ -4,7 +4,7 @@ import { formatKmValue } from "../../lib/compactado";
 // `km` = compactado.km; `servicios` = compactado.servicios (para nombrar los servicios con km de mas).
 export const KmViajeResumen = ({ km, servicios = [], className }) => {
   if (!km) return null;
-  const { planificado, real, extra, grande, reparto } = km;
+  const { planificado, circuito, real, extra, grande, reparto } = km;
   const nombres = (reparto?.servicioIds ?? [])
     .map((id) => servicios.find((s) => s.id === id)?.codigo)
     .filter(Boolean)
@@ -13,7 +13,7 @@ export const KmViajeResumen = ({ km, servicios = [], className }) => {
   return (
     <div className={className}>
       <p className="text-[13px] text-ink-100">
-        Planificado <b>{formatKmValue(planificado)}</b> · Real <b>{formatKmValue(real)}</b>
+        {circuito ? "Circuito planificado" : "Planificado"} <b>{formatKmValue(planificado)}</b> · Real <b>{formatKmValue(real)}</b>
         {extra != null && extra !== 0 && (
           <span className={extra > 0 ? "font-semibold text-warning-500" : "font-semibold text-accent-400"}>
             {" "}
@@ -22,6 +22,11 @@ export const KmViajeResumen = ({ km, servicios = [], className }) => {
           </span>
         )}
       </p>
+      {circuito && (
+        <p className="mt-0.5 text-[12px] text-ink-400">
+          Lugar de espera &rarr; retiro &rarr; todas las paradas en orden &rarr; lugar de espera.
+        </p>
+      )}
       {real != null && reparto?.origen === "CHOFER" && (
         <p className="mt-0.5 text-[12px] text-ink-300">
           El chofer indicó los km de más{nombres ? ` en ${nombres}` : ""}.

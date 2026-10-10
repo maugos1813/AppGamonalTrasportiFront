@@ -14,6 +14,8 @@ import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
 import { listClientsRequest } from "../../lib/clients.api";
 import { APLICATIVO_OPTIONS, RECORD_STATUS_OPTIONS, SPEDIZZIONE_OPTIONS, ZONA_OPTIONS, destinoSugerencias } from "../../lib/constants";
+import { useTarifasKm } from "../../hooks/useTarifasKm";
+import { formatCurrency } from "../../lib/format";
 import { createRecordRequest } from "../../lib/records.api";
 import { DestinoSugerencias } from "../../components/records/DestinoSugerencias";
 import { FechasAviso } from "../../components/records/FechasAviso";
@@ -83,6 +85,9 @@ export const NewDhlAbServiceRecordPage = () => {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
+  // Los km del cliente son de ida: se cuentan x2 y se pagan a la tarifa de DHL / AB Service.
+  const tarifas = useTarifasKm();
+  const kmCliente = Number(form.kilometros) || 0;
 
   useEffect(() => {
     Promise.all([listUsersRequest(), listVehiclesRequest(), listClientsRequest()])
@@ -421,15 +426,24 @@ export const NewDhlAbServiceRecordPage = () => {
           </p>
 
           <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
-            <TextField
-              id="kilometros"
-              label="Km planificados"
-              type="number"
-              step="0.1"
-              min="0"
-              value={form.kilometros}
-              onChange={handleChange("kilometros")}
-            />
+            <div>
+              <TextField
+                id="kilometros"
+                label="Km del cliente (solo ida)"
+                type="number"
+                step="0.1"
+                min="0"
+                value={form.kilometros}
+                onChange={handleChange("kilometros")}
+              />
+              <p className="mt-1.5 text-[12px] text-ink-400">
+                {kmCliente > 0
+                  ? `x 2 (ida y vuelta) = ${Math.round(kmCliente * 20) / 10} km facturables${
+                      tarifas ? ` · a ${tarifas.DHL_AB} EUR/km = ${formatCurrency(kmCliente * 2 * tarifas.DHL_AB)}` : ""
+                    }`
+                  : "Los km que manda el cliente son de ida: se cuentan x2 y se pagan a la tarifa de DHL."}
+              </p>
+            </div>
             <TextField
               id="areaC"
               label="Area C"

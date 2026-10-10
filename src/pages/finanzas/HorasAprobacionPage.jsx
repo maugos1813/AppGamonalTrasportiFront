@@ -257,10 +257,16 @@ const EstimacionBlock = ({ recordId, estimacion, declaredMin, onUpdate, onApplyE
       )}
       {e && (
         <div className="mt-2 flex flex-col gap-1.5">
-          <Row label="Retiro">
-            {romeHHMM(e.inicioAt)} en {e.salida}
+          <Row label="Salida">
+            {romeHHMM(e.inicioAt)} desde {e.salida}
+            {e.retiros?.length > 0 && <> &rarr; retiro en {e.retiros.join(" y ")}</>}
             {e.inicioInferido && <span className="text-warning-500"> (deducido de la ETA: falta la hora de retiro)</span>}
           </Row>
+          {e.viaje && (
+            <Row label="Viaje compacto">
+              {e.viaje.length} servicios en un solo circuito, sin volver entre una entrega y la siguiente
+            </Row>
+          )}
           <Row label="Hasta la entrega final">
             conduccion {formatDuration(e.conduccionIdaMin)}
             {e.distanciaIdaKm != null && ` (${e.distanciaIdaKm} km)`} + {e.paradas} {e.paradas === 1 ? "parada" : "paradas"} (
@@ -270,6 +276,11 @@ const EstimacionBlock = ({ recordId, estimacion, declaredMin, onUpdate, onApplyE
             a {e.retorno.nombre}: {formatDuration(e.conduccionVueltaMin)}
             {e.rutaFuente === "estimada" ? " (estimado en linea recta)" : ""}
           </Row>
+          {e.circuitoKm != null && (
+            <Row label="Circuito planificado">
+              <b>{e.circuitoKm} km</b> en total (ida y vuelta al lugar de espera): lo que se compara con los km declarados
+            </Row>
+          )}
           <Row label="Descansos supuestos">{e.descansosMin > 0 ? formatDuration(e.descansosMin) : "ninguno (trayecto corto)"}</Row>
           <Row label="Total estimado">
             <b>{formatDuration(e.totalMin)}</b> &rarr; fin ~<b>{romeHHMM(e.finEstimadoAt)}</b>
@@ -386,10 +397,18 @@ const ReviewCard = ({ item, onReviewed }) => {
         )}
         <Fact label="Espera">{j.esperaMin} min</Fact>
         <Fact label="Pausa no trabajada">{j.pausaMin} min</Fact>
-        <Fact label={item.viaje?.km ? "Km del viaje real / plan" : "Km reales / plan"}>
+        <Fact
+          label={
+            item.viaje?.km
+              ? `Km del viaje real / ${item.viaje.km.circuito ? "circuito" : "plan"}`
+              : item.circuito
+                ? "Km reales / circuito"
+                : "Km reales / plan"
+          }
+        >
           {item.viaje?.km
             ? `${item.viaje.km.real ?? "-"} / ${item.viaje.km.planificado}`
-            : `${item.kilometrosReales ?? "-"} / ${item.kilometros ?? item.rutaDistanciaKm ?? "-"}`}
+            : `${item.kilometrosReales ?? "-"} / ${item.circuito?.km ?? item.kilometros ?? item.rutaDistanciaKm ?? "-"}`}
         </Fact>
         <Fact label="Pago">
           <span className="text-ink-300 line-through decoration-ink-500">{formatCurrency(item.pago.actual)}</span>{" "}

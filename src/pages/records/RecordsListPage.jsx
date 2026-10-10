@@ -50,6 +50,7 @@ import {
   updateRecordRequest,
 } from "../../lib/records.api";
 import { getAppsheetSyncStatusRequest, runAppsheetSyncRequest } from "../../lib/sync.api";
+import { kmRecorrido } from "../../lib/km";
 
 const SYNC_ERROR_PREVIEW = 5;
 
@@ -704,7 +705,7 @@ export const RecordsListPage = ({ section: sectionHint }) => {
     (isPrivileged ? summary : records)?.forEach((r) => {
       const entry = stats[classifyRecord(r)];
       entry.count += 1;
-      entry.km += r.kilometros ?? r.kilometrosReales ?? 0;
+      entry.km += kmRecorrido(r);
     });
     return stats;
   }, [isPrivileged, summary, records]);

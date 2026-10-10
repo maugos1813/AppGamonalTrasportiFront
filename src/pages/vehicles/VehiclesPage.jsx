@@ -40,6 +40,7 @@ import { computeFleetKmUsage, computeVehicleDocumentAlerts, filterToMainAreas } 
 import { listRecordsByMonthRequest } from "../../lib/records.api";
 import { listVehiclesRequest, syncVehiclesFromVelocityFleetRequest } from "../../lib/vehicles.api";
 import { setListSearch, useListSearch } from "../../lib/listSearchStore";
+import { kmRecorrido } from "../../lib/km";
 
 const areaLabel = (value) => VEHICLE_AREA_OPTIONS.find((opt) => opt.value === value)?.label ?? value;
 const centroLabel = (grupo) => (grupo ? GRUPO_LABELS[grupo] ?? grupo : "Sin grupo");
@@ -333,7 +334,7 @@ const KmMonthPanel = ({ records }) => {
   const total = records
     ? records
         .filter((r) => r.estado !== "ANNULLATO")
-        .reduce((sum, r) => sum + (r.kilometrosReales ?? r.kilometros ?? 0), 0)
+        .reduce((sum, r) => sum + kmRecorrido(r), 0)
     : null;
   const monthName = new Date().toLocaleDateString("es-AR", { month: "long" });
 

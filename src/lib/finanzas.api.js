@@ -14,3 +14,8 @@ export const getPagosChoferesRequest = (params) =>
 // Gastos cargados en los servicios del mes (peajes, Area C, hotel...). Solo OWNER/ADMIN.
 export const getGastosServiciosRequest = (month) =>
   api.get(`${BASE}/gastos-servicios`, { params: { month } }).then((res) => res.data.data.gastos);
+
+// Tarifas por km (EUR/km): { AUTO_FURGONCINO, H1_L1, H2_L2, CASONATO, DHL_AB }. Las ve la oficina y las cambia el Admin.
+export const getTarifasKmRequest = () => api.get(`${BASE}/tarifas-km`).then((res) => res.data.data.tarifas);
+
+export const setTarifasKmRequest = (tarifas) => api.put(`${BASE}/tarifas-km`, tarifas).then((res) => res.data.data.tarifas);

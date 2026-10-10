@@ -2,6 +2,7 @@ import { EN_PROCESO_STATUSES, TIPO_DOCUMENTO_LABELS, getTagliandoStatus } from "
 import { desdeCorte } from "./fechasCorte";
 import { formatCurrency, formatDate, formatDateTime } from "./format";
 import { RECORD_AREAS, classifyRecord } from "./recordAreas";
+import { kmRecorrido } from "./km";
 
 const isSameDay = (a, b) => {
   const dateA = new Date(a);
@@ -182,7 +183,8 @@ const DRIVER_HOURLY_RATE = 10;
 // planificado porque ese es de un solo tramo).
 const ASSUMED_KM_PER_HOUR = 100;
 
-const dhlKmCharge = (record, rate) => (record.kilometros ?? 0) * DHL_KM_MULTIPLIER * rate;
+// La tarifa sale del servicio (precio por km automatico de DHL / AB Service); 0,43 EUR/km si no la trae.
+const dhlKmCharge = (record, rate) => (record.kilometros ?? 0) * DHL_KM_MULTIPLIER * (record.precioKm ?? rate);
 const dhlExtras = (record) => (record.areaC ?? 0) + (record.costoEspera ?? 0);
 
 // Horas manejadas: las reales si el chofer ya las cargo; si no, se estiman a
@@ -365,7 +367,7 @@ export const computeMonthlyKmTrend = (records, now = new Date()) => {
     if (r.estado === "ANNULLATO") return;
     const date = new Date(r.fechaServicio);
     if (date.getFullYear() !== year) return;
-    buckets[date.getMonth()].km += r.kilometrosReales ?? r.kilometros ?? 0;
+    buckets[date.getMonth()].km += kmRecorrido(r);
   });
 
   return buckets;

@@ -19,6 +19,7 @@ import {
   TruckIcon,
   UsersIcon,
 } from "../../components/ui/icons";
+import { TarifasKmCard } from "../../components/finanzas/TarifasKmCard";
 import { useAuth } from "../../context/AuthContext";
 import { useDataRefresh } from "../../context/DataRefreshContext";
 import { parseApiError } from "../../lib/api";
@@ -251,6 +252,8 @@ const ResumenOficinaPage = () => {
           )}
         </PanelShell>
       </div>
+
+      <TarifasKmCard canEdit={user?.cargo === "OWNER"} />
     </div>
   );
 };
