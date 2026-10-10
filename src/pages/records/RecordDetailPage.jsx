@@ -339,7 +339,8 @@ const toFormState = (record) => ({
   areaC: record.areaC ?? "",
   costoEspera: record.costoEspera ?? "",
   costoTraforoFrejusBrennero: record.costoTraforoFrejusBrennero ?? "",
-  peajes: record.peajes ?? "",
+  // Lo que se escribio a mano (record.peajes es el efectivo: mancatos asignados o, si no hay, este valor).
+  peajes: record.peajesManual ?? "",
   vignetta: record.vignetta ?? "",
   costoHotel: record.costoHotel ?? "",
   costoOtros: record.costoOtros ?? "",
@@ -388,6 +389,16 @@ const COST_BREAKDOWN_FIELDS = [
   ["costoHotel", "Hotel"],
   ["costoOtros", "Otros"],
 ];
+
+// Peajes del servicio: los mancatos asignados si hay (mandan), si no lo cargado a mano. Nunca la suma de ambos.
+const peajesText = (record) => {
+  const d = record.peajesDetalle;
+  if (!record.peajes) return "-";
+  if (d?.fuente !== "MANCATOS") return formatCurrency(record.peajes);
+  const n = d.mancatos.count;
+  const manual = d.manual > 0 ? ` · a mano ${formatCurrency(d.manual)} (no cuenta)` : "";
+  return `${formatCurrency(record.peajes)} · ${n} ${n === 1 ? "mancato" : "mancatos"}${manual}`;
+};
 
 const buildCostText = (record) => {
   const lines = [
@@ -879,7 +890,7 @@ const RecordSummaryView = ({
               label="Traforo Frejus/Brennero"
               value={record.costoTraforoFrejusBrennero ? formatCurrency(record.costoTraforoFrejusBrennero) : "-"}
             />
-            <InfoRow label="Peajes" value={record.peajes ? formatCurrency(record.peajes) : "-"} />
+            <InfoRow label="Peajes" value={peajesText(record)} />
             <InfoRow label="Vignetta" value={record.vignetta ? formatCurrency(record.vignetta) : "-"} />
             <InfoRow label="Hotel" value={record.costoHotel ? formatCurrency(record.costoHotel) : "-"} />
             <InfoRow label="Otros" value={record.costoOtros ? formatCurrency(record.costoOtros) : "-"} />
@@ -1285,15 +1296,24 @@ const RecordEditForm = ({
                 value={form.costoCombustible}
                 onChange={handleChange("costoCombustible")}
               />
-              <TextField
-                id="peajes"
-                label="Peajes"
-                type="number"
-                step="0.01"
-                min="0"
-                value={form.peajes}
-                onChange={handleChange("peajes")}
-              />
+              <div>
+                <TextField
+                  id="peajes"
+                  label={record.peajesDetalle?.fuente === "MANCATOS" ? "Peajes (a mano)" : "Peajes"}
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.peajes}
+                  onChange={handleChange("peajes")}
+                />
+                {record.peajesDetalle?.fuente === "MANCATOS" && (
+                  <p className="mt-1.5 text-[12px] text-ink-400">
+                    Hay {record.peajesDetalle.mancatos.count} {record.peajesDetalle.mancatos.count === 1 ? "mancato asignado" : "mancatos asignados"}{" "}
+                    que suman {formatCurrency(record.peajesDetalle.mancatos.total)}: ese valor es el que cuenta en las finanzas; este
+                    campo solo vale si no hay mancatos.
+                  </p>
+                )}
+              </div>
               <TextField
                 id="vignetta"
                 label="Vignetta"
