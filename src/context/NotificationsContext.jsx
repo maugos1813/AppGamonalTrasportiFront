@@ -29,6 +29,8 @@ import { listMultaAlertsRequest } from "../lib/multas.api";
 import { getGpsEstadoRequest } from "../lib/gps.api";
 import { gpsEstadoTitle, isGpsFailing } from "../lib/gps";
 import { listPermisosRequest } from "../lib/permisos.api";
+import { computeSeguimientoAlerts } from "../lib/seguimiento";
+import { listSeguimientoRequest } from "../lib/seguimiento.api";
 import { listUsersRequest } from "../lib/users.api";
 import {
   getVehicleRequest,
@@ -181,6 +183,8 @@ const buildOwnerAlerts = async () => {
     multaAlerts,
     permisosPendientes,
     gpsEstado,
+    ,
+    seguimiento,
   ] =
     await Promise.all([
       listPendingRecordsRequest(),
@@ -201,9 +205,12 @@ const buildOwnerAlerts = async () => {
       // cada 2 minutos mientras cualquier pantalla de la app este abierta, no solo el Mapa.
       // El resultado real de las alertas viene de las requests de arriba.
       listVehicleLivePositionsRequest().catch(() => null),
+      // Seguimiento de servicios en camino: sin GPS activo o fuera de su ETA. De paso el backend manda los push.
+      listSeguimientoRequest().catch(() => null),
     ]);
 
-  return sortBySeverity([
+  // Los avisos del seguimiento (servicio sin GPS o fuera de ETA) piden accion ya: van siempre arriba de todo.
+  return [...computeSeguimientoAlerts(seguimiento), ...sortBySeverity([
     ...(PHONE_GPS_ENABLED ? computeLocationPermissionAlerts(users, pendingRecords) : []),
     ...computeDriverDocumentAlerts(documents, users),
     ...computeVehicleDocumentAlerts(vehicles),
@@ -234,7 +241,7 @@ const buildOwnerAlerts = async () => {
           },
         ]
       : []),
-  ]);
+  ])];
 };
 
 const NotificationsContext = createContext(null);

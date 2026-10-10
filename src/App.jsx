@@ -38,6 +38,7 @@ const NewDriverPage = lazy(() =>
   import("./pages/drivers/NewDriverPage").then((m) => ({ default: m.NewDriverPage })),
 );
 const MapPage = lazy(() => import("./pages/map/MapPage").then((m) => ({ default: m.MapPage })));
+const SeguimientoPage = lazy(() => import("./pages/map/SeguimientoPage").then((m) => ({ default: m.SeguimientoPage })));
 const AreaCPage = lazy(() => import("./pages/map/AreaCPage").then((m) => ({ default: m.AreaCPage })));
 const ControlFlotaPage = lazy(() =>
   import("./pages/control-flota/ControlFlotaPage").then((m) => ({ default: m.ControlFlotaPage })),
@@ -307,6 +308,7 @@ function App() {
               <Route path="/multas/*" element={<LegacyRedirect from="/multas" to="/finanzas/multas" />} />
               <Route path="/combustible/*" element={<LegacyRedirect from="/combustible" to="/finanzas/combustible" />} />
               <Route path="/mapa" element={<RoleOnly privileged><MapPage /></RoleOnly>} />
+              <Route path="/mapa/seguimiento" element={<RoleOnly privileged><SeguimientoPage /></RoleOnly>} />
               <Route path="/mapa/area-c" element={<RoleOnly privileged><AreaCPage /></RoleOnly>} />
               <Route path="/control-flota" element={<RoleOnly privileged><ControlFlotaPage /></RoleOnly>} />
               <Route path="/mecanica" element={<RoleOnly privileged><MecanicaPage /></RoleOnly>} />
