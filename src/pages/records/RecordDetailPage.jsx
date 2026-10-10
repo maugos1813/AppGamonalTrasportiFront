@@ -17,6 +17,7 @@ import { StatusBadge } from "../../components/ui/StatusBadge";
 import { TextField } from "../../components/ui/TextField";
 import { Textarea } from "../../components/ui/Textarea";
 import { SlideOverPanel } from "../../components/ui/SlideOverPanel";
+import { RetiroPaqueteField } from "../../components/records/RetiroPaqueteField";
 import { FechasAviso } from "../../components/records/FechasAviso";
 import { combineStopAddress, StopListEditor } from "../../components/records/StopListEditor";
 import { buildSalidaPayload } from "../../components/records/SalidaField";
@@ -337,9 +338,9 @@ const toFormState = (record) => ({
   // Las tres fechas van en hora de pared de Roma (el backend las interpreta asi): lo que escribe la
   // oficina es lo que se guarda. No entran en OWNER_FIELDS: se mandan solo si cambiaron (y "" en
   // fechaRetiro significa "borrar"), ver handleSave.
-  fechaServicio: toRomeDateTimeInputValue(record.fechaServicio),
   eta: toRomeDateTimeInputValue(record.eta),
   fechaRetiro: toRomeDateTimeInputValue(record.fechaRetiro),
+  retiroPaqueteAt: toRomeDateTimeInputValue(record.retiroPaqueteAt),
   kilometros: record.kilometros ?? "",
   precioKm: record.precioKm ?? "",
   areaC: record.areaC ?? "",
@@ -413,7 +414,7 @@ const buildCostText = (record) => {
   const lines = [
     `Costos del servicio ${record.codigo}`,
     `${record.client?.nombre ?? "Sin cliente"} - ${record.destinazione}`,
-    formatDateTime(record.fechaServicio),
+    formatDateTime(record.fechaRetiro ?? record.eta),
     "",
   ];
 
@@ -578,9 +579,12 @@ export const RecordDetailPage = () => {
     if (!isChofer && form.fechaRetiro !== toRomeDateTimeInputValue(record.fechaRetiro)) {
       payload.fechaRetiro = form.fechaRetiro;
     }
-    // Fecha de servicio y ETA: igual, solo si cambiaron (reenviarlas sin tocar les borraria los segundos).
+    if (!isChofer && form.retiroPaqueteAt !== toRomeDateTimeInputValue(record.retiroPaqueteAt)) {
+      payload.retiroPaqueteAt = form.retiroPaqueteAt;
+    }
+    // ETA: igual, solo si cambio (reenviarlas sin tocar les borraria los segundos).
     if (!isChofer) {
-      for (const field of ["fechaServicio", "eta"]) {
+      for (const field of ["eta"]) {
         if (form[field] && form[field] !== toRomeDateTimeInputValue(record[field])) payload[field] = form[field];
       }
     }
@@ -803,9 +807,11 @@ const RecordSummaryView = ({
       <p className="mt-3 text-[15px] text-ink-200">{record.descripcion}</p>
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <InfoRow label="Fecha de servicio" value={`${formatRomeDateTime(record.fechaServicio)} (Roma)`} />
+        {record.retiroPaqueteAt && (
+          <InfoRow label="Retiro del paquete" value={`${formatRomeDateTime(record.retiroPaqueteAt)} (Roma)`} />
+        )}
         <InfoRow
-          label="Fecha retiro"
+          label={record.retiroPaqueteAt ? "Salida a entregar" : "Salida / retiro"}
           value={record.fechaRetiro ? `${formatRomeDateTime(record.fechaRetiro)} (Roma)` : "Sin cargar"}
         />
         <InfoRow label="ETA" value={`${formatRomeDateTime(record.eta)} (Roma)`} />
@@ -1134,19 +1140,23 @@ const RecordEditForm = ({
                 value={form.ciudad}
                 onChange={handleChange("ciudad")}
               />
-              <TextField
-                id="fechaServicio"
-                label="Fecha de servicio (hora de Roma)"
-                type="datetime-local"
-                value={form.fechaServicio}
-                onChange={handleChange("fechaServicio")}
-              />
-              <TextField
-                id="fechaRetiro"
-                label="Fecha retiro (hora de Roma)"
-                type="datetime-local"
-                value={form.fechaRetiro}
-                onChange={handleChange("fechaRetiro")}
+              <div>
+                <TextField
+                  id="fechaRetiro"
+                  label="Fecha retiro (hora de Roma)"
+                  type="datetime-local"
+                  value={form.fechaRetiro}
+                  onChange={handleChange("fechaRetiro")}
+                />
+                <p className="mt-1.5 text-[12px] text-ink-400">
+                  Cuando sale el chofer a trabajar: de ahi cuentan sus horas y el dia del servicio. Si el paquete se retira antes y se
+                  entrega dias despues, pon aqui la hora en que sale a entregar.
+                </p>
+              </div>
+              <RetiroPaqueteField
+                value={form.retiroPaqueteAt}
+                onChange={(v) => setField("retiroPaqueteAt", v)}
+                fechaRetiro={form.fechaRetiro}
               />
               <TextField
                 id="eta"
@@ -1161,7 +1171,6 @@ const RecordEditForm = ({
               fechas={form}
               original={{
                 eta: toRomeDateTimeInputValue(record.eta),
-                fechaServicio: toRomeDateTimeInputValue(record.fechaServicio),
               }}
             />
 

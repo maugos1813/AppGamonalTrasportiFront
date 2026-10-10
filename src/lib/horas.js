@@ -29,9 +29,15 @@ export const previewShift = ({ inicio, fin, esperaMin = 0, pausaMin = 0 }, rates
   if (start == null || end == null) return { error: "" };
   if (end <= start) return { error: "La hora de fin debe ser posterior a la de inicio" };
   const total = end - start;
-  if (total > 24 * 60) return { error: "La jornada no puede superar las 24 horas, revisa las fechas" };
   const espera = Math.max(0, Number(esperaMin) || 0);
   const pausa = Math.max(0, Number(pausaMin) || 0);
+  // Mismo criterio que el servidor (computeShiftHours): descontada la pausa no trabajada, lo trabajado no pasa de 24 h.
+  if (total > 48 * 60 || total - pausa > 24 * 60) {
+    return {
+      error:
+        "La jornada no puede superar las 24 horas trabajadas (la pausa no trabajada se descuenta): pon como inicio la hora en que saliste a entregar (no la del retiro del paquete), revisa las fechas y anota tu descanso en la pausa",
+    };
+  }
   if (espera + pausa > total) return { error: "La espera y la pausa no pueden superar la jornada" };
 
   const dayStart = toMin(rates?.banda?.diaInicio ?? "06:30");

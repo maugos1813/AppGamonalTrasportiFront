@@ -121,6 +121,10 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
         })
       : null;
   const toggleExtra = (id) => setExtraIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  // Inicio declarado muy lejos de la salida planificada (mas de 3 horas): queda para revision, con el motivo en comentarios.
+  const salidaPlanificada = record.fechaRetiro ? toRomeDateTimeInputValue(record.fechaRetiro) : null;
+  const salidaLejos =
+    Boolean(inicio && salidaPlanificada) && Math.abs(Date.parse(inicio) - Date.parse(salidaPlanificada)) > 3 * 60 * 60 * 1000;
   const canSubmit = preview.totalMin != null && !preview.error && !handoverError;
 
   const handleSubmit = async (e) => {
@@ -223,6 +227,25 @@ export const CerrarServicioModal = ({ record, reglas, onClose, onDone }) => {
                 {record.origen
                   ? `Recibiste el paquete a las ${formatRomeDateTime(record.traspasoHora)}. Si saliste antes para encontrarte con el otro chofer, pon tu hora de salida.`
                   : `Le diste el paquete a ${record.relevo.chofer.nombre} a las ${formatRomeDateTime(record.traspasoHora ?? record.relevo.traspasoHora)}. Tu jornada sigue hasta que vuelves al lugar de espera.`}
+              </div>
+            )}
+
+            {record.retiroPaqueteAt && (
+              <div className="rounded-xl bg-accent-500/10 px-4 py-3 text-[13px] text-ink-200">
+                Retiraste el paquete el <b className="text-ink-50">{formatRomeDateTime(record.retiroPaqueteAt)}</b>
+                {record.fechaRetiro && (
+                  <>
+                    {" "}y sales a entregarlo el <b className="text-ink-50">{formatRomeDateTime(record.fechaRetiro)}</b>
+                  </>
+                )}
+                . Tus horas empiezan cuando saliste a entregar, no cuando retiraste el paquete.
+              </div>
+            )}
+
+            {salidaLejos && (
+              <div className="rounded-xl bg-warning-500/10 px-4 py-3 text-[13px] text-ink-200">
+                Tu inicio es muy distinto de la salida planificada ({formatRomeDateTime(record.fechaRetiro)}). Si saliste en
+                otro horario, explica el motivo en los comentarios: el responsable va a revisar estas horas.
               </div>
             )}
 

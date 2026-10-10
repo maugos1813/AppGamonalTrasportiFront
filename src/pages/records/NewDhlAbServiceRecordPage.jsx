@@ -18,6 +18,7 @@ import { useTarifasKm } from "../../hooks/useTarifasKm";
 import { formatCurrency } from "../../lib/format";
 import { createRecordRequest } from "../../lib/records.api";
 import { DestinoSugerencias } from "../../components/records/DestinoSugerencias";
+import { RetiroPaqueteField } from "../../components/records/RetiroPaqueteField";
 import { FechasAviso } from "../../components/records/FechasAviso";
 import { buildSalidaPayload, EMPTY_SALIDA, SalidaField } from "../../components/records/SalidaField";
 import { listUsersRequest } from "../../lib/users.api";
@@ -33,9 +34,9 @@ const INITIAL_FORM = {
   extrasPiazzaZona: "MILANO",
   spedizzione: "DHL",
   estado: "IN_SOSPESO",
-  fechaServicio: "",
   eta: "",
   fechaRetiro: "",
+  retiroPaqueteAt: "",
   descripcion: "",
   comentarios: "",
   ciudad: "",
@@ -256,23 +257,26 @@ export const NewDhlAbServiceRecordPage = () => {
               error={fieldErrors.vehicleId?.[0]}
             />
 
-            <TextField
-              id="fechaServicio"
-              label="Data (hora de Roma)"
-              type="datetime-local"
-              value={form.fechaServicio}
-              onChange={handleChange("fechaServicio")}
-              error={fieldErrors.fechaServicio?.[0]}
-              required
-            />
+            <div>
+              <TextField
+                id="fechaRetiro"
+                label="Fecha retiro (hora de Roma)"
+                type="datetime-local"
+                value={form.fechaRetiro}
+                onChange={handleChange("fechaRetiro")}
+                error={fieldErrors.fechaRetiro?.[0]}
+              />
+              <p className="mt-1.5 text-[12px] text-ink-400">
+                Cuando sale el chofer a trabajar: de ahi cuentan sus horas y el dia del servicio. Si el paquete se retira antes y se
+                entrega dias despues, pon aqui la hora en que sale a entregar.
+              </p>
+            </div>
 
-            <TextField
-              id="fechaRetiro"
-              label="Fecha retiro (hora de Roma)"
-              type="datetime-local"
-              value={form.fechaRetiro}
-              onChange={handleChange("fechaRetiro")}
-              error={fieldErrors.fechaRetiro?.[0]}
+            <RetiroPaqueteField
+              value={form.retiroPaqueteAt}
+              onChange={(v) => setField("retiroPaqueteAt", v)}
+              fechaRetiro={form.fechaRetiro}
+              error={fieldErrors.retiroPaqueteAt?.[0]}
             />
 
             <TextField
