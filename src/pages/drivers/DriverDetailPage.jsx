@@ -699,12 +699,12 @@ export const DriverDetailPage = () => {
       </GlassCard>
 
       {isPrivileged && <AsistenciaCard driverId={driver.id} />}
-      {(isRrhh || user.cargo === "OWNER") && driver.cargo === "CHOFER" && (
+      {(isRrhh || user.cargo === "OWNER") && (
         <GlassCard>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-[17px] font-medium text-ink-50">Busta paga</h2>
-              <p className="mt-1 text-[13px] text-ink-400">Sube y consulta las busta paga de este chofer.</p>
+              <p className="mt-1 text-[13px] text-ink-400">Sube y consulta las busta paga de esta persona.</p>
             </div>
             <Link to={`/busta-paga?chofer=${driver.id}`} className="text-[14px] font-medium text-accent-400 hover:text-accent-300">
               Ver busta paga &rarr;

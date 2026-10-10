@@ -379,6 +379,7 @@ export const AppShell = () => {
                 </>
               )}
               {(isPrivileged || isRrhh) && <SidebarNavTab to="/choferes" label="Choferes" icon={UsersIcon} />}
+              {user?.cargo === "OWNER" && <SidebarNavTab to="/busta-paga" label="Busta paga" icon={FileTextIcon} />}
               {isPrivileged && <SidebarNavTab to="/permisos" label="Permisos" icon={CalendarIcon} />}
               {(isPrivileged || isRrhh) && <SidebarNavTab to="/vehiculos" label="Vehículos" icon={TruckIcon} />}
               {isPrivileged && <SidebarNavTab to="/mapa" label="Mapa" icon={MapPinIcon} />}

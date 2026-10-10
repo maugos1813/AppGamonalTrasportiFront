@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { MetaKmCard } from "../../components/chofer/MetaKmCard";
 import { MancatoBanner } from "../../components/chofer/MancatoBanner";
+import { RendimientoCard } from "../../components/chofer/RendimientoCard";
 import { ResumenServiciosCard } from "../../components/chofer/ResumenServiciosCard";
 import { ServiciosActualesCard } from "../../components/chofer/ServiciosActualesCard";
 import { CerrarServicioModal } from "../../components/horas/CerrarServicioModal";
@@ -19,7 +19,7 @@ import { computeCurrentServices, computeMyServiceCounts } from "../../lib/dashbo
 import { formatDateTime } from "../../lib/format";
 import { needsHours } from "../../lib/horas";
 import { getRecordRequest, listRecordsRequest, uploadRecordFileRequest } from "../../lib/records.api";
-import { getMyProgressRequest } from "../../lib/metas.api";
+import { getMyDrivingStyleRequest, getMyProgressRequest } from "../../lib/metas.api";
 import { updateMyReperibilidadRequest } from "../../lib/users.api";
 
 const PENDING_HOURS_DAYS = 14;
@@ -41,6 +41,7 @@ export const ChoferDashboardPage = () => {
   const [records, setRecords] = useState(null);
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(null);
+  const [estilo, setEstilo] = useState(null);
 
   // Servicio al que se le estan cargando las horas (modal "Terminar servicio").
   const [closing, setClosing] = useState(null);
@@ -73,6 +74,10 @@ export const ChoferDashboardPage = () => {
     // La meta es un extra: si falla, el resto del dashboard se ve igual.
     getMyProgressRequest()
       .then(setProgress)
+      .catch(() => {});
+    // El estilo de manejo viene del GPS y puede tardar: va aparte para no demorar el resto de la tarjeta.
+    getMyDrivingStyleRequest()
+      .then(setEstilo)
       .catch(() => {});
   }, []);
 
@@ -161,7 +166,7 @@ export const ChoferDashboardPage = () => {
         onUpload={handleUpload}
       />
 
-      <MetaKmCard progress={progress} />
+      <RendimientoCard progress={progress} estilo={estilo} />
 
       <ResumenServiciosCard counts={myServiceCounts} />
 

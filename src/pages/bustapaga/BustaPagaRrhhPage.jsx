@@ -14,15 +14,17 @@ import {
   deleteBustaPagaRequest,
   getBustaPagaFileRequest,
   listBustasPagaRequest,
+  listDestinatariosRequest,
   uploadBustaPagaRequest,
 } from "../../lib/bustaPaga.api";
 import { MESES, openPdfFromRequest, periodoLabel } from "../../lib/bustaPaga";
 import { formatDateTime } from "../../lib/format";
-import { listUsersRequest } from "../../lib/users.api";
+import { CARGO_LABELS } from "../../lib/constants";
 
 const MONTH_OPTIONS = MESES.map((label, index) => ({ value: String(index + 1), label }));
 
-// Recursos Humanos (y el Admin): sube la busta paga de cada chofer y ve cuales ya firmaron.
+// Recursos Humanos (y el Admin): sube la busta paga de cada persona del equipo (chofer, Responsable, Recursos
+// Humanos o Admin) y ve cuales ya firmaron.
 export const BustaPagaRrhhPage = () => {
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -53,14 +55,14 @@ export const BustaPagaRrhhPage = () => {
 
   useEffect(() => {
     if (!allowed) return;
-    listUsersRequest()
-      .then((users) => setDrivers(users.filter((u) => u.cargo === "CHOFER" && u.estado === "ACTIVO")))
+    listDestinatariosRequest()
+      .then(setDrivers)
       .catch((err) => setError(parseApiError(err).message));
     loadBustas();
   }, [allowed, loadBustas]);
 
   const driverOptions = useMemo(
-    () => (drivers ?? []).map((d) => ({ value: d.id, label: `${d.nombre} ${d.apellido}` })),
+    () => (drivers ?? []).map((d) => ({ value: d.id, label: `${d.nombre} ${d.apellido} · ${CARGO_LABELS[d.cargo] ?? d.cargo}` })),
     [drivers]
   );
 
@@ -77,12 +79,12 @@ export const BustaPagaRrhhPage = () => {
     e.preventDefault();
     setError("");
     setSuccess("");
-    if (!choferId) return setError("Elige el chofer");
+    if (!choferId) return setError("Elige a quién se la envías");
     if (!archivo) return setError("Selecciona el PDF de la busta paga");
     setUploading(true);
     try {
       await uploadBustaPagaRequest({ choferId, anio: Number(anio), mes: Number(mes), archivo });
-      const name = driverOptions.find((d) => d.value === choferId)?.label ?? "el chofer";
+      const name = driverOptions.find((d) => d.value === choferId)?.label ?? "la persona";
       setSuccess(`Busta paga de ${periodoLabel(anio, Number(mes))} enviada a ${name}. Se le envió un aviso al celular.`);
       setArchivo(null);
       e.target.reset();
@@ -130,7 +132,7 @@ export const BustaPagaRrhhPage = () => {
       <div>
         <h1 className="text-[28px] font-semibold tracking-tight text-ink-50">Busta paga</h1>
         <p className="mt-1 text-[14px] text-ink-300">
-          Envía la busta paga a cada chofer. Para abrirla, el chofer tiene que firmar que la recibe y queda el comprobante.
+          Envía la busta paga a cada persona del equipo (choferes, Responsables, Recursos Humanos y Admin). Para abrirla, quien la recibe tiene que firmar y queda el comprobante.
         </p>
       </div>
 
@@ -141,8 +143,8 @@ export const BustaPagaRrhhPage = () => {
             <div className="md:col-span-2">
               <SearchableSelect
                 id="bp-chofer"
-                label="Chofer"
-                placeholder="Escribe para buscar un chofer"
+                label="Enviar a"
+                placeholder="Escribe para buscar una persona"
                 options={driverOptions}
                 value={choferId}
                 onChange={setChoferId}
@@ -173,7 +175,7 @@ export const BustaPagaRrhhPage = () => {
           {success && <Alert variant="success">{success}</Alert>}
           <div>
             <Button type="submit" loading={uploading} className="sm:w-auto sm:px-8">
-              Enviar al chofer
+              Enviar busta paga
             </Button>
           </div>
         </form>
@@ -191,9 +193,9 @@ export const BustaPagaRrhhPage = () => {
             <div className="w-64">
               <SearchableSelect
                 id="bp-filtro"
-                label="Filtrar por chofer"
-                placeholder="Todos los choferes"
-                options={[{ value: "", label: "Todos los choferes" }, ...driverOptions]}
+                label="Filtrar por persona"
+                placeholder="Todos"
+                options={[{ value: "", label: "Todos" }, ...driverOptions]}
                 value={filterChofer}
                 onChange={changeFilter}
                 maxSuggestions={8}
@@ -214,7 +216,7 @@ export const BustaPagaRrhhPage = () => {
               <div className="min-w-0">
                 <span className="block truncate text-[15px] font-medium text-ink-50">{busta.chofer}</span>
                 <span className="block text-[12px] text-ink-400">
-                  {periodoLabel(busta.anio, busta.mes)} · enviada {formatDateTime(busta.subidaAt)}
+                  {CARGO_LABELS[busta.cargo] ?? ""} · {periodoLabel(busta.anio, busta.mes)} · enviada {formatDateTime(busta.subidaAt)}
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-2">

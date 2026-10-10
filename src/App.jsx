@@ -1,10 +1,11 @@
-import { lazy, Suspense } from "react";
-import { Navigate, Outlet, Route, Routes, useLocation } from "react-router-dom";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { Navigate, Outlet, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { AppShell } from "./components/layout/AppShell";
 import { GuestRoute } from "./components/layout/GuestRoute";
 import { ProtectedRoute } from "./components/layout/ProtectedRoute";
 import { PageLoader } from "./components/ui/PageLoader";
 import { useAuth } from "./context/AuthContext";
+import { CARGO_LABELS } from "./lib/constants";
 import { DataRefreshProvider } from "./context/DataRefreshContext";
 
 // Paginas cargadas de forma perezosa (React.lazy): antes se importaban todas de
@@ -172,6 +173,41 @@ const OverlayRoutes = () => (
   </Suspense>
 );
 
+// Cuando el Admin le cambia el cargo a alguien con la app abierta, AuthContext lo detecta y la vista (menu, inicio,
+// permisos) se rearma sola. Aqui se lleva a la persona a su nueva pantalla de inicio y se le avisa.
+const RoleChangeNotice = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const lastRef = useRef({ id: null, cargo: null });
+  const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const last = lastRef.current;
+    if (user?.id && last.id === user.id && last.cargo && last.cargo !== user.cargo) {
+      navigate("/", { replace: true });
+      setNotice(`Tu cargo cambió a ${CARGO_LABELS[user.cargo] ?? user.cargo}. Ya se actualizó tu pantalla.`);
+    }
+    lastRef.current = { id: user?.id ?? null, cargo: user?.cargo ?? null };
+  }, [user?.id, user?.cargo, navigate]);
+
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(() => setNotice(""), 8000);
+    return () => window.clearTimeout(timer);
+  }, [notice]);
+
+  if (!notice) return null;
+  return (
+    <div
+      role="status"
+      className="fixed inset-x-4 top-4 z-[100] mx-auto max-w-md rounded-2xl bg-accent-500 px-4 py-3 text-center text-[14px] font-medium text-white shadow-lg"
+      onClick={() => setNotice("")}
+    >
+      {notice}
+    </div>
+  );
+};
+
 function App() {
   const location = useLocation();
   // Al navegar a un detalle/alta desde una lista (RecordsListPage/DriversPage/
@@ -184,6 +220,7 @@ function App() {
 
   return (
     <DataRefreshProvider>
+      <RoleChangeNotice />
       <Suspense fallback={<PageLoader />}>
         <Routes location={backgroundLocation ?? location}>
           <Route element={<GuestRoute />}>

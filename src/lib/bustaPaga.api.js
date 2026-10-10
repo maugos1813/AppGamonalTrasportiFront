@@ -3,6 +3,14 @@ import { api } from "./api";
 export const listBustasPagaRequest = (params) =>
   api.get("/busta-paga", { params }).then((res) => res.data.data.bustas);
 
+// Las propias (cualquier cargo recibe busta paga). Sin `propias`, la oficina y Recursos Humanos ven las de todos.
+export const listMisBustasPagaRequest = () =>
+  api.get("/busta-paga", { params: { propias: "true" } }).then((res) => res.data.data.bustas);
+
+// A quien se le puede enviar una busta paga: todos los usuarios activos, con su cargo.
+export const listDestinatariosRequest = () =>
+  api.get("/busta-paga/destinatarios").then((res) => res.data.data.usuarios);
+
 export const uploadBustaPagaRequest = ({ choferId, anio, mes, archivo }) => {
   const form = new FormData();
   form.set("choferId", choferId);

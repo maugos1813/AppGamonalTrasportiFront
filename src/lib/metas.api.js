@@ -11,6 +11,10 @@ export const setMetasConfigRequest = (metas) => api.put(`${BASE}/config`, metas)
 export const getMyProgressRequest = (month) =>
   api.get(`${BASE}/mi-progreso`, { params: { month } }).then((res) => res.data.data);
 
+// Estilo de manejo (OneSystec) de los ultimos 30 dias: { puntaje, dias, vehiculos } o null si no hay datos.
+export const getMyDrivingStyleRequest = () =>
+  api.get(`${BASE}/mi-estilo-manejo`).then((res) => res.data.data.estilo);
+
 // Oficina: { month, metas, items: [{ id, nombre, apellido, nivel, meta, km, porcentaje, ... }] }.
 export const listDriversProgressRequest = (month) =>
   api.get(`${BASE}/choferes`, { params: { month } }).then((res) => res.data.data);

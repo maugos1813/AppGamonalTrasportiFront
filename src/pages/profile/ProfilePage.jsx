@@ -760,13 +760,11 @@ export const ProfilePage = () => {
               <Section icon={ClipboardListIcon} title="Mi mes">
                 <MyMonth />
               </Section>
-
-              <MisBustaPagaCard />
             </>
           ) : isRrhh ? (
             <Section icon={ShieldIcon} title="Acceso y permisos" action={<Badge tone="success">Recursos Humanos</Badge>}>
               <ul className="flex flex-col gap-2.5 text-[14px] text-ink-50">
-                {["Choferes: datos, documentos y estado", "Vehiculos", "Carga de busta paga de cada chofer"].map((item) => (
+                {["Choferes: datos, documentos y estado", "Vehiculos", "Carga de la busta paga de todo el personal"].map((item) => (
                   <li key={item} className="flex items-center gap-2.5">
                     <CheckCircleIcon className="h-4.5 w-4.5 shrink-0 text-success-500" />
                     {item}
@@ -808,6 +806,8 @@ export const ProfilePage = () => {
               </Section>
             </>
           )}
+          {/* La busta paga la recibe todo el personal, sea cual sea su cargo */}
+          <MisBustaPagaCard />
         </div>
 
         {/* Columna 3: emergencia, documentos y acciones */}

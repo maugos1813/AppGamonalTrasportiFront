@@ -5,12 +5,12 @@ import { GlassCard } from "../ui/GlassCard";
 import { Spinner } from "../ui/Spinner";
 import { FileTextIcon } from "../ui/icons";
 import { parseApiError } from "../../lib/api";
-import { getBustaPagaFileRequest, listBustasPagaRequest } from "../../lib/bustaPaga.api";
+import { getBustaPagaFileRequest, listMisBustasPagaRequest } from "../../lib/bustaPaga.api";
 import { openPdfFromRequest, periodoLabel } from "../../lib/bustaPaga";
 import { formatDateTime } from "../../lib/format";
 import { FirmarBustaPagaModal } from "./FirmarBustaPagaModal";
 
-// Seccion "Mis busta paga" del perfil del chofer: para abrir cada una tiene que firmar primero.
+// Seccion "Mis busta paga" del perfil (la tiene todo usuario, sea cual sea su cargo): para abrir cada una tiene que firmar primero.
 export const MisBustaPagaCard = () => {
   const [bustas, setBustas] = useState(null);
   const [error, setError] = useState("");
@@ -18,7 +18,7 @@ export const MisBustaPagaCard = () => {
   const [openingId, setOpeningId] = useState(null);
 
   const load = useCallback(() => {
-    listBustasPagaRequest()
+    listMisBustasPagaRequest()
       .then(setBustas)
       .catch((err) => setError(parseApiError(err).message));
   }, []);
